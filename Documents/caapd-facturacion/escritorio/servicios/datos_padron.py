@@ -144,6 +144,62 @@ class ServicioDatosPadron(ServicioDatos):
             else:
                 self._inicializar_por_defecto()
 
+        self._asegurar_categorias_completas()
+
+    def _asegurar_categorias_completas(self) -> None:
+        """Garantiza que la configuración posea las categorías estándar completas (A, B, C) con nombres."""
+        if not hasattr(self, "config") or not isinstance(self.config, dict):
+            self.config = {}
+        cats = self.config.setdefault("categorias", {})
+        if not isinstance(cats, dict):
+            cats = {}
+            self.config["categorias"] = cats
+
+        defaults = {
+            "A": {
+                "nombre": "Doméstico / General",
+                "cargo_fijo": 1.5,
+                "tarifa_desague": 0.0,
+                "rangos": [
+                    {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
+                    {"m3_desde": 10, "m3_hasta": 20, "precio_m3": 1.5},
+                    {"m3_desde": 20, "m3_hasta": None, "precio_m3": 2.5},
+                ],
+            },
+            "B": {
+                "nombre": "Comercial",
+                "cargo_fijo": 2.5,
+                "tarifa_desague": 0.0,
+                "rangos": [
+                    {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.5},
+                    {"m3_desde": 10, "m3_hasta": 20, "precio_m3": 2.0},
+                    {"m3_desde": 20, "m3_hasta": None, "precio_m3": 3.0},
+                ],
+            },
+            "C": {
+                "nombre": "Estatal / Social",
+                "cargo_fijo": 1.5,
+                "tarifa_desague": 0.0,
+                "rangos": [
+                    {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
+                    {"m3_desde": 10, "m3_hasta": 20, "precio_m3": 1.5},
+                    {"m3_desde": 20, "m3_hasta": None, "precio_m3": 2.5},
+                ],
+            },
+        }
+
+        import copy
+        for cod, d in defaults.items():
+            if cod not in cats or not isinstance(cats[cod], dict):
+                cats[cod] = copy.deepcopy(d)
+            else:
+                if not cats[cod].get("nombre"):
+                    cats[cod]["nombre"] = d["nombre"]
+                if "cargo_fijo" not in cats[cod]:
+                    cats[cod]["cargo_fijo"] = d["cargo_fijo"]
+                if "rangos" not in cats[cod]:
+                    cats[cod]["rangos"] = copy.deepcopy(d["rangos"])
+
     def _cargar_desde_excel(self, ruta: Path) -> bool:
         """Carga config, usuarios y mes_docs desde un archivo de respaldo Excel (RESPALDO_*.xlsx)."""
         try:
@@ -157,6 +213,7 @@ class ServicioDatosPadron(ServicioDatos):
                 return False
 
             self.config = cfg
+            self._asegurar_categorias_completas()
             self.usuarios = usr
             self.mes = mes
             self.periodo = periodo
@@ -183,6 +240,7 @@ class ServicioDatosPadron(ServicioDatos):
             ],
             "categorias": {
                 "A": {
+                    "nombre": "Doméstico / General",
                     "cargo_fijo": 1.5,
                     "tarifa_desague": 0.0,
                     "rangos": [
@@ -190,7 +248,27 @@ class ServicioDatosPadron(ServicioDatos):
                         {"m3_desde": 10, "m3_hasta": 20, "precio_m3": 1.5},
                         {"m3_desde": 20, "m3_hasta": None, "precio_m3": 2.5},
                     ],
-                }
+                },
+                "B": {
+                    "nombre": "Comercial",
+                    "cargo_fijo": 2.5,
+                    "tarifa_desague": 0.0,
+                    "rangos": [
+                        {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.5},
+                        {"m3_desde": 10, "m3_hasta": 20, "precio_m3": 2.0},
+                        {"m3_desde": 20, "m3_hasta": None, "precio_m3": 3.0},
+                    ],
+                },
+                "C": {
+                    "nombre": "Estatal / Social",
+                    "cargo_fijo": 1.5,
+                    "tarifa_desague": 0.0,
+                    "rangos": [
+                        {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
+                        {"m3_desde": 10, "m3_hasta": 20, "precio_m3": 1.5},
+                        {"m3_desde": 20, "m3_hasta": None, "precio_m3": 2.5},
+                    ],
+                },
             },
         }
         self.periodo = "2026-10"
@@ -663,6 +741,7 @@ class ServicioDatosPadron(ServicioDatos):
         cfg_reciente = config_por_periodo.get(periodo_reciente, {})
         if cfg_reciente:
             self.config.update(cfg_reciente)
+        self._asegurar_categorias_completas()
 
         if "mes_actual" in self.config:
             self.config["mes_actual"]["periodo"] = periodo_reciente
@@ -1060,6 +1139,7 @@ class ServicioDatosPadron(ServicioDatos):
     # Operaciones de Configuración
     # -----------------------------------------------------------------------
     def cargar_config(self) -> Dict[str, Any]:
+        self._asegurar_categorias_completas()
         return self.config
 
     def guardar_config(self, datos: Dict[str, Any]) -> None:
@@ -1083,37 +1163,144 @@ class ServicioDatosPadron(ServicioDatos):
     def obtener_usuario(self, id_usuario: str) -> Optional[Dict[str, Any]]:
         return self.usuarios.get(id_usuario)
 
+    def _sincronizar_usuario_unitario_a_firebase(
+        self, id_usuario: str, datos_doc: Dict[str, Any], id_antiguo_borrar: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Sincroniza un único usuario hacia Firestore en la colección mes_<periodo_activo>
+        únicamente si el mes actual está en estado ABIERTO.
+        NO sube ningún campo de dinero ni pagos.
+        Retorna (exito: bool, mensaje_error: Optional[str]).
+        """
+        mes_actual = self.config.get("mes_actual", {})
+        estado = str(mes_actual.get("estado") or "").upper()
+        periodo = mes_actual.get("periodo") or self.periodo
+
+        if estado != "ABIERTO" or not periodo:
+            return True, None
+
+        if getattr(self, "es_contingencia", False):
+            return True, None
+
+        # Preparar payload limpio para Firebase (CERO dinero)
+        meds_raw = datos_doc.get("medidores") or []
+        meds_limpios = []
+        for m in meds_raw:
+            if isinstance(m, dict):
+                meds_limpios.append({
+                    "nro_medidor": str(m.get("nro_medidor") or ""),
+                    "lectura_anterior": m.get("lectura_anterior"),
+                    "lectura_actual": m.get("lectura_actual"),
+                    "fecha_lectura": m.get("fecha_lectura"),
+                    "estado_lectura": m.get("estado_lectura") or "PENDIENTE",
+                    "novedad": m.get("novedad"),
+                    "nota": m.get("nota"),
+                    "registrado_por": m.get("registrado_por"),
+                })
+            else:
+                meds_limpios.append({
+                    "nro_medidor": str(m),
+                    "lectura_anterior": None,
+                    "lectura_actual": None,
+                    "fecha_lectura": None,
+                    "estado_lectura": "PENDIENTE",
+                    "novedad": None,
+                    "nota": None,
+                    "registrado_por": None,
+                })
+
+        payload = {
+            "id_usuario": id_usuario,
+            "nro_conexion": str(datos_doc.get("nro_conexion") or ""),
+            "nombre": str(datos_doc.get("nombre") or ""),
+            "sector": str(datos_doc.get("sector") or ""),
+            "direccion": str(datos_doc.get("direccion") or ""),
+            "codigo_categoria": str(datos_doc.get("codigo_categoria") or "A"),
+            "consumo_total_m3": datos_doc.get("consumo_total_m3") or 0,
+            "historial_m3": datos_doc.get("historial_m3") or [],
+            "medidores": meds_limpios,
+        }
+
+        try:
+            import firebase_client as fb
+            db = fb.db()
+            col_ref = db.collection(f"mes_{periodo}")
+            if id_antiguo_borrar and id_antiguo_borrar != id_usuario:
+                col_ref.document(id_antiguo_borrar).delete()
+                self.ops["escrituras"] += 1
+            col_ref.document(id_usuario).set(payload, merge=True)
+            self.ops["escrituras"] += 1
+            return True, None
+        except Exception as e:
+            return False, str(e)
+
     def guardar_usuario(
-        self, id_usuario: str, datos: Dict[str, Any], agregar_al_mes: bool = False
-    ) -> None:
+        self, id_usuario: str, datos: Dict[str, Any], agregar_al_mes: bool = True
+    ) -> Tuple[bool, Optional[str]]:
         d = dict(datos)
         d["_id"] = id_usuario
+        d["id_usuario"] = id_usuario
         self.usuarios[id_usuario] = d
-        if agregar_al_mes and self.mes is not None:
+
+        # Si el mes actual está ABIERTO, se agrega automáticamente al mes activo
+        mes_actual = self.config.get("mes_actual", {})
+        esta_abierto = str(mes_actual.get("estado") or "").upper() == "ABIERTO"
+        if (agregar_al_mes or esta_abierto) and self.mes is not None:
             if id_usuario not in self.mes:
                 self.mes[id_usuario] = dict(d)
+
+        # 1. Guardar en Excel local (fuente de verdad indiscutible)
         self.guardar_en_respaldo_local()
 
-    def actualizar_usuario(self, id_usuario: str, cambios: Dict[str, Any]) -> None:
+        # 2. Sincronizar un único documento a Firebase si el mes está ABIERTO
+        exito_sync, err_sync = self._sincronizar_usuario_unitario_a_firebase(
+            id_usuario, self.mes.get(id_usuario, d)
+        )
+        return exito_sync, err_sync
+
+    def actualizar_usuario(
+        self, id_usuario: str, cambios: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
         if id_usuario in self.usuarios:
             self.usuarios[id_usuario].update(cambios)
             if id_usuario in self.mes:
                 self.mes[id_usuario].update(cambios)
             self.guardar_en_respaldo_local()
+            exito_sync, err_sync = self._sincronizar_usuario_unitario_a_firebase(
+                id_usuario, self.mes.get(id_usuario, self.usuarios[id_usuario])
+            )
+            return exito_sync, err_sync
+        return True, None
 
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
+        if id_viejo == id_nuevo:
+            raise ValueError("El nuevo ID es igual al ID actual.")
+        if id_nuevo in self.usuarios:
+            raise ValueError(f"Ya existe un usuario con el ID/DNI '{id_nuevo}'.")
         if id_viejo not in self.usuarios:
             raise ValueError(f"Usuario {id_viejo} no existe.")
+
         u = self.usuarios.pop(id_viejo)
         u["_id"] = id_nuevo
         u["id_usuario"] = id_nuevo
         self.usuarios[id_nuevo] = u
+
+        doc_mes = None
         if id_viejo in self.mes:
             m = self.mes.pop(id_viejo)
             m["_id"] = id_nuevo
             m["id_usuario"] = id_nuevo
             self.mes[id_nuevo] = m
+            doc_mes = m
+
         self.guardar_en_respaldo_local()
+
+        # Sincronizar hacia Firebase: eliminar id_viejo y escribir id_nuevo si mes está ABIERTO
+        exito_sync, err_sync = self._sincronizar_usuario_unitario_a_firebase(
+            id_nuevo, doc_mes or u, id_antiguo_borrar=id_viejo
+        )
+        u["_sync_exito"] = exito_sync
+        u["_sync_error"] = err_sync
         return u
 
     def obtener_siguiente_conexion_libre(self) -> str:

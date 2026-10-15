@@ -448,13 +448,14 @@ QComboBox QAbstractItemView {
     border-radius: 8px;
     padding: 4px;
     outline: none;
+    min-width: 240px;
 }
 
 QComboBox QAbstractItemView::item {
     background-color: #ffffff;
     color: #000000;
-    min-height: 28px;
-    padding: 6px 10px;
+    min-height: 26px;
+    padding: 6px 12px;
     border-radius: 4px;
 }
 
@@ -467,6 +468,33 @@ QComboBox QAbstractItemView::item:selected {
     background-color: #e0f2fe;
     color: #000000;
     font-weight: 500;
+}
+
+/* --- QCheckBox (Texto de alto contraste y caja clara) --- */
+QCheckBox {
+    color: #1e293b;
+    font-size: 13px;
+    font-weight: 500;
+    spacing: 8px;
+    background: transparent;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #0369a1;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #0284c7;
+    background-color: #f0f9ff;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #0369a1;
+    border-color: #0369a1;
 }
 
 /* --- QMenu y Menús Contextuales --- */

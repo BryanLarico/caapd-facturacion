@@ -287,3 +287,222 @@ def test_pagina_usuarios_interaccion_completa(qtbot, datos_usuarios_prueba):
     pagina._ejecutar_busqueda()
     assert pagina.proxy_model.rowCount() == 1
     assert "Mostrando 1 de 4 registros" in pagina.lbl_conteo_registros.text()
+
+
+def test_nuevo_usuario_mes_abierto_guarda_excel_y_sube_un_doc_firebase(tmp_path):
+    """Verifica que con mes ABIERTO se guarde en Excel y se suba un único doc a Firebase sin dinero."""
+    from unittest.mock import MagicMock, patch
+    from servicios.datos_padron import ServicioDatosPadron
+
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.es_contingencia = False
+    servicio.es_local_first = True
+    servicio.ops = {"lecturas": 0, "escrituras": 0}
+    servicio.base_dir = tmp_path
+    servicio.periodo = "2026-09"
+    servicio.config = {
+        "mes_actual": {"periodo": "2026-09", "estado": "ABIERTO"},
+        "sectores": ["CENTRO"],
+    }
+    servicio.usuarios = {}
+    servicio.mes = {}
+    servicio.guardar_en_respaldo_local = MagicMock()
+
+    mock_doc = MagicMock()
+    mock_col = MagicMock(return_value=mock_doc)
+    mock_db = MagicMock()
+    mock_db.collection.return_value.document.return_value = mock_doc
+
+    with patch("firebase_client.db", return_value=mock_db):
+        exito, err = servicio.guardar_usuario(
+            "70889911",
+            {
+                "nro_conexion": "000999",
+                "nombre": "MAMANI CHOQUE, RAUL",
+                "sector": "CENTRO",
+                "direccion": "AV PRINCIPAL 10",
+                "codigo_categoria": "A",
+                "medidores": ["554433"],
+            },
+        )
+
+    assert exito is True
+    assert err is None
+    # 1. Guardado en Excel
+    servicio.guardar_en_respaldo_local.assert_called_once()
+    assert "70889911" in servicio.usuarios
+    assert "70889911" in servicio.mes
+
+    # 2. Subido a Firebase sin campos de dinero
+    mock_db.collection.assert_called_with("mes_2026-09")
+    mock_doc.set.assert_called_once()
+    payload = mock_doc.set.call_args[0][0]
+    assert payload["id_usuario"] == "70889911"
+    assert "total_a_pagar" not in payload
+    assert "monto_pagado" not in payload
+    assert "deuda_anterior" not in payload
+
+
+def test_nuevo_usuario_mes_cerrado_no_toca_firebase(tmp_path):
+    """Verifica que con mes FACTURADO / CERRADO se guarde en Excel pero NO toque Firebase."""
+    from unittest.mock import MagicMock, patch
+    from servicios.datos_padron import ServicioDatosPadron
+
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.es_contingencia = False
+    servicio.es_local_first = True
+    servicio.ops = {"lecturas": 0, "escrituras": 0}
+    servicio.base_dir = tmp_path
+    servicio.periodo = "2026-09"
+    servicio.config = {
+        "mes_actual": {"periodo": "2026-09", "estado": "FACTURADO"},
+        "sectores": ["CENTRO"],
+    }
+    servicio.usuarios = {}
+    servicio.mes = {}
+    servicio.guardar_en_respaldo_local = MagicMock()
+
+    with patch("firebase_client.db") as mock_fb:
+        exito, err = servicio.guardar_usuario(
+            "70889922",
+            {
+                "nro_conexion": "001000",
+                "nombre": "QUISPE MAMANI, LUCIA",
+                "sector": "CENTRO",
+                "direccion": "CALLE SUR 45",
+                "codigo_categoria": "B",
+                "medidores": [],
+            },
+        )
+
+    assert exito is True
+    assert err is None
+    servicio.guardar_en_respaldo_local.assert_called_once()
+    assert "70889922" in servicio.usuarios
+    # No debe interactuar con Firebase
+    mock_fb.assert_not_called()
+
+
+def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monkeypatch):
+    """Verifica que ante falla de red se guarde en Excel y se alerte al usuario sin perder datos."""
+    from unittest.mock import MagicMock, patch
+    from servicios.datos_padron import ServicioDatosPadron
+
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.es_contingencia = False
+    servicio.es_local_first = True
+    servicio.ops = {"lecturas": 0, "escrituras": 0}
+    servicio.base_dir = tmp_path
+    servicio.periodo = "2026-09"
+    servicio.config = {
+        "mes_actual": {"periodo": "2026-09", "estado": "ABIERTO"},
+        "sectores": ["CENTRO"],
+        "categorias": {"A": {"nombre": "Doméstico"}},
+    }
+    servicio.usuarios = {}
+    servicio.mes = {}
+    servicio.guardar_en_respaldo_local = MagicMock()
+
+    avisos = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda parent, titulo, texto: avisos.append((titulo, texto)) or QMessageBox.StandardButton.Ok,
+    )
+
+    mock_doc = MagicMock()
+    mock_doc.set.side_effect = ConnectionError("Falla de conexión a internet")
+    mock_db = MagicMock()
+    mock_db.collection.return_value.document.return_value = mock_doc
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=servicio.config)
+    qtbot.addWidget(dialogo)
+
+    dialogo.campo_id.setText("71234567")
+    dialogo.campo_nombre.setText("GARCIA LOPEZ, ANA")
+
+    with patch("firebase_client.db", return_value=mock_db):
+        dialogo._guardar()
+
+    # Excel local quedó guardado con éxito
+    servicio.guardar_en_respaldo_local.assert_called_once()
+    assert "71234567" in servicio.usuarios
+
+    # Se alertó al usuario sobre la sincronización pendiente
+    assert any("Aviso de sincronización" in a[0] for a in avisos)
+    assert any("se enviará con el próximo 'Enviar mes'" in a[1] for a in avisos)
+
+
+def test_dialogo_editar_dni_sd_a_real_renombra_y_sincroniza(qtbot, tmp_path):
+    """Verifica la corrección de DNI desde el diálogo de edición: renombra en Excel y sincroniza en Firebase."""
+    from unittest.mock import MagicMock, patch
+    from servicios.datos_padron import ServicioDatosPadron
+
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.es_contingencia = False
+    servicio.es_local_first = True
+    servicio.ops = {"lecturas": 0, "escrituras": 0}
+    servicio.base_dir = tmp_path
+    servicio.periodo = "2026-09"
+    servicio.config = {
+        "mes_actual": {"periodo": "2026-09", "estado": "ABIERTO"},
+        "sectores": ["CENTRO"],
+        "categorias": {"A": {"nombre": "Doméstico"}},
+    }
+    servicio.usuarios = {
+        "SD-001": {
+            "_id": "SD-001",
+            "id_usuario": "SD-001",
+            "nro_conexion": "000010",
+            "nombre": "USUARIO SIN DNI INICIAL",
+            "sector": "CENTRO",
+            "direccion": "CALLE REAL",
+            "codigo_categoria": "A",
+            "activo": True,
+            "medidores": ["112233"],
+        }
+    }
+    servicio.mes = {
+        "SD-001": {
+            "_id": "SD-001",
+            "id_usuario": "SD-001",
+            "nro_conexion": "000010",
+            "nombre": "USUARIO SIN DNI INICIAL",
+            "sector": "CENTRO",
+            "direccion": "CALLE REAL",
+            "codigo_categoria": "A",
+            "medidores": [{"nro_medidor": "112233", "lectura_actual": None}],
+        }
+    }
+    servicio.guardar_en_respaldo_local = MagicMock()
+
+    mock_doc_viejo = MagicMock()
+    mock_doc_nuevo = MagicMock()
+
+    def doc_selector(doc_id):
+        return mock_doc_viejo if doc_id == "SD-001" else mock_doc_nuevo
+
+    mock_db = MagicMock()
+    mock_db.collection.return_value.document.side_effect = doc_selector
+
+    usuario_editar = dict(servicio.usuarios["SD-001"])
+    dialogo = DialogoUsuario(servicio_datos=servicio, usuario=usuario_editar, config=servicio.config)
+    qtbot.addWidget(dialogo)
+
+    # Reemplazar SD-001 por DNI definitivo 30771072
+    dialogo.campo_id.setText("30771072")
+    dialogo.campo_nombre.setText("QUISPE CONDORI, JUAN")
+
+    with patch("firebase_client.db", return_value=mock_db):
+        dialogo._guardar()
+
+    # Verificaciones:
+    # 1. En padrón ya no existe SD-001 y existe 30771072
+    assert "SD-001" not in servicio.usuarios
+    assert "30771072" in servicio.usuarios
+    assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
+
+    # 2. En Firebase: se eliminó SD-001 y se guardó 30771072
+    mock_doc_viejo.delete.assert_called()
+    mock_doc_nuevo.set.assert_called()
+

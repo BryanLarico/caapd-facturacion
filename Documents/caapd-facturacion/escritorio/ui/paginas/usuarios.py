@@ -76,26 +76,12 @@ class PaginaUsuarios(QWidget):
         self.indicador_carga = IndicadorCarga()
         fila_encabezado.addWidget(self.indicador_carga)
 
-        # Botones de cabecera
+        # Botón de cabecera
         self.btn_nuevo = QPushButton("➕ Nuevo Usuario")
         self.btn_nuevo.setProperty("class", "boton boton_primario")
         self.btn_nuevo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_nuevo.clicked.connect(self.abrir_modal_nuevo)
         fila_encabezado.addWidget(self.btn_nuevo)
-
-        self.btn_importar_excel = QPushButton("📥 Importar Excel")
-        self.btn_importar_excel.setProperty("class", "boton boton_secundario")
-        self.btn_importar_excel.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_importar_excel.setToolTip("Cargar lecturas o usuarios desde un archivo Excel")
-        self.btn_importar_excel.clicked.connect(self.abrir_modal_importar_excel)
-        fila_encabezado.addWidget(self.btn_importar_excel)
-
-        self.btn_actualizar = QPushButton("🔄 Actualizar")
-        self.btn_actualizar.setProperty("class", "boton boton_secundario")
-        self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_actualizar.setToolTip("Recargar padrón completo desde Firestore")
-        self.btn_actualizar.clicked.connect(self.actualizar_padron)
-        fila_encabezado.addWidget(self.btn_actualizar)
 
         layout_principal.addLayout(fila_encabezado)
 
@@ -174,23 +160,16 @@ class PaginaUsuarios(QWidget):
 
         self.tabla.selectionModel().selectionChanged.connect(self._al_cambiar_seleccion)
 
-        # Ajuste inicial de anchos de columna
+        # Ajuste inicial de anchos de columna (Responsive interactivo)
         h_header = self.tabla.horizontalHeader()
-        h_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        h_header.resizeSection(0, 85)   # Conexión
-        h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        h_header.resizeSection(1, 115)  # DNI
-        h_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(2, 230)  # Apellidos y Nombres (reducido ~40%)
-        h_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(3, 140)  # Sector
-        h_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(4, 150)  # Dirección
-        h_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Medidores (toma todo el espacio libre para no cortarse)
-        h_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        h_header.resizeSection(6, 60)   # Cat.
-        h_header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
-        h_header.resizeSection(7, 85)   # Estado
+        h_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)  # Conexión
+        h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)  # DNI
+        h_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)  # Apellidos y Nombres (Responsive)
+        h_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)  # Sector
+        h_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Dirección
+        h_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)  # Medidores (Responsive)
+        h_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)  # Cat.
+        h_header.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)  # Estado
 
         layout_principal.addWidget(self.tabla, stretch=1)
 
@@ -204,13 +183,7 @@ class PaginaUsuarios(QWidget):
         self.btn_accion_editar.clicked.connect(self._accion_editar)
         fila_acciones.addWidget(self.btn_accion_editar)
 
-        self.btn_accion_corregir = QPushButton("🆔 Corregir DNI")
-        self.btn_accion_corregir.setProperty("class", "boton boton_aviso")
-        self.btn_accion_corregir.setEnabled(False)
-        self.btn_accion_corregir.clicked.connect(self._accion_corregir_dni)
-        fila_acciones.addWidget(self.btn_accion_corregir)
-
-        self.btn_accion_estado = QPushButton("⏸️ Cambiar Estado")
+        self.btn_accion_estado = QPushButton("⏸️ Desactivar")
         self.btn_accion_estado.setProperty("class", "boton boton_secundario")
         self.btn_accion_estado.setEnabled(False)
         self.btn_accion_estado.clicked.connect(self._accion_cambiar_estado)
@@ -233,7 +206,6 @@ class PaginaUsuarios(QWidget):
     def cargar_datos_asincrono(self, forzar: bool = False) -> None:
         """Carga usuarios y configuración en segundo plano."""
         self.indicador_carga.iniciar("Cargando padrón...")
-        self.btn_actualizar.setEnabled(False)
 
         def tarea() -> Any:
             cfg = self.servicio.cargar_config()
@@ -276,13 +248,52 @@ class PaginaUsuarios(QWidget):
         self._actualizar_contadores()
         self._actualizar_conteo_visibles()
 
+        # Ajustar anchos responsivamente
+        self._ajustar_anchos_columnas()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._ajustar_anchos_columnas()
+
+    def _ajustar_anchos_columnas(self) -> None:
+        """Distribuye anchos de columna de forma responsive:
+        - Reduce el exceso en Apellidos y Nombres (~58% del espacio flexible).
+        - Otorga más espacio a Medidores (~42% del espacio flexible, mín. 180px) para evitar truncar números o listas.
+        - Asegura Sector y Dirección con ancho suficiente para lectura íntegra (mín. 175px).
+        """
+        self.tabla.setColumnWidth(0, 75)
+        self.tabla.setColumnWidth(1, 110)
+        self.tabla.setColumnWidth(6, 55)
+        self.tabla.setColumnWidth(7, 85)
+
+        w_sec = max(175, self.tabla.sizeHintForColumn(3))
+        w_dir = max(175, self.tabla.sizeHintForColumn(4))
+        self.tabla.setColumnWidth(3, w_sec)
+        self.tabla.setColumnWidth(4, w_dir)
+
+        ancho_disp = self.tabla.viewport().width()
+        if ancho_disp <= 0:
+            ancho_disp = self.tabla.width() - 25
+
+        fijas = 75 + 110 + w_sec + w_dir + 55 + 85
+        restante = ancho_disp - fijas
+
+        if restante > 390:
+            w_med = max(180, int(restante * 0.42))
+            w_nom = restante - w_med
+        else:
+            w_nom = 230
+            w_med = 180
+
+        self.tabla.setColumnWidth(2, w_nom)
+        self.tabla.setColumnWidth(5, w_med)
+
     def _al_fallar_carga(self, err_msg: str) -> None:
         self.alerta_flash.set_mensaje(f"Error al cargar usuarios: {err_msg}", "peligro")
         mostrar_dialogo_error(self, "Error al cargar padrón", err_msg)
 
     def _al_finalizar_carga(self) -> None:
         self.indicador_carga.detener()
-        self.btn_actualizar.setEnabled(True)
 
     def _actualizar_contadores(self) -> None:
         total = len(self.lista_usuarios_completa)
@@ -356,14 +367,11 @@ class PaginaUsuarios(QWidget):
             source_row = self.proxy_model.mapToSource(proxy_idx).row()
             u = self.modelo_base.obtener_usuario(source_row)
             if u:
-                es_pend = bool(u.get("es_pendiente"))
-                self.btn_accion_corregir.setEnabled(es_pend)
                 es_act = bool(u.get("activo", True))
                 self.btn_accion_estado.setEnabled(True)
                 self.btn_accion_estado.setText("⏸️ Desactivar" if es_act else "▶️ Activar")
                 return
 
-        self.btn_accion_corregir.setEnabled(False)
         self.btn_accion_estado.setEnabled(False)
 
     def _obtener_usuario_seleccionado(self) -> Optional[Dict[str, Any]]:
@@ -409,21 +417,6 @@ class PaginaUsuarios(QWidget):
         if u:
             self._abrir_modal_editar(u)
 
-    def _accion_corregir_dni(self) -> None:
-        u = self._obtener_usuario_seleccionado()
-        if not u:
-            return
-        dialogo = DialogoCorregirDni(
-            servicio_datos=self.servicio,
-            usuario=u,
-            parent=self,
-        )
-        if dialogo.exec() == DialogoCorregirDni.DialogCode.Accepted:
-            self.alerta_flash.set_mensaje(
-                f"DNI de '{u.get('nombre')}' corregido exitosamente.", "exito"
-            )
-            self.cargar_datos_asincrono(forzar=True)
-
     def _accion_cambiar_estado(self) -> None:
         u = self._obtener_usuario_seleccionado()
         if not u:
@@ -450,9 +443,3 @@ class PaginaUsuarios(QWidget):
                 self.cargar_datos_asincrono(forzar=True)
             except Exception as e:
                 mostrar_dialogo_error(self, "Error al cambiar estado", str(e))
-
-    def abrir_modal_importar_excel(self) -> None:
-        from ui.paginas.importar_mes_dialogo import DialogoImportarMesExcel
-        diag = DialogoImportarMesExcel(self.servicio, self)
-        if diag.exec() == QMessageBox.DialogCode.Accepted:
-            self.cargar_datos_asincrono(forzar=True)

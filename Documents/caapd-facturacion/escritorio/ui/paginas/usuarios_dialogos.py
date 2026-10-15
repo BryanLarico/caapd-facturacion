@@ -43,11 +43,12 @@ class DialogoUsuario(QDialog):
         self.config = config
         self.usuario = usuario
         self.es_edicion = usuario is not None
+        self.id_original = str(self.usuario.get("id_usuario") or self.usuario.get("_id") or "") if self.es_edicion else ""
 
         self.medidores_lista: List[str] = []
 
         self.setWindowTitle("Editar Usuario" if self.es_edicion else "Nuevo Usuario")
-        self.resize(540, 620)
+        self.resize(540, 560)
         self.setModal(True)
 
         self._construir_ui()
@@ -73,15 +74,13 @@ class DialogoUsuario(QDialog):
         layout_id.addWidget(lbl_id)
 
         self.campo_id = QLineEdit()
-        self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072)")
+        self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072) o SD-xxx")
         self.campo_id.setMaxLength(12)
-        if self.es_edicion:
-            self.campo_id.setReadOnly(True)
-            self.campo_id.setStyleSheet("background-color: #f1f5f9; color: #475569;")
         layout_id.addWidget(self.campo_id)
 
         if not self.es_edicion:
             self.chk_sin_dni = QCheckBox("Persona sin DNI (asignar ID provisional correlativo)")
+            self.chk_sin_dni.setStyleSheet("color: #1e293b; font-size: 13px; font-weight: 500;")
             self.chk_sin_dni.toggled.connect(self._toggle_sin_dni)
             layout_id.addWidget(self.chk_sin_dni)
 
@@ -123,11 +122,14 @@ class DialogoUsuario(QDialog):
         col_sec.addWidget(lbl_sec)
 
         self.combo_sector = QComboBox()
-        self.combo_sector.setView(QListView())
-        sectores = self.config.get("sectores", [
+        self.combo_sector.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        sec_view = QListView()
+        sec_view.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.combo_sector.setView(sec_view)
+        sectores = self.config.get("sectores") or [
             "BARRIO DE CHAUPI", "BARRIO DE PACHAYZA", "BARRIO DE LUCMANI",
             "HUAQUILLO", "CHAUPICERCA", "AYACUCHO"
-        ])
+        ]
         self.combo_sector.addItems(sectores)
         col_sec.addWidget(self.combo_sector)
         fila_sec_cat.addLayout(col_sec, stretch=1)
@@ -139,10 +141,34 @@ class DialogoUsuario(QDialog):
         col_cat.addWidget(lbl_cat)
 
         self.combo_categoria = QComboBox()
-        self.combo_categoria.setView(QListView())
-        categorias = self.config.get("categorias", {"A": {"nombre": "Doméstico"}})
-        for cod, datos in categorias.items():
-            self.combo_categoria.addItem(f"{cod} — {datos.get('nombre', '')}", cod)
+        self.combo_categoria.setMinimumWidth(180)
+        self.combo_categoria.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        cat_view = QListView()
+        cat_view.setTextElideMode(Qt.TextElideMode.ElideNone)
+        cat_view.setMinimumWidth(260)
+        self.combo_categoria.setView(cat_view)
+
+        nombres_defecto = {
+            "A": "Doméstico / General",
+            "B": "Comercial",
+            "C": "Estatal / Social",
+        }
+        categorias_raw = self.config.get("categorias") or {}
+        categorias = dict(categorias_raw) if isinstance(categorias_raw, dict) else {}
+
+        # Garantizar que las 3 categorías estándar siempre existan con nombre
+        for cod, nom_def in nombres_defecto.items():
+            if cod not in categorias or not isinstance(categorias[cod], dict):
+                categorias[cod] = {"nombre": nom_def}
+            elif not categorias[cod].get("nombre"):
+                categorias[cod]["nombre"] = nom_def
+
+        for cod, datos in sorted(categorias.items()):
+            nom = datos.get("nombre") if isinstance(datos, dict) else str(datos)
+            if not nom:
+                nom = nombres_defecto.get(cod, f"Categoría {cod}")
+            self.combo_categoria.addItem(f"{cod} — {nom}", cod)
+
         col_cat.addWidget(self.combo_categoria)
         fila_sec_cat.addLayout(col_cat, stretch=1)
 
@@ -188,22 +214,6 @@ class DialogoUsuario(QDialog):
 
         layout_principal.addLayout(col_med)
 
-        # 6. Opciones de estado
-        self.chk_activo = QCheckBox("Usuario ACTIVO en el servicio de agua")
-        self.chk_activo.setChecked(True)
-        layout_principal.addWidget(self.chk_activo)
-
-        mes_actual = self.config.get("mes_actual", {})
-        if not self.es_edicion and mes_actual.get("estado") == "ABIERTO":
-            periodo = mes_actual.get("periodo", "")
-            self.chk_agregar_al_mes = QCheckBox(
-                f"Agregar automáticamente a la lista del mes abierto ({periodo})"
-            )
-            self.chk_agregar_al_mes.setChecked(True)
-            layout_principal.addWidget(self.chk_agregar_al_mes)
-        else:
-            self.chk_agregar_al_mes = None
-
         layout_principal.addStretch(1)
 
         # Botones de pie
@@ -241,8 +251,6 @@ class DialogoUsuario(QDialog):
                 if self.combo_categoria.itemData(i) == cat:
                     self.combo_categoria.setCurrentIndex(i)
                     break
-
-            self.chk_activo.setChecked(bool(self.usuario.get("activo", True)))
 
             # Medidores
             meds = self.usuario.get("medidores") or []
@@ -318,14 +326,12 @@ class DialogoUsuario(QDialog):
         self.layout_chips.addStretch(1)
 
     def _guardar(self) -> None:
-        id_usuario = self.campo_id.text().strip()
+        nuevo_id = self.campo_id.text().strip()
         nombre = self.campo_nombre.text().strip().upper()
         conexion = self.campo_conexion.text().strip()
         sector = self.combo_sector.currentText()
         cat_data = self.combo_categoria.currentData() or "A"
         direccion = self.campo_direccion.text().strip().upper()
-        activo = self.chk_activo.isChecked()
-        agregar_al_mes = self.chk_agregar_al_mes.isChecked() if self.chk_agregar_al_mes else False
 
         # Validaciones
         if not nombre:
@@ -333,31 +339,66 @@ class DialogoUsuario(QDialog):
             self.campo_nombre.setFocus()
             return
 
+        # 1. Determinar y validar ID
+        id_final = ""
         if not self.es_edicion:
             sin_dni = getattr(self, "chk_sin_dni", None) and self.chk_sin_dni.isChecked()
-            if sin_dni or not id_usuario:
-                id_usuario = self.servicio.obtener_siguiente_id_sd()
+            if sin_dni or not nuevo_id:
+                id_final = self.servicio.obtener_siguiente_id_sd()
             else:
-                if id_usuario.isdigit() and len(id_usuario) in (7, 8):
-                    id_usuario = codigos.normalizar_dni(id_usuario)
+                if nuevo_id.isdigit() and len(nuevo_id) in (7, 8):
+                    id_final = codigos.normalizar_dni(nuevo_id)
+                elif nuevo_id.startswith("SD-") or nuevo_id.isdigit():
+                    id_final = nuevo_id
+                else:
+                    QMessageBox.warning(self, "DNI inválido", "El DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
+                    self.campo_id.setFocus()
+                    return
 
-            # Verificar si ya existe
-            if self.servicio.obtener_usuario(id_usuario) is not None:
+            if self.servicio.obtener_usuario(id_final) is not None:
                 QMessageBox.warning(
-                    self, "ID ya registrado", f"Ya existe un usuario registrado con el ID/DNI '{id_usuario}'."
+                    self, "ID ya registrado", f"Ya existe un usuario registrado con el ID/DNI '{id_final}'."
                 )
                 self.campo_id.setFocus()
                 return
+        else:
+            # Modo edición: si el usuario cambió el DNI / ID (ej. de SD-001 a DNI real)
+            id_final = self.id_original
+            if nuevo_id and nuevo_id != self.id_original:
+                if nuevo_id.isdigit() and len(nuevo_id) in (7, 8):
+                    norm_id = codigos.normalizar_dni(nuevo_id)
+                elif nuevo_id.startswith("SD-") or nuevo_id.isdigit():
+                    norm_id = nuevo_id
+                else:
+                    QMessageBox.warning(self, "DNI inválido", "El nuevo DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
+                    self.campo_id.setFocus()
+                    return
 
-        # Validar medidores únicos entre distintas personas
+                if self.servicio.obtener_usuario(norm_id) is not None:
+                    QMessageBox.warning(
+                        self, "ID ya registrado", f"Ya existe otro usuario registrado con el ID/DNI '{norm_id}'."
+                    )
+                    self.campo_id.setFocus()
+                    return
+
+                # Reasignar DNI en el padrón, mes y espejo Firebase
+                try:
+                    self.servicio.corregir_dni_usuario(self.id_original, norm_id)
+                    id_final = norm_id
+                except Exception as e:
+                    QMessageBox.critical(self, "Error al cambiar DNI", f"No se pudo reasignar el DNI:\n{e}")
+                    return
+
+        # 2. Validar medidores únicos entre distintas personas
         valido, err_msg = self.servicio.validar_medidores_unicos(
-            self.medidores_lista, id_usuario_actual=id_usuario if self.es_edicion else None
+            self.medidores_lista, id_usuario_actual=id_final
         )
         if not valido:
             QMessageBox.critical(self, "Medidor duplicado", err_msg or "Medidor ya asignado a otra persona.")
             return
 
         con_norm = codigos.normalizar_conexion(conexion) if conexion else self.servicio.obtener_siguiente_conexion_libre()
+        activo_final = self.usuario.get("activo", True) if self.es_edicion else True
 
         datos_guardar = {
             "nro_conexion": con_norm,
@@ -365,12 +406,30 @@ class DialogoUsuario(QDialog):
             "sector": sector,
             "direccion": direccion,
             "codigo_categoria": cat_data,
-            "activo": activo,
+            "activo": activo_final,
             "medidores": list(self.medidores_lista),
         }
 
         try:
-            self.servicio.guardar_usuario(id_usuario, datos_guardar, agregar_al_mes=agregar_al_mes)
+            exito_sync = True
+            err_sync = None
+            if not self.es_edicion:
+                res = self.servicio.guardar_usuario(id_final, datos_guardar, agregar_al_mes=True)
+            else:
+                res = self.servicio.actualizar_usuario(id_final, datos_guardar)
+
+            if isinstance(res, tuple):
+                exito_sync, err_sync = res
+            elif isinstance(res, dict):
+                exito_sync = res.get("_sync_exito", True)
+                err_sync = res.get("_sync_error")
+
+            if not exito_sync and err_sync:
+                QMessageBox.warning(
+                    self,
+                    "Aviso de sincronización",
+                    "Guardado en el padrón. No se pudo enviar a Firebase; se enviará con el próximo 'Enviar mes'."
+                )
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el usuario:\n{e}")
