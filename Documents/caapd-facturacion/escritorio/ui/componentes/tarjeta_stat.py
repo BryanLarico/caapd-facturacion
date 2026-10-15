@@ -34,17 +34,17 @@ class TarjetaStat(QFrame):
 
         # Configuración de sombra suave (exclusivo para tarjetas de inicio)
         sombra = QGraphicsDropShadowEffect(self)
-        sombra.setBlurRadius(16)
-        sombra.setOffset(0, 4)
-        sombra.setColor(QColor(0, 0, 0, 28))
+        sombra.setBlurRadius(10)
+        sombra.setOffset(0, 2)
+        sombra.setColor(QColor(0, 0, 0, 24))
         self.setGraphicsEffect(sombra)
 
-        # Altura fija equilibrada para evitar que se estiren en pantallas grandes
-        self.setFixedHeight(100)
+        # Altura fija equilibrada y compacta para encajar perfectamente en pantalla
+        self.setFixedHeight(72)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(2)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(1)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Número grande

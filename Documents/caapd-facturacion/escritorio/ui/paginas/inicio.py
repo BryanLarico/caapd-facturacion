@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFrame,
     QGraphicsDropShadowEffect,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -62,8 +63,8 @@ class PaginaInicio(QWidget):
         contenedor = QWidget()
         contenedor.setMaximumWidth(1260)
         self.layout_contenido = QVBoxLayout(contenedor)
-        self.layout_contenido.setContentsMargins(28, 20, 28, 20)
-        self.layout_contenido.setSpacing(16)
+        self.layout_contenido.setContentsMargins(24, 12, 24, 12)
+        self.layout_contenido.setSpacing(10)
 
         scroll_wrapper_layout.addStretch(1)
         scroll_wrapper_layout.addWidget(contenedor, stretch=10)
@@ -72,7 +73,7 @@ class PaginaInicio(QWidget):
         # --- 1. Encabezado ---
         fila_encabezado = QHBoxLayout()
         col_titulos = QVBoxLayout()
-        col_titulos.setSpacing(4)
+        col_titulos.setSpacing(2)
 
         lbl_titulo = QLabel("Panel de control")
         lbl_titulo.setObjectName("encabezado_titulo")
@@ -107,12 +108,12 @@ class PaginaInicio(QWidget):
         self.widget_mes_contenedor = QWidget()
         self.layout_mes = QVBoxLayout(self.widget_mes_contenedor)
         self.layout_mes.setContentsMargins(0, 0, 0, 0)
-        self.layout_mes.setSpacing(10)
+        self.layout_mes.setSpacing(8)
         self.layout_contenido.addWidget(self.widget_mes_contenedor)
 
         # --- 4. Tarjetas de Estadísticas (Generados, Pagados, Pendientes) ---
         self.fila_stats = QHBoxLayout()
-        self.fila_stats.setSpacing(18)
+        self.fila_stats.setSpacing(12)
 
         self.card_generados = TarjetaStat(numero=0, label="Recibos generados", variante="azul")
         self.card_pagados = TarjetaStat(numero=0, label="Pagados", variante="verde")
@@ -128,17 +129,18 @@ class PaginaInicio(QWidget):
         self.card_sectores = QFrame()
         self.card_sectores.setProperty("class", "tarjeta")
         self.layout_card_sectores = QVBoxLayout(self.card_sectores)
-        self.layout_card_sectores.setContentsMargins(18, 18, 18, 18)
-        self.layout_card_sectores.setSpacing(12)
+        self.layout_card_sectores.setContentsMargins(16, 10, 16, 10)
+        self.layout_card_sectores.setSpacing(6)
 
         lbl_titulo_sectores = QLabel("📊 Avance de lecturas por sector")
         lbl_titulo_sectores.setObjectName("tarjeta_titulo")
         self.layout_card_sectores.addWidget(lbl_titulo_sectores)
 
         self.contenedor_filas_sectores = QWidget()
-        self.layout_filas_sectores = QVBoxLayout(self.contenedor_filas_sectores)
+        self.layout_filas_sectores = QGridLayout(self.contenedor_filas_sectores)
         self.layout_filas_sectores.setContentsMargins(0, 0, 0, 0)
-        self.layout_filas_sectores.setSpacing(4)
+        self.layout_filas_sectores.setHorizontalSpacing(20)
+        self.layout_filas_sectores.setVerticalSpacing(2)
         self.layout_card_sectores.addWidget(self.contenedor_filas_sectores)
 
         self.layout_contenido.addWidget(self.card_sectores)
@@ -169,7 +171,7 @@ class PaginaInicio(QWidget):
         """Actualiza la pantalla desde el padrón local, sube a Firebase o descarga de lectores móviles."""
         if getattr(self.servicio, "es_local_first", False):
             from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
-            dlg = DialogoActualizarBaseDatos(self)
+            dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
 
@@ -184,7 +186,7 @@ class PaginaInicio(QWidget):
                 return
 
             elif dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE:
-                self.indicador_carga.iniciar("Subiendo bases a Firebase...")
+                self.indicador_carga.iniciar("Enviando mes a lectores...")
                 self.btn_actualizar.setEnabled(False)
 
                 def progreso_callback(pct, txt):
@@ -192,19 +194,19 @@ class PaginaInicio(QWidget):
                         ventana.mostrar_progreso(pct, txt)
 
                 def tarea_subir():
-                    return self.servicio.reescribir_a_firebase(callback_progreso=progreso_callback)
+                    return self.servicio.enviar_mes_a_lectores(callback_progreso=progreso_callback)
 
                 def al_terminar_subida(res):
                     if hasattr(ventana, "ocultar_progreso"):
-                        ventana.ocultar_progreso("¡Bases sincronizadas con Firebase!")
+                        ventana.ocultar_progreso("¡Mes enviado a los lectores!")
                     self.cargar_datos_asincrono(limpiar_cache=True)
                     QMessageBox.information(
                         self,
-                        "Sincronización Completada",
-                        f"Se subieron a Firebase:\n\n"
-                        f"• {res.get('usuarios', 0)} usuarios en la colección 'usuarios'.\n"
-                        f"• {len(res.get('meses', []))} colecciones mensuales.\n"
-                        f"• {res.get('operaciones_escritura', 0)} operaciones de escritura totales.",
+                        "Envío a Lectores Completado",
+                        f"¡Mes {res.get('periodo', '')} enviado exitosamente a Firebase!\n\n"
+                        f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote.\n"
+                        f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
+                        f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
                     )
 
                 worker = Worker(tarea_subir)
@@ -214,16 +216,36 @@ class PaginaInicio(QWidget):
                 return
 
             elif dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE:
-                self.indicador_carga.iniciar("Sincronizando con Firebase...")
+                self.indicador_carga.iniciar("Descargando lecturas de lectores...")
                 self.btn_actualizar.setEnabled(False)
 
+                def progreso_callback(pct, txt):
+                    if hasattr(ventana, "mostrar_progreso"):
+                        ventana.mostrar_progreso(pct, txt)
+
                 def tarea_sync():
-                    return self.servicio.sincronizar_desde_firebase()
+                    return self.servicio.traer_lecturas_de_lectores(callback_progreso=progreso_callback)
 
                 def al_terminar_descarga(res):
                     if hasattr(ventana, "ocultar_progreso"):
                         ventana.ocultar_progreso("¡Lecturas descargadas!")
                     self.cargar_datos_asincrono(limpiar_cache=True)
+
+                    conflictos = res.get("conflictos_admin") or []
+                    info_extra = ""
+                    if conflictos:
+                        info_extra = (
+                            f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                            + "\n".join(f"  • {c['nombre']} (Medidor {c['nro_medidor']}): ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)" for c in conflictos[:5])
+                        )
+                    QMessageBox.information(
+                        self,
+                        "Descarga de Lecturas Completada",
+                        f"¡Descarga finalizada con éxito!\n\n"
+                        f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
+                        f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+                        f"{info_extra}",
+                    )
 
                 worker = Worker(tarea_sync)
                 worker.signals.resultado.connect(al_terminar_descarga)
@@ -268,17 +290,17 @@ class PaginaInicio(QWidget):
 
             # Sombra suave exclusiva en banner
             sombra_banner = QGraphicsDropShadowEffect(banner)
-            sombra_banner.setBlurRadius(18)
-            sombra_banner.setOffset(0, 4)
-            sombra_banner.setColor(QColor(3, 105, 161, 45))
+            sombra_banner.setBlurRadius(10)
+            sombra_banner.setOffset(0, 2)
+            sombra_banner.setColor(QColor(3, 105, 161, 40))
             banner.setGraphicsEffect(sombra_banner)
 
             banner_layout = QHBoxLayout(banner)
-            banner_layout.setContentsMargins(20, 16, 20, 16)
-            banner_layout.setSpacing(16)
+            banner_layout.setContentsMargins(16, 10, 16, 10)
+            banner_layout.setSpacing(12)
 
             info_layout = QVBoxLayout()
-            info_layout.setSpacing(4)
+            info_layout.setSpacing(2)
 
             periodo_formateado = periodo.replace("-", "/")
             lbl_periodo = QLabel(periodo_formateado)
@@ -299,7 +321,7 @@ class PaginaInicio(QWidget):
 
             # Botones según la tabla de CONTEXTO §3b
             botones_layout = QHBoxLayout()
-            botones_layout.setSpacing(10)
+            botones_layout.setSpacing(8)
 
             if estado == "ABIERTO":
                 btn1 = QPushButton("📊 Ir a Lecturas")
@@ -381,23 +403,30 @@ class PaginaInicio(QWidget):
         self.card_pagados.set_valor(stats_recibos.get("pagados", 0))
         self.card_pendientes.set_valor(stats_recibos.get("pendientes", 0))
 
-        # 3. Renderizar Avance por Sectores
+        # 3. Renderizar Avance por Sectores (distribuido en 2 columnas para pantalla compacta)
         self._limpiar_layout(self.layout_filas_sectores)
         if stats_sectores:
-            for s in stats_sectores:
+            num_sectores = len(stats_sectores)
+            columnas = 2 if num_sectores > 3 else 1
+            for idx, s in enumerate(stats_sectores):
                 fila_sector = BarraProgresoSector(
                     sector=s.get("sector", ""),
                     total=s.get("total", 0),
                     leidos=s.get("leidos", 0),
                 )
-                self.layout_filas_sectores.addWidget(fila_sector)
+                if columnas == 2:
+                    fila = idx // 2
+                    col = idx % 2
+                    self.layout_filas_sectores.addWidget(fila_sector, fila, col)
+                else:
+                    self.layout_filas_sectores.addWidget(fila_sector, idx, 0)
         else:
             lbl_vacio = QLabel("Sin datos — Abre un mes para ver el avance de lecturas.")
             lbl_vacio.setStyleSheet("color: #64748b; font-style: italic; padding: 12px 0;")
             lbl_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout_filas_sectores.addWidget(lbl_vacio)
+            self.layout_filas_sectores.addWidget(lbl_vacio, 0, 0, 1, 2)
 
-    def _limpiar_layout(self, layout: QVBoxLayout) -> None:
+    def _limpiar_layout(self, layout: Any) -> None:
         """Remueve y elimina todos los widgets hijos de un layout."""
         while layout.count():
             item = layout.takeAt(0)

@@ -492,7 +492,7 @@ class PaginaCobros(QWidget):
         """Actualiza desde el padrón local, sube a Firebase o descarga de lectores móviles."""
         if getattr(self.servicio, "es_local_first", False):
             from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
-            dlg = DialogoActualizarBaseDatos(self)
+            dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
 
@@ -507,7 +507,7 @@ class PaginaCobros(QWidget):
                 return
 
             elif dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE:
-                self.indicador.iniciar("Subiendo bases a Firebase...")
+                self.indicador.iniciar("Enviando mes a lectores...")
                 self.btn_actualizar.setEnabled(False)
 
                 def progreso_callback(pct, txt):
@@ -515,19 +515,19 @@ class PaginaCobros(QWidget):
                         ventana.mostrar_progreso(pct, txt)
 
                 def tarea_subir():
-                    return self.servicio.reescribir_a_firebase(callback_progreso=progreso_callback)
+                    return self.servicio.enviar_mes_a_lectores(callback_progreso=progreso_callback)
 
                 def al_terminar_subida(res):
                     if hasattr(ventana, "ocultar_progreso"):
-                        ventana.ocultar_progreso("¡Bases sincronizadas con Firebase!")
+                        ventana.ocultar_progreso("¡Mes enviado a los lectores!")
                     self.cargar_datos_asincrono(forzar=True)
                     QMessageBox.information(
                         self,
-                        "Sincronización Completada",
-                        f"Se subieron a Firebase:\n\n"
-                        f"• {res.get('usuarios', 0)} usuarios en la colección 'usuarios'.\n"
-                        f"• {len(res.get('meses', []))} colecciones mensuales.\n"
-                        f"• {res.get('operaciones_escritura', 0)} operaciones de escritura totales.",
+                        "Envío a Lectores Completado",
+                        f"¡Mes {res.get('periodo', '')} enviado exitosamente a Firebase!\n\n"
+                        f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote.\n"
+                        f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
+                        f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
                     )
 
                 worker = Worker(tarea_subir)
@@ -537,16 +537,36 @@ class PaginaCobros(QWidget):
                 return
 
             elif dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE:
-                self.indicador.iniciar("Sincronizando con Firebase...")
+                self.indicador.iniciar("Descargando lecturas de lectores...")
                 self.btn_actualizar.setEnabled(False)
 
+                def progreso_callback(pct, txt):
+                    if hasattr(ventana, "mostrar_progreso"):
+                        ventana.mostrar_progreso(pct, txt)
+
                 def tarea_sync():
-                    return self.servicio.sincronizar_desde_firebase()
+                    return self.servicio.traer_lecturas_de_lectores(callback_progreso=progreso_callback)
 
                 def al_terminar_descarga(res):
                     if hasattr(ventana, "ocultar_progreso"):
                         ventana.ocultar_progreso("¡Lecturas descargadas!")
                     self.cargar_datos_asincrono(forzar=True)
+
+                    conflictos = res.get("conflictos_admin") or []
+                    info_extra = ""
+                    if conflictos:
+                        info_extra = (
+                            f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                            + "\n".join(f"  • {c['nombre']} (Medidor {c['nro_medidor']}): ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)" for c in conflictos[:5])
+                        )
+                    QMessageBox.information(
+                        self,
+                        "Descarga de Lecturas Completada",
+                        f"¡Descarga finalizada con éxito!\n\n"
+                        f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
+                        f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+                        f"{info_extra}",
+                    )
 
                 worker = Worker(tarea_sync)
                 worker.signals.resultado.connect(al_terminar_descarga)

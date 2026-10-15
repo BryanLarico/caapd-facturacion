@@ -7,7 +7,7 @@ banners de modo contingencia y cola offline, botones de respaldo y control de ci
 import os
 from typing import Dict, Optional
 
-from PySide6.QtCore import QThreadPool, QTimer, Qt
+from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
 
 import respaldo
 import rutas
-from servicios import cola_offline
 from servicios.datos import ServicioDatos
 from servicios.metricas_monitoring import consultar_metricas_hoy
 from ui.hilos import Worker, mostrar_dialogo_error
@@ -55,18 +54,16 @@ class VentanaPrincipal(QMainWindow):
         self.setMinimumSize(960, 600)
 
         self.botones_nav: Dict[str, QPushButton] = {}
+        self._verificando_archivos: bool = False
 
         self._construir_ui()
         self.actualizar_barra_estado()
 
-        # Temporizador para verificar y sincronizar cola offline cada 60s
-        self.timer_cola = QTimer(self)
-        self.timer_cola.setInterval(60000)
-        self.timer_cola.timeout.connect(self._verificar_y_sincronizar_cola)
-        self.timer_cola.start()
-
-        # Actualizar visibilidad inicial de banners
-        self._actualizar_banner_cola()
+        # Temporizador para verificar cambios externos en los archivos Excel cada 15s
+        self.timer_archivos = QTimer(self)
+        self.timer_archivos.setInterval(15000)
+        self.timer_archivos.timeout.connect(self._verificar_archivos_externos)
+        self.timer_archivos.start()
 
     def _construir_ui(self) -> None:
         widget_central = QWidget()
@@ -92,15 +89,11 @@ class VentanaPrincipal(QMainWindow):
         nav_superior = self._crear_barra_superior()
         layout_principal.addWidget(nav_superior)
 
-        # 2. Banners de Estado (Contingencia y Cola Offline)
+        # 2. Banner de Estado Contingencia
         self.banner_contingencia = self._crear_banner_contingencia()
         layout_principal.addWidget(self.banner_contingencia)
         if not getattr(self.servicio, "es_contingencia", False):
             self.banner_contingencia.hide()
-
-        self.banner_cola = self._crear_banner_cola()
-        layout_principal.addWidget(self.banner_cola)
-        self.banner_cola.hide()
 
         # 3. Contenedor de Páginas (QStackedWidget)
         self.stacked_widget = QStackedWidget()
@@ -150,36 +143,7 @@ class VentanaPrincipal(QMainWindow):
         lay.addStretch(1)
         return banner
 
-    def _crear_banner_cola(self) -> QFrame:
-        banner = QFrame()
-        banner.setStyleSheet("""
-            QFrame {
-                background-color: #ffedd5;
-                border-bottom: 1px solid #fed7aa;
-                padding: 4px 16px;
-            }
-        """)
-        lay = QHBoxLayout(banner)
-        lay.setContentsMargins(16, 4, 16, 4)
-        self.lbl_cola_texto = QLabel("⚠️ Hay 0 cambio(s) pendiente(s) de sincronizar con el servidor.")
-        self.lbl_cola_texto.setStyleSheet("color: #9a3412; font-size: 13px; font-weight: 500;")
-        lay.addWidget(self.lbl_cola_texto)
 
-        self.btn_sinc_cola = QPushButton("🔄 Sincronizar ahora")
-        self.btn_sinc_cola.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_sinc_cola.setStyleSheet("""
-            QPushButton {
-                background-color: #ea580c; color: #ffffff;
-                font-weight: bold; font-size: 11px;
-                padding: 4px 10px; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #c2410c; }
-            QPushButton:disabled { background-color: #94a3b8; color: #f1f5f9; }
-        """)
-        self.btn_sinc_cola.clicked.connect(self._accion_sincronizar_manual)
-        lay.addWidget(self.btn_sinc_cola)
-        lay.addStretch(1)
-        return banner
 
     def _crear_barra_superior(self) -> QFrame:
         nav = QFrame()
@@ -385,103 +349,46 @@ class VentanaPrincipal(QMainWindow):
         else:
             self.lbl_ultimo_respaldo.setText("Último respaldo: Pendiente")
 
-    def _actualizar_banner_cola(self) -> None:
-        n_pend = cola_offline.cantidad_pendientes()
-        if n_pend > 0:
-            self.lbl_cola_texto.setText(f"⚠️ Hay {n_pend} cambio(s) pendiente(s) de sincronizar con el servidor.")
-            self.banner_cola.show()
-        else:
-            self.banner_cola.hide()
-
-    def _accion_sincronizar_manual(self) -> None:
-        """Disparado cuando el usuario hace clic en el botón 'Sincronizar ahora'."""
-        self._sincronizar_cola_servidor(manual=True)
-
-    def _verificar_y_sincronizar_cola(self) -> None:
-        """Disparado periódicamente por el temporizador cada 60s."""
-        self._sincronizar_cola_servidor(manual=False)
-
-    def _sincronizar_cola_servidor(self, manual: bool = False) -> None:
-        n_pend = cola_offline.cantidad_pendientes()
-        if n_pend == 0:
-            self._actualizar_banner_cola()
-            if manual:
-                QMessageBox.information(
-                    self,
-                    "Sincronización al Día",
-                    "No hay cambios pendientes de sincronizar con el servidor.",
-                )
+    def _verificar_archivos_externos(self) -> None:
+        """Comprueba si algún archivo en 'Base de datos/' fue modificado externamente."""
+        if getattr(self, "_verificando_archivos", False):
             return
+        if hasattr(self.servicio, "verificar_cambios_externos"):
+            hay_cambios, modificados = self.servicio.verificar_cambios_externos()
+            if hay_cambios:
+                self._verificando_archivos = True
+                self.timer_archivos.stop()
+                arch_str = ", ".join(modificados[:3])
 
-        # En modo contingencia forzado (offline absoluto) no se conecta a Firebase
-        if getattr(self.servicio, "es_contingencia", False):
-            self._actualizar_banner_cola()
-            if manual:
-                QMessageBox.warning(
-                    self,
-                    "Modo Contingencia",
-                    "La aplicación se inició en Modo Contingencia (sin conexión a Firebase).\n\n"
-                    "Para sincronizar con la nube, inicie la aplicación normalmente con conexión a internet.",
+                # Reconocer cambios inmediatamente para evitar cualquier reaparición en bucle
+                if hasattr(self.servicio, "reconocer_cambios_externos"):
+                    self.servicio.reconocer_cambios_externos()
+
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Icon.Question)
+                msg.setWindowTitle("Archivos Modificados Externamente")
+                msg.setText("<b>Se detectaron cambios en los archivos de 'Base de datos':</b>")
+                msg.setInformativeText(
+                    f"Uno o más archivos fueron modificados externamente:\n\n"
+                    f"  • {arch_str}\n\n"
+                    f"¿Deseas recargar la base de datos en pantalla ahora?"
                 )
-            return
+                btn_si = msg.addButton("Sí", QMessageBox.ButtonRole.YesRole)
+                btn_no = msg.addButton("No", QMessageBox.ButtonRole.NoRole)
+                msg.setDefaultButton(btn_si)
+                msg.exec()
 
-        if manual:
-            if hasattr(self, "btn_sinc_cola"):
-                self.btn_sinc_cola.setEnabled(False)
-            self.mostrar_progreso(25, f"Sincronizando {n_pend} cambio(s) con Firebase...")
+                if msg.clickedButton() == btn_si:
+                    if hasattr(self.servicio, "cargar_desde_carpeta_base_datos"):
+                        self.servicio.cargar_desde_carpeta_base_datos()
+                        if hasattr(self.servicio, "reconocer_cambios_externos"):
+                            self.servicio.reconocer_cambios_externos()
+                        idx = self.stacked_widget.currentIndex()
+                        if 0 <= idx < len(self.PAGINAS):
+                            self.navegar_a(self.PAGINAS[idx])
 
-        def tarea_sinc():
-            from servicios.datos import ServicioDatosFirebase
-            servicio_remoto = ServicioDatosFirebase()
-            return cola_offline.sincronizar_cola(servicio_remoto)
-
-        def al_terminar(res):
-            if hasattr(self, "btn_sinc_cola"):
-                self.btn_sinc_cola.setEnabled(True)
-            self._actualizar_banner_cola()
-            self.actualizar_barra_estado()
-
-            enviados = res.get("enviados", 0)
-            fallidos = res.get("fallidos", 0)
-            pendientes = res.get("pendientes", 0)
-
-            if manual:
-                if fallidos == 0 and enviados > 0:
-                    self.ocultar_progreso(f"¡{enviados} cambio(s) sincronizados!")
-                    QMessageBox.information(
-                        self,
-                        "Sincronización Exitosa",
-                        f"¡Sincronización completada!\n\n"
-                        f"Se enviaron {enviados} cambio(s) a Firebase Firestore correctamente.\n"
-                        f"La nube y los datos locales están ahora al día.",
-                    )
-                elif fallidos > 0:
-                    self.ocultar_progreso("Aviso en sincronización")
-                    QMessageBox.warning(
-                        self,
-                        "Aviso de Sincronización",
-                        f"Se enviaron {enviados} cambio(s), pero {fallidos} cambio(s) no se pudieron sincronizar.\n"
-                        f"Quedan {pendientes} cambio(s) en cola.\n\n"
-                        f"Revisa tu conexión a internet e inténtalo de nuevo.",
-                    )
-                else:
-                    self.ocultar_progreso()
-            else:
-                if enviados > 0:
-                    self.ocultar_progreso(f"¡{enviados} cambio(s) sincronizados en segundo plano!")
-
-        def al_fallar(err):
-            if hasattr(self, "btn_sinc_cola"):
-                self.btn_sinc_cola.setEnabled(True)
-            self.ocultar_progreso()
-            self._actualizar_banner_cola()
-            if manual:
-                mostrar_dialogo_error(self, "Error al sincronizar con Firebase", str(err))
-
-        worker = Worker(tarea_sinc)
-        worker.signals.resultado.connect(al_terminar)
-        worker.signals.error.connect(al_fallar)
-        QThreadPool.globalInstance().start(worker)
+                self._verificando_archivos = False
+                self.timer_archivos.start()
 
     def _accion_respaldar_ahora(self) -> None:
         ruta = respaldo.ejecutar_respaldo_ahora()
@@ -535,36 +442,10 @@ class VentanaPrincipal(QMainWindow):
         self.lbl_estado_progreso.setText("")
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Control de cierre seguro: advierte de cambios offline y genera respaldo final."""
-        n_pend = cola_offline.cantidad_pendientes()
-        if n_pend > 0:
-            resp = QMessageBox.question(
-                self,
-                "Cambios Pendientes sin Sincronizar",
-                f"Hay {n_pend} cambio(s) pendiente(s) de sincronizar con el servidor.\n"
-                f"Estos cambios se conservarán en disco para cuando se restablezca la conexión.\n\n"
-                f"¿Está seguro de cerrar el programa ahora?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if resp != QMessageBox.StandardButton.Yes:
-                event.ignore()
-                return
-
-        # Detener temporizadores activos
+        """Control de cierre inmediato y seguro: detiene temporizadores y sale sin demoras."""
+        self._verificando_archivos = True
         try:
-            self.timer_cola.stop()
+            self.timer_archivos.stop()
         except Exception:
             pass
-
-        # Generar respaldo de salida con aviso (solo para servicios reales)
-        if not getattr(self.servicio, "es_memoria", False):
-            try:
-                cfg = self.servicio.cargar_config()
-                usr = self.servicio.cargar_usuarios()
-                mes = getattr(self.servicio, "mes", {})
-                respaldo.ejecutar_respaldo_ahora(config=cfg, usuarios=usr, mes_docs=mes)
-            except Exception:
-                pass
-
         event.accept()

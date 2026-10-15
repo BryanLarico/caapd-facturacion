@@ -31,23 +31,25 @@ class BarraProgresoSector(QFrame):
         self.setProperty("class", "sector_fila")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(16)
+        layout.setContentsMargins(8, 3, 8, 3)
+        layout.setSpacing(10)
 
         # Nombre del sector
         self.lbl_sector = QLabel(sector)
         self.lbl_sector.setObjectName("sector_nombre")
+        self.lbl_sector.setStyleSheet("font-size: 13px; font-weight: 500;")
         layout.addWidget(self.lbl_sector, stretch=1)
 
         # Contenedor derecho: Texto y barra
         der_layout = QVBoxLayout()
         der_layout.setContentsMargins(0, 0, 0, 0)
-        der_layout.setSpacing(4)
+        der_layout.setSpacing(2)
 
         # Texto con avance y check
         check_str = " ✅" if (leidos == total and total > 0) else ""
         self.lbl_avance = QLabel(f"{leidos} de {total}{check_str}")
         self.lbl_avance.setObjectName("sector_progreso_txt")
+        self.lbl_avance.setStyleSheet("font-size: 11px;")
         self.lbl_avance.setAlignment(Qt.AlignmentFlag.AlignRight)
         der_layout.addWidget(self.lbl_avance)
 
@@ -57,7 +59,8 @@ class BarraProgresoSector(QFrame):
         self.barra.setRange(0, 100)
         self.barra.setValue(pct)
         self.barra.setTextVisible(False)
-        self.barra.setFixedWidth(200)
+        self.barra.setFixedHeight(8)
+        self.barra.setFixedWidth(140)
 
         if pct == 100 and total > 0:
             self.barra.setProperty("completo", "true")

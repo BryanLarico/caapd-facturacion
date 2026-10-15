@@ -608,7 +608,7 @@ def leer_respaldo_excel(ruta_archivo: Path | str) -> Dict[str, Any]:
                     "deuda_anterior": deuda_ant,
                     "deuda_actual": deuda_act,
                     "total_a_pagar": tot_pagar,
-                    "meses_adeudados": int(meses_val if meses_val is not None else 1),
+                    "meses_adeudados": 0 if pago_txt == "SI" else int(meses_val if meses_val is not None else 1),
                     "monto_pagado": m_pagado,
                     "pago": pago_txt,
                     "fecha_pago": str(f_pag_val).strip() if f_pag_val else None,
