@@ -240,6 +240,109 @@ def test_abrir_mes_crea_documentos_para_usuarios_activos(servicio_mock):
     assert doc_juan["consumo_total_m3"] is None
 
 
+def test_abrir_mes_copia_datos_relevantes_del_mes_anterior(servicio_mock):
+    servicio_mock.config["mes_actual"] = {
+        "periodo": "2026-09",
+        "estado": "FACTURADO",
+    }
+    servicio_mock.periodo = "2026-09"
+    documento_anterior = {
+        "70112233": {
+            "nro_conexion": "000001",
+            "nombre": "NOMBRE ANTERIOR",
+            "sector": "SECTOR ANTERIOR",
+            "direccion": "DIRECCION ANTERIOR",
+            "codigo_categoria": "B",
+            "medidores": [{
+                "nro_medidor": "001001",
+                "lectura_anterior": 100,
+                "lectura_actual": 120,
+                "fecha_anterior": "2026-08-25",
+                "fecha_lectura": "2026-09-25",
+                "consumo": 20,
+                "estado_lectura": "LEIDO",
+                "novedad": "NORMAL",
+                "nota": "Nota de septiembre",
+                "registrado_por": "lector@example.com",
+            }],
+            "consumo_total_m3": 20,
+            "historial_m3": [1, 2, 3, 4],
+            "total_a_pagar": 100,
+            "monto_pagado": 25,
+            "meses_adeudados": 2,
+            "nro_recibo": "000123",
+        }
+    }
+    servicio_mock.mes = documento_anterior
+    servicio_mock.meses_encontrados = {"2026-09": documento_anterior}
+
+    servicio_mock.abrir_mes("2026-10", "2026-10-01", "2026-10-15")
+
+    nuevo = servicio_mock.mes["70112233"]
+    medidor = nuevo["medidores"][0]
+    assert medidor["lectura_anterior"] == 120
+    assert medidor["fecha_anterior"] == "2026-09-25"
+    assert medidor["consumo_anterior"] == 20
+    assert medidor["lectura_actual"] is None
+    assert medidor["estado_lectura"] == "PENDIENTE"
+    assert medidor["nota"] == ""
+    assert medidor["registrado_por"] is None
+    assert nuevo["nombre"] == "JUAN PEREZ QUISPE"
+    assert nuevo["historial_m3"] == [1, 2, 3, 4, 20]
+    assert nuevo["deuda_anterior"] == 75
+    assert nuevo["meses_adeudados"] == 3
+    assert nuevo["nro_recibo"] is None
+    assert nuevo["total_a_pagar"] is None
+    assert nuevo["monto_pagado"] == 0
+
+
+def test_abrir_mes_padron_copia_lectura_y_saldo_del_mes_anterior(monkeypatch):
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    anterior = {
+        "70112233": {
+            "medidores": [{
+                "nro_medidor": "001001",
+                "lectura_anterior": 100,
+                "lectura_actual": 120,
+                "fecha_lectura": "2026-09-25",
+                "estado_lectura": "LEIDO",
+            }],
+            "consumo_total_m3": 20,
+            "historial_m3": [1, 2, 3, 4],
+            "total_a_pagar": 100,
+            "monto_pagado": 100,
+            "meses_adeudados": 1,
+        }
+    }
+    servicio.config = {"mes_actual": {"periodo": "2026-09", "estado": "FACTURADO"}}
+    servicio.periodo = "2026-09"
+    servicio.usuarios = {
+        "70112233": {
+            "nro_conexion": "000001",
+            "nombre": "JUAN PEREZ",
+            "sector": "BARRIO DE CHAUPI",
+            "direccion": "CALLE REAL",
+            "codigo_categoria": "A",
+            "activo": True,
+            "medidores": ["001001"],
+        }
+    }
+    servicio.mes = anterior
+    servicio.meses_encontrados = {"2026-09": anterior}
+    monkeypatch.setattr(servicio, "guardar_en_respaldo_local", lambda: None)
+
+    resultado = servicio.abrir_mes("2026-10", "2026-10-01", "2026-10-15")
+
+    assert resultado["usuarios_creados"] == 1
+    nuevo = servicio.mes["70112233"]
+    assert nuevo["medidores"][0]["lectura_anterior"] == 120
+    assert nuevo["medidores"][0]["fecha_anterior"] == "2026-09-25"
+    assert nuevo["medidores"][0]["consumo_anterior"] == 20
+    assert nuevo["historial_m3"] == [1, 2, 3, 4, 20]
+    assert nuevo["deuda_anterior"] == 0
+    assert nuevo["meses_adeudados"] == 1
+
+
 def test_guardar_lectura_medidor_y_recalcular_consumo(servicio_mock):
     servicio_mock.abrir_mes("2026-10", "2026-10-10", "2026-10-25", {"001001": 50})
     
@@ -474,6 +577,92 @@ def test_dialogo_abrir_mes_ui(qtbot, servicio_mock):
     diag.input_periodo.setText("2026-08")
     assert diag.btn_abrir.isEnabled() is False
     assert not diag.lbl_alerta_periodo.isHidden()
+
+
+def test_dialogo_abrir_mes_muestra_carga_y_no_se_cierra_antes_de_terminar(
+    qtbot, servicio_mock, monkeypatch
+):
+    workers = []
+    diag = DialogoAbrirMes(servicio_mock)
+    qtbot.addWidget(diag)
+    diag.show()
+    diag.thread_pool = type("PoolCapturador", (), {
+        "start": lambda self, worker: workers.append(worker)
+    })()
+
+    diag._ejecutar_apertura()
+
+    assert len(workers) == 1
+    assert not diag.indicador.isHidden()
+    assert not diag.btn_abrir.isEnabled()
+    assert not diag.btn_cancelar.isEnabled()
+    assert diag.isVisible()
+
+    workers[0].run()
+
+    assert diag.result() == QMessageBox.DialogCode.Accepted
+    assert diag.indicador.isHidden()
+
+
+def test_dialogo_abrir_mes_mantiene_dialogo_y_restaura_controles_si_falla(
+    qtbot, servicio_mock, monkeypatch
+):
+    workers = []
+    errores = []
+    diag = DialogoAbrirMes(servicio_mock)
+    qtbot.addWidget(diag)
+    diag.show()
+    diag.thread_pool = type("PoolCapturador", (), {
+        "start": lambda self, worker: workers.append(worker)
+    })()
+    monkeypatch.setattr(
+        "ui.paginas.mes_dialogo.mostrar_dialogo_error",
+        lambda *args: errores.append(args[-1]),
+    )
+    monkeypatch.setattr(
+        servicio_mock, "abrir_mes",
+        lambda **kwargs: (_ for _ in ()).throw(OSError("No se pudo guardar el Excel")),
+    )
+
+    diag._ejecutar_apertura()
+    assert not diag.indicador.isHidden()
+    workers[0].run()
+
+    assert diag.isVisible()
+    assert diag.btn_abrir.isEnabled()
+    assert diag.btn_cancelar.isEnabled()
+    assert diag.panel_form.isEnabled()
+    assert diag.indicador.isHidden()
+    assert errores == ["No se pudo guardar el Excel"]
+
+
+def test_abrir_mes_refresca_lecturas_sin_abrir_dialogo_actualizar(
+    qtbot, servicio_mock, monkeypatch
+):
+    pagina = PaginaLecturas(servicio_mock)
+    qtbot.addWidget(pagina)
+    refrescos = []
+
+    class DialogoAceptado:
+        def __init__(self, servicio, parent):
+            pass
+
+        def exec(self):
+            return QMessageBox.DialogCode.Accepted
+
+    monkeypatch.setattr("ui.paginas.lecturas.DialogoAbrirMes", DialogoAceptado)
+    monkeypatch.setattr(
+        pagina, "cargar_datos_asincrono",
+        lambda **kwargs: refrescos.append(kwargs),
+    )
+    monkeypatch.setattr(
+        pagina, "actualizar_datos",
+        lambda: pytest.fail("No debe abrir el diálogo de sincronización"),
+    )
+
+    pagina._abrir_modal_mes()
+
+    assert refrescos == [{"forzar": True}]
 
 
 def test_dialogo_sugiere_mes_actual_si_la_ultima_base_es_antigua(

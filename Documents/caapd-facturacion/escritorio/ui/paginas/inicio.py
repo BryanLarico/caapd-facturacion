@@ -5,7 +5,7 @@ Réplica exacta del panel HTML con carga asíncrona, banner de estado según
 CONTEXTO §3b, métricas destacadas y avance de lecturas por sector.
 """
 from typing import Any, Dict, List, Optional
-from PySide6.QtCore import QThreadPool, Qt, Signal
+from PySide6.QtCore import QThreadPool, Qt, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
@@ -26,7 +26,7 @@ from ui.componentes.alerta import AlertaWidget
 from ui.componentes.barra_progreso_sector import BarraProgresoSector
 from ui.componentes.indicador_carga import IndicadorCarga
 from ui.componentes.tarjeta_stat import TarjetaStat
-from ui.hilos import Worker, mostrar_dialogo_error
+from ui.hilos import Worker, mostrar_dialogo_error, mostrar_dialogo_info
 
 
 class PaginaInicio(QWidget):
@@ -169,96 +169,117 @@ class PaginaInicio(QWidget):
 
     def actualizar_datos(self) -> None:
         """Actualiza la pantalla desde el padrón local, sube a Firebase o descarga de lectores móviles."""
-        if getattr(self.servicio, "es_local_first", False):
-            from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
-            dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return
+        if not getattr(self.servicio, "es_local_first", False):
+            self.cargar_datos_asincrono(limpiar_cache=True)
+            return
 
-            ventana = self.window()
+        from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
+        dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
 
-            if dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_LOCAL:
-                if hasattr(ventana, "mostrar_progreso"):
-                    ventana.mostrar_progreso(50, "Recargando padrón local...")
-                self.cargar_datos_asincrono(limpiar_cache=True)
-                if hasattr(ventana, "ocultar_progreso"):
-                    ventana.ocultar_progreso("¡Padrón local recargado!")
-                return
+        accion = dlg.resultado_accion
+        if accion == DialogoActualizarBaseDatos.ACCION_LOCAL:
+            # Relectura real de los Excel del disco (pesada) -> en segundo plano, sin diálogo modal encima.
+            self.cargar_datos_asincrono(limpiar_cache=True)
+        elif accion == DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE:
+            self._lanzar_sincronizacion(
+                "Enviando mes a lectores...",
+                self.servicio.enviar_mes_a_lectores,
+                self._al_terminar_subida,
+            )
+        elif accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE:
+            self._lanzar_sincronizacion(
+                "Descargando lecturas de lectores...",
+                self.servicio.traer_lecturas_de_lectores,
+                self._al_terminar_descarga,
+            )
 
-            elif dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE:
-                self.indicador_carga.iniciar("Enviando mes a lectores...")
-                self.btn_actualizar.setEnabled(False)
+    # ------------------------------------------------------------------
+    # Sincronización con Firebase (un solo Worker, slots reales de QObject)
+    # ------------------------------------------------------------------
+    def _lanzar_sincronizacion(self, texto: str, funcion_servicio: Any, slot_exito: Any) -> None:
+        ventana = self.window()
+        self.indicador_carga.iniciar(texto)
+        self.btn_actualizar.setEnabled(False)
+        if hasattr(ventana, "set_sincronizando"):
+            ventana.set_sincronizando(True)  # pausa la vigilancia de archivos externos
 
-                def progreso_callback(pct, txt):
-                    if hasattr(ventana, "mostrar_progreso"):
-                        ventana.mostrar_progreso(pct, txt)
+        def progreso_callback(pct: int, txt: str) -> None:
+            if hasattr(ventana, "mostrar_progreso"):
+                ventana.mostrar_progreso(pct, txt)
 
-                def tarea_subir():
-                    return self.servicio.enviar_mes_a_lectores(callback_progreso=progreso_callback)
+        worker = Worker(funcion_servicio, callback_progreso=progreso_callback)
+        # Conexiones EN COLA explícitas a métodos de este QWidget: siempre corren en el hilo GUI.
+        worker.signals.resultado.connect(slot_exito, Qt.ConnectionType.QueuedConnection)
+        worker.signals.error.connect(self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
+        self.thread_pool.start(worker)
 
-                def al_terminar_subida(res):
-                    if hasattr(ventana, "ocultar_progreso"):
-                        ventana.ocultar_progreso("¡Mes enviado a los lectores!")
-                    self.cargar_datos_asincrono(limpiar_cache=True)
-                    periodos = res.get("periodos_subidos") or [res.get("periodo", "")]
-                    por_periodo = res.get("subidos_por_periodo") or {}
-                    detalle_meses = "\n".join(
-                        f"    - Mes {per}: {por_periodo.get(per, 0)} usuarios" for per in periodos
-                    )
-                    QMessageBox.information(
-                        self,
-                        "Envío a Lectores Completado",
-                        f"¡{len(periodos)} mes(es) enviados exitosamente a Firebase ({', '.join(periodos)})!\n\n"
-                        f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote:\n{detalle_meses}\n"
-                        f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
-                        f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
-                    )
+    def _terminar_sincronizacion(self, texto_final: str) -> None:
+        ventana = self.window()
+        if hasattr(ventana, "ocultar_progreso"):
+            ventana.ocultar_progreso(texto_final)
+        if hasattr(ventana, "set_sincronizando"):
+            ventana.set_sincronizando(False)
+        self.indicador_carga.detener()
+        self.btn_actualizar.setEnabled(True)
 
-                worker = Worker(tarea_subir)
-                worker.signals.resultado.connect(al_terminar_subida)
-                worker.signals.error.connect(self._al_fallar_carga)
-                self.thread_pool.start(worker)
-                return
+    @Slot(object)
+    def _al_terminar_subida(self, res: Any) -> None:
+        self._terminar_sincronizacion("¡Mes enviado a los lectores!")
+        res = res or {}
+        periodos = res.get("periodos_subidos") or [res.get("periodo", "")]
+        por_periodo = res.get("subidos_por_periodo") or {}
+        detalle_meses = "\n".join(
+            f"    - Mes {per}: {por_periodo.get(per, 0)} usuarios" for per in periodos
+        )
+        # 1) Primero el diálogo (sin ningún trabajo pesado corriendo detrás)
+        mostrar_dialogo_info(
+            self,
+            "Envío a Lectores Completado",
+            f"¡{len(periodos)} mes(es) enviados exitosamente a Firebase!\n"
+            f"Meses: {', '.join(periodos)}\n\n"
+            f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote:\n{detalle_meses}\n"
+            f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
+            f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
+        )
+        # 2) Después, refrescar estadísticas desde la MEMORIA (el servicio ya guardó el Excel).
+        #    limpiar_cache=False: NO se vuelven a leer todos los Excel del disco.
+        self.cargar_datos_asincrono(limpiar_cache=False)
 
-            elif dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE:
-                self.indicador_carga.iniciar("Descargando lecturas de lectores...")
-                self.btn_actualizar.setEnabled(False)
+    @Slot(object)
+    def _al_terminar_descarga(self, res: Any) -> None:
+        self._terminar_sincronizacion("¡Lecturas descargadas!")
+        res = res or {}
+        conflictos = res.get("conflictos_admin") or []
+        info_extra = ""
+        if conflictos:
+            info_extra = (
+                f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                + "\n".join(
+                    f"  • {c['nombre']} (Medidor {c['nro_medidor']}): "
+                    f"ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)"
+                    for c in conflictos[:5]
+                )
+            )
+        mostrar_dialogo_info(
+            self,
+            "Descarga de Lecturas Completada",
+            f"¡Descarga finalizada con éxito!\n\n"
+            f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
+            f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+            f"{info_extra}",
+        )
+        self.cargar_datos_asincrono(limpiar_cache=False)
 
-                def progreso_callback(pct, txt):
-                    if hasattr(ventana, "mostrar_progreso"):
-                        ventana.mostrar_progreso(pct, txt)
-
-                def tarea_sync():
-                    return self.servicio.traer_lecturas_de_lectores(callback_progreso=progreso_callback)
-
-                def al_terminar_descarga(res):
-                    if hasattr(ventana, "ocultar_progreso"):
-                        ventana.ocultar_progreso("¡Lecturas descargadas!")
-                    self.cargar_datos_asincrono(limpiar_cache=True)
-
-                    conflictos = res.get("conflictos_admin") or []
-                    info_extra = ""
-                    if conflictos:
-                        info_extra = (
-                            f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
-                            + "\n".join(f"  • {c['nombre']} (Medidor {c['nro_medidor']}): ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)" for c in conflictos[:5])
-                        )
-                    QMessageBox.information(
-                        self,
-                        "Descarga de Lecturas Completada",
-                        f"¡Descarga finalizada con éxito!\n\n"
-                        f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
-                        f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
-                        f"{info_extra}",
-                    )
-
-                worker = Worker(tarea_sync)
-                worker.signals.resultado.connect(al_terminar_descarga)
-                worker.signals.error.connect(self._al_fallar_carga)
-                self.thread_pool.start(worker)
-                return
-
-        self.cargar_datos_asincrono(limpiar_cache=True)
+    @Slot(str)
+    def _al_fallar_sincronizacion(self, err_msg: str) -> None:
+        self._terminar_sincronizacion("")
+        mostrar_dialogo_error(
+            self,
+            "Error de sincronización con Firebase",
+            f"No se pudo completar la operación:\n\n{err_msg}",
+        )
 
     def _al_recibir_datos(self, resultado: Any) -> None:
         config, stats_sectores, stats_recibos = resultado

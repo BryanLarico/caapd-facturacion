@@ -320,6 +320,62 @@ def test_accion_a_detecta_y_borra_sobrantes_en_paralelo(servicio_prueba):
     assert "DOC_USR" in borrados
 
 
+def test_publicar_mes_actual_solo_crea_mes_nuevo_y_preserva_periodos(servicio_prueba):
+    mock_db = MagicMock()
+    batch = MagicMock()
+    mock_db.batch.return_value = batch
+
+    col_mes = MagicMock()
+    config_ref = MagicMock()
+    config_snapshot = MagicMock()
+    config_snapshot.to_dict.return_value = {
+        "mes_actual": {"periodo": "2026-08", "estado": "CERRADO"},
+        "periodos_disponibles": ["2026-07", "2026-08"],
+        "sectores": ["AYACUCHO"],
+    }
+    config_ref.get.return_value = config_snapshot
+
+    def obtener_coleccion(nombre):
+        if nombre == "mes_2026-09":
+            return col_mes
+        if nombre == "config":
+            config_collection = MagicMock()
+            config_collection.document.return_value = config_ref
+            return config_collection
+        pytest.fail(f"No debía acceder a la colección {nombre}")
+
+    mock_db.collection.side_effect = obtener_coleccion
+
+    with patch("firebase_client.db", return_value=mock_db):
+        resultado = servicio_prueba.publicar_mes_actual_a_lectores()
+
+    assert resultado["exito"] is True
+    assert resultado["periodo"] == "2026-09"
+    assert resultado["usuarios_subidos"] == len(servicio_prueba.mes)
+    assert batch.create.call_count == len(servicio_prueba.mes)
+    assert batch.set.call_args.args[0] is config_ref
+    datos_config = batch.set.call_args.args[1]
+    assert datos_config["mes_actual"]["periodo"] == "2026-09"
+    assert datos_config["periodos_disponibles"] == ["2026-07", "2026-08", "2026-09"]
+    batch.commit.assert_called_once()
+    mock_db.collections.assert_not_called()
+    batch.delete.assert_not_called()
+
+
+def test_publicar_mes_actual_se_detiene_si_ya_hay_documentos(servicio_prueba):
+    mock_db = MagicMock()
+    col_mes = MagicMock()
+    col_mes.list_documents.return_value = [MagicMock()]
+    mock_db.collection.return_value = col_mes
+
+    with patch("firebase_client.db", return_value=mock_db):
+        with pytest.raises(ValueError, match="ya contiene documentos"):
+            servicio_prueba.publicar_mes_actual_a_lectores()
+
+    mock_db.batch.assert_not_called()
+    mock_db.collections.assert_not_called()
+
+
 def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
     """Acción B: Descarga lecturas de lectores móviles y recalcula consumo."""
     mock_db = MagicMock()
@@ -343,15 +399,25 @@ def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
             }
         ],
     }
-    col_mes.stream.return_value = [doc_cloud]
+    def stream_documentos(timeout):
+        assert timeout == 60
+        yield doc_cloud
+        assert servicio_prueba.mes["30770229"]["medidores"][0]["lectura_actual"] == 975
 
+    consulta = col_mes.select.return_value
+    consulta.stream.side_effect = stream_documentos
+
+    progresos = []
     with patch("firebase_client.db", return_value=mock_db), \
          patch.object(servicio_prueba, "guardar_en_respaldo_local", return_value=None), \
          patch.object(servicio_prueba, "guardar_config", return_value=None):
 
-        res = servicio_prueba.traer_lecturas_de_lectores()
+        res = servicio_prueba.traer_lecturas_de_lectores(
+            callback_progreso=lambda pct, texto: progresos.append((pct, texto))
+        )
 
     assert res["exito"] is True
+    assert res["documentos_descargados"] == 1
     assert res["actualizados"] == 1
     assert len(res["conflictos_admin"]) == 0
 
@@ -362,6 +428,10 @@ def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
     assert servicio_prueba.mes["30770229"]["consumo_total_m3"] == 21
     assert m_local["registrado_por"] == "lector@ispacas.pe"
     assert servicio_prueba.config.get("ultima_descarga_lectores") is not None
+    col_mes.select.assert_called_once_with(["medidores", "nombre"])
+    consulta.stream.assert_called_once_with(timeout=60)
+    assert any("1 documentos recibidos" in texto for _, texto in progresos)
+    assert progresos[-1][0] == 100
 
 
 def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
@@ -385,7 +455,7 @@ def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
             }
         ],
     }
-    col_mes.stream.return_value = [doc_cloud]
+    col_mes.select.return_value.stream.return_value = [doc_cloud]
 
     with patch("firebase_client.db", return_value=mock_db), \
          patch.object(servicio_prueba, "guardar_en_respaldo_local", return_value=None), \
@@ -441,6 +511,13 @@ def test_dialogo_confirmacion_requiere_escribir_confirmar(qapp, tmp_path):
         assert dlg2.btn_si.isEnabled()
         dlg2._confirmar_accion()
         assert dlg2.resultado_accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE
+
+        dlg3 = DialogoActualizarBaseDatos()
+        dlg3._mostrar_confirmacion(DialogoActualizarBaseDatos.ACCION_PUBLICAR_MES_ACTUAL)
+        assert dlg3.pila.currentIndex() == 1
+        assert dlg3.btn_si.isEnabled()
+        dlg3._confirmar_accion()
+        assert dlg3.resultado_accion == DialogoActualizarBaseDatos.ACCION_PUBLICAR_MES_ACTUAL
 
 
 def test_verificar_cambios_externos(servicio_prueba):

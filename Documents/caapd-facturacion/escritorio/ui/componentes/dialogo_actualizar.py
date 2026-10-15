@@ -4,10 +4,11 @@ ui/componentes/dialogo_actualizar.py — Centro de Sincronización con Lectores 
 Flujo en DOS pasos dentro del mismo diálogo:
   Paso 1 · Elegir acción:
       - "Sobreescribe Nube"  → Enviar mes a los lectores (Excel ➔ Nube).
+      - "Solo agrega"        → Publicar únicamente el mes activo (Excel ➔ Nube).
       - "Descarga Espejo"    → Traer lecturas de los lectores (Nube ➔ Excel).
   Paso 2 · Pregunta "¿Está seguro?" con la explicación de lo que hace cada botón:
       - Sobreescribe Nube: exige escribir la palabra CONFIRMAR (Regla 5a) antes de habilitar el botón.
-      - Descarga Espejo:   basta con pulsar "Sí, traer lecturas".
+      - Solo agrega y Descarga Espejo: basta con confirmar; no reemplazan documentos existentes.
 """
 from __future__ import annotations
 import os
@@ -35,6 +36,7 @@ class DialogoActualizarBaseDatos(QDialog):
 
     ACCION_LOCAL = "local"
     ACCION_SUBIR_FIREBASE = "subir_firebase"
+    ACCION_PUBLICAR_MES_ACTUAL = "publicar_mes_actual"
     ACCION_DESCARGAR_FIREBASE = "descargar_firebase"
     ACCION_CANCELAR = "cancelar"
 
@@ -61,6 +63,25 @@ class DialogoActualizarBaseDatos(QDialog):
             "aviso": "Esto BORRARÁ todo lo que hay en Firebase y lo reemplazará con tus Excel actuales. "
                      "Las lecturas que los lectores hayan registrado y que aún NO hayas descargado se perderán.",
             "boton": "Sí, enviar a la nube",
+        },
+        ACCION_PUBLICAR_MES_ACTUAL: {
+            "icono": "📤",
+            "titulo": "Publicar solo el mes actual",
+            "direccion": "Excel ➔ Nube",
+            "badge": "Solo agrega",
+            "color": "#15803d",
+            "color_hover": "#166534",
+            "fondo": "#f0fdf4",
+            "borde": "#bbf7d0",
+            "texto": "#166534",
+            "resumen": "Publica el padrón local activo para que los lectores puedan comenzar el nuevo mes, sin limpiar otros meses.",
+            "hace": [
+                "Publica únicamente los usuarios y medidores del mes activo en su colección `mes_aaaa-mm`.",
+                "Actualiza `config/general` para que la app de los lectores abra ese periodo, conservando los periodos ya disponibles.",
+                "No modifica ni elimina colecciones de otros meses. Si la colección actual ya tiene documentos, se detiene sin sobrescribirlos.",
+            ],
+            "aviso": "Operación de solo creación. Si el periodo ya está publicado en Firebase, se cancelará para evitar reemplazar lecturas.",
+            "boton": "Sí, publicar solo este mes",
         },
         ACCION_DESCARGAR_FIREBASE: {
             "icono": "📥",
@@ -278,6 +299,7 @@ class DialogoActualizarBaseDatos(QDialog):
         lay.addWidget(lbl_elige)
 
         lay.addWidget(self._crear_tarjeta_accion(self.ACCION_SUBIR_FIREBASE))
+        lay.addWidget(self._crear_tarjeta_accion(self.ACCION_PUBLICAR_MES_ACTUAL))
         lay.addWidget(self._crear_tarjeta_accion(self.ACCION_DESCARGAR_FIREBASE))
 
         lbl_tip = QLabel(
@@ -481,10 +503,14 @@ class DialogoActualizarBaseDatos(QDialog):
         lay_d = QVBoxLayout(panel_dif)
         lay_d.setContentsMargins(14, 10, 14, 10)
         lay_d.setSpacing(6)
-        lbl_d_tit = QLabel("RECUERDA LA DIFERENCIA ENTRE LOS DOS BOTONES")
+        lbl_d_tit = QLabel("RECUERDA LA DIFERENCIA ENTRE LAS TRES ACCIONES")
         lbl_d_tit.setObjectName("panelTitulo")
         lay_d.addWidget(lbl_d_tit)
-        for accion in (self.ACCION_SUBIR_FIREBASE, self.ACCION_DESCARGAR_FIREBASE):
+        for accion in (
+            self.ACCION_SUBIR_FIREBASE,
+            self.ACCION_PUBLICAR_MES_ACTUAL,
+            self.ACCION_DESCARGAR_FIREBASE,
+        ):
             info = self.INFO_ACCIONES[accion]
             lbl = QLabel(
                 f"{info['icono']}&nbsp; <b style='color:{info['texto']};'>{info['badge']}</b> "
@@ -520,7 +546,10 @@ class DialogoActualizarBaseDatos(QDialog):
     # ------------------------------------------------------------------ #
     def _mostrar_confirmacion(self, accion: str) -> None:
         """Muestra la pregunta '¿Está seguro?' para la acción elegida."""
-        if accion == self.ACCION_SUBIR_FIREBASE and self._hay_archivo_de_prueba():
+        if accion in (
+            self.ACCION_SUBIR_FIREBASE,
+            self.ACCION_PUBLICAR_MES_ACTUAL,
+        ) and self._hay_archivo_de_prueba():
             self._avisar_archivo_de_prueba()
             return
 
@@ -579,6 +608,8 @@ class DialogoActualizarBaseDatos(QDialog):
     def _confirmar_accion(self) -> None:
         if self.accion_pendiente == self.ACCION_SUBIR_FIREBASE:
             self._elegir_subir()
+        elif self.accion_pendiente == self.ACCION_PUBLICAR_MES_ACTUAL:
+            self._elegir_publicar_mes_actual()
         elif self.accion_pendiente == self.ACCION_DESCARGAR_FIREBASE:
             self._elegir_descargar()
 
@@ -604,6 +635,10 @@ class DialogoActualizarBaseDatos(QDialog):
 
     def _elegir_descargar(self) -> None:
         self.resultado_accion = self.ACCION_DESCARGAR_FIREBASE
+        self.accept()
+
+    def _elegir_publicar_mes_actual(self) -> None:
+        self.resultado_accion = self.ACCION_PUBLICAR_MES_ACTUAL
         self.accept()
 
     # ------------------------------------------------------------------ #

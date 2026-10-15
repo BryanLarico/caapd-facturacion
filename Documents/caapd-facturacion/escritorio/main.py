@@ -6,6 +6,10 @@ Inicia la aplicación PySide6, aplica fuentes y tema QSS, y abre la ventana prin
 from pathlib import Path
 import faulthandler
 import sys
+import warnings
+
+# Silenciar el aviso de Google sobre Python 3.10 (no es un error; solo ruido en consola)
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
 
 # Configuración inicial de rutas
 import rutas
@@ -13,6 +17,7 @@ import rutas
 from PySide6.QtGui import QFont, QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication
 
+from ui.hilos import esperar_hilos
 from ui.ventana_principal import VentanaPrincipal
 
 
@@ -83,6 +88,9 @@ def main() -> None:
 
     # Carga de datos asíncrona de Inicio (la ventana se muestra inmediatamente)
     ventana.pagina_inicio.cargar_datos_asincrono()
+
+    # Antes de destruir QApplication, esperar a los Workers del pool (cierre limpio).
+    app.aboutToQuit.connect(lambda: esperar_hilos(5000))
 
     sys.exit(app.exec())
 

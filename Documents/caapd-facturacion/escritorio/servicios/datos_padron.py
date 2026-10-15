@@ -19,7 +19,9 @@ import respaldo_excel
 import rutas
 from servicios.datos import (
     ServicioDatos,
+    construir_documentos_mes,
     obtener_periodo_actual,
+    obtener_mes_anterior,
     siguiente_periodo,
     todas_lecturas_completas,
 )
@@ -110,6 +112,102 @@ def buscar_archivo_padron_mes() -> Optional[Path]:
         padrones.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return padrones[0]
     return None
+
+
+def fusionar_lecturas_nube(
+    docs_nube: Dict[str, Dict[str, Any]],
+    mes_local: Dict[str, Dict[str, Any]],
+) -> Tuple[int, List[Dict[str, Any]]]:
+    """Incorpora al padrón local las lecturas ya descargadas de la nube.
+
+    No toca la red: recibe los documentos en memoria. Conserva la lectura de ADMIN
+    cuando la nube trae un valor distinto y reporta ese conflicto. Recalcula el
+    consumo de cada medidor y el consumo total del usuario.
+
+    Devuelve (lecturas_actualizadas, conflictos_admin).
+    """
+    actualizados = 0
+    conflictos_admin: List[Dict[str, Any]] = []
+
+    for uid, datos_cloud in (docs_nube or {}).items():
+        doc_local = (mes_local or {}).get(uid)
+        if not doc_local:
+            continue
+
+        datos_cloud = datos_cloud or {}
+        meds_cloud = datos_cloud.get("medidores") or []
+        meds_local = doc_local.get("medidores") or []
+        modificado_usuario = False
+
+        for mc in meds_cloud:
+            if not isinstance(mc, dict):
+                continue
+            nro = str(mc.get("nro_medidor") or "")
+            ml = next((m for m in meds_local if str(m.get("nro_medidor") or "") == nro), None)
+            if not ml and len(meds_local) == 1:
+                ml = meds_local[0]
+            if not ml:
+                continue
+
+            lec_cloud = mc.get("lectura_actual")
+            if lec_cloud is None:
+                continue
+
+            # Protección ADMIN: si ya hay lectura de ADMIN, verificar conflicto.
+            reg_por = str(ml.get("registrado_por") or "").upper()
+            lec_local = ml.get("lectura_actual")
+            if reg_por == "ADMIN" and lec_local is not None:
+                try:
+                    if int(lec_local) != int(lec_cloud):
+                        conflictos_admin.append({
+                            "id_usuario": uid,
+                            "nombre": doc_local.get("nombre", ""),
+                            "nro_medidor": nro,
+                            "lectura_admin": lec_local,
+                            "lectura_cloud": lec_cloud,
+                            "registrado_por_cloud": mc.get("registrado_por") or "Lector",
+                        })
+                        continue
+                except Exception:
+                    pass
+
+            # Asignar la lectura tomada por el lector.
+            try:
+                ml["lectura_actual"] = int(lec_cloud)
+            except Exception:
+                ml["lectura_actual"] = lec_cloud
+            ml["estado_lectura"] = mc.get("estado_lectura", "LEIDO")
+            ml["novedad"] = mc.get("novedad", "NORMAL")
+            ml["nota"] = mc.get("nota", "")
+            ml["fecha_lectura"] = mc.get("fecha_lectura") or datetime.date.today().isoformat()
+            ml["registrado_por"] = mc.get("registrado_por") or "LECTOR"
+            actualizados += 1
+            modificado_usuario = True
+
+        # Recalcular el consumo del usuario.
+        if modificado_usuario or any(m.get("lectura_actual") is not None for m in meds_local):
+            consumo_total = 0
+            for m in meds_local:
+                ant = m.get("lectura_anterior")
+                act = m.get("lectura_actual")
+                nov = str(m.get("novedad") or "").upper()
+                if act is not None and ant is not None:
+                    try:
+                        act_i = int(act)
+                        ant_i = int(ant)
+                        if nov == "CAMBIO_MEDIDOR":
+                            c = act_i
+                        elif act_i >= ant_i:
+                            c = act_i - ant_i
+                        else:
+                            c = 0
+                    except Exception:
+                        c = 0
+                    m["consumo_m3"] = c
+                    consumo_total += c
+            doc_local["consumo_total_m3"] = consumo_total
+
+    return actualizados, conflictos_admin
 
 
 class ServicioDatosPadron(ServicioDatos):
@@ -442,12 +540,12 @@ class ServicioDatosPadron(ServicioDatos):
                 self.mes) > 0 else "ABIERTO"
 
     def guardar_en_respaldo_local(self, periodo: Optional[str] = None) -> Path:
-        """Guarda el padrón del mes en Base de datos/ para conservarlo y sincronizarlo."""
+        """Guarda el estado actual como padrón Excel en Base de datos/."""
         p_obj = periodo or self.periodo or self.config.get(
             "mes_actual", {}).get("periodo") or "2026-10"
 
         destino = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
-        respaldo_excel.generar_respaldo_excel(
+        resultado = respaldo_excel.generar_respaldo_excel(
             config=self.config,
             usuarios=self.usuarios,
             mes_docs=self.mes,
@@ -457,7 +555,7 @@ class ServicioDatosPadron(ServicioDatos):
         self.ruta_excel = destino
         if destino.exists():
             self._archivos_mtime[str(destino)] = destino.stat().st_mtime
-        return destino
+        return resultado
 
     def _extraer_datos_archivo_excel(self, ruta: Path) -> Dict[str, Any]:
         """Extrae usuarios y documentos del mes desde cualquier archivo de respaldo o padrón Excel."""
@@ -976,26 +1074,50 @@ class ServicioDatosPadron(ServicioDatos):
         if callback_progreso:
             callback_progreso(70, "Buscando documentos obsoletos en Firebase (list_documents)...")
 
-        refs_sobrantes = []
+        colecciones_a_revisar = []
 
         # a) Sobrantes dentro de cada colección vigente (usuarios que ya no están en el Excel de ese mes)
         for per in periodos:
             uids_locales = set(docs_por_periodo[per].keys())
-            try:
-                for doc_ref in db.collection(f"mes_{per}").list_documents():
-                    if doc_ref.id not in uids_locales:
-                        refs_sobrantes.append(doc_ref)
-            except Exception:
-                pass
+            colecciones_a_revisar.append(
+                (db.collection(f"mes_{per}"), uids_locales, f"mes_{per}")
+            )
 
         # b) Colecciones de meses fuera de la ventana vigente y colección obsoleta 'usuarios'
-        try:
-            for c in db.collections():
-                if (c.id.startswith("mes_") and c.id not in colecciones_vigentes) or c.id == "usuarios":
-                    for doc_ref in c.list_documents():
-                        refs_sobrantes.append(doc_ref)
-        except Exception:
-            pass
+        for c in db.collections():
+            if (c.id.startswith("mes_") and c.id not in colecciones_vigentes) or c.id == "usuarios":
+                colecciones_a_revisar.append((c, None, c.id))
+
+        def _buscar_sobrantes(coleccion, uids_validos):
+            documentos = coleccion.list_documents()
+            if uids_validos is None:
+                return list(documentos)
+            return [doc_ref for doc_ref in documentos if doc_ref.id not in uids_validos]
+
+        refs_sobrantes = []
+        if colecciones_a_revisar:
+            if callback_progreso:
+                callback_progreso(
+                    70,
+                    f"Revisando {len(colecciones_a_revisar)} colección(es) de Firebase en paralelo...",
+                )
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(5, len(colecciones_a_revisar))
+            ) as executor:
+                futuras = {
+                    executor.submit(_buscar_sobrantes, coleccion, uids): nombre
+                    for coleccion, uids, nombre in colecciones_a_revisar
+                }
+                revisadas = 0
+                for futura in concurrent.futures.as_completed(futuras):
+                    refs_sobrantes.extend(futura.result())
+                    revisadas += 1
+                    if callback_progreso:
+                        pct = 70 + int((revisadas / len(futuras)) * 4)
+                        callback_progreso(
+                            pct,
+                            f"Revisión Firebase: {futuras[futura]} ({revisadas}/{len(futuras)} colecciones)...",
+                        )
 
         total_sobrantes = len(refs_sobrantes)
 
@@ -1045,6 +1167,82 @@ class ServicioDatosPadron(ServicioDatos):
             "exito": True,
         }
 
+    def publicar_mes_actual_a_lectores(
+        self, callback_progreso: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Crea solo el periodo local activo en Firebase y conserva los demás meses."""
+        import time
+        import firebase_client as fb
+
+        t_inicio = time.perf_counter()
+        periodo = str(self.periodo or "").strip()
+        if not periodo:
+            raise ValueError("No hay un periodo activo para publicar.")
+
+        documentos = self._preparar_docs_para_nube(self.mes)
+        if not documentos:
+            raise ValueError(f"El padrón local del periodo {periodo} no contiene usuarios.")
+        if len(documentos) > 499:
+            raise ValueError(
+                "El mes tiene más de 499 usuarios y no se puede publicar de forma "
+                "atómica en una sola operación segura."
+            )
+
+        if callback_progreso:
+            callback_progreso(15, f"Preparando el padrón local {periodo}...")
+
+        db = fb.db()
+        col_ref = db.collection(f"mes_{periodo}")
+        if next(iter(col_ref.list_documents()), None) is not None:
+            raise ValueError(
+                f"Firebase ya contiene documentos para el periodo {periodo}. "
+                "No se modificó la nube; usa «Traer lecturas de los lectores» "
+                "o revisa el periodo antes de publicar."
+            )
+
+        if callback_progreso:
+            callback_progreso(35, "Verificando configuración de la app móvil...")
+
+        config_ref = db.collection("config").document("general")
+        config_snapshot = config_ref.get()
+        config_nube = config_snapshot.to_dict() or {}
+        periodos_disponibles = {
+            str(p) for p in (config_nube.get("periodos_disponibles") or []) if p
+        }
+        periodos_disponibles.add(periodo)
+
+        config_local = self.config.get("mes_actual") or {}
+        datos_config = {
+            "mes_actual": {
+                "periodo": periodo,
+                "estado": config_local.get("estado", "ABIERTO"),
+                "fecha_emision": config_local.get("fecha_emision"),
+                "fecha_vencimiento": config_local.get("fecha_vencimiento"),
+            },
+            "periodos_disponibles": sorted(periodos_disponibles),
+        }
+
+        if callback_progreso:
+            callback_progreso(55, f"Publicando {len(documentos)} usuarios del mes {periodo}...")
+
+        batch = db.batch()
+        for uid, datos in documentos.items():
+            batch.create(col_ref.document(uid), datos)
+        batch.set(config_ref, datos_config, merge=True)
+        batch.commit()
+        self.ops["escrituras"] += len(documentos) + 1
+
+        duracion = time.perf_counter() - t_inicio
+        if callback_progreso:
+            callback_progreso(100, f"¡Mes {periodo} publicado en {duracion:.2f} s!")
+
+        return {
+            "periodo": periodo,
+            "usuarios_subidos": len(documentos),
+            "tiempo_segundos": round(duracion, 2),
+            "exito": True,
+        }
+
     def reescribir_a_firebase(
         self, callback_progreso: Optional[Any] = None
     ) -> Dict[str, Any]:
@@ -1069,30 +1267,36 @@ class ServicioDatosPadron(ServicioDatos):
         t_inicio = time.perf_counter()
         p = periodo or self.periodo
 
-        if callback_progreso:
-            callback_progreso(10, f"Conectando a Firebase para descargar lecturas del mes {p}...")
-
         actualizados = 0
         conflictos_admin = []
         db = fb.db()
         col = db.collection(f"mes_{p}")
 
         if callback_progreso:
-            callback_progreso(30, "Descargando documentos del mes desde la nube...")
+            callback_progreso(
+                30,
+                "Conectando con Firestore; la descarga tiene un límite de 60 segundos...",
+            )
 
-        docs = list(col.stream())
-        self.ops["lecturas"] += len(docs)
-
-        total_docs = len(docs)
-        if callback_progreso:
-            callback_progreso(50, f"Procesando {total_docs} documentos descargados...")
-
-        for idx, doc in enumerate(docs, 1):
+        total_docs_locales = len(self.mes)
+        docs_recibidos = 0
+        consulta = col.select(["medidores", "nombre"])
+        for idx, doc in enumerate(consulta.stream(timeout=60), 1):
+            docs_recibidos = idx
+            self.ops["lecturas"] += 1
             uid = doc.id
-            datos_cloud = doc.to_dict() or {}
+            if callback_progreso and (idx == 1 or idx % 5 == 0):
+                pct = 30 + int(
+                    min(idx, total_docs_locales) / max(1, total_docs_locales) * 45
+                )
+                callback_progreso(
+                    pct,
+                    f"Descargando y consolidando lecturas ({idx} documentos recibidos)...",
+                )
             if uid not in self.mes:
                 continue
 
+            datos_cloud = doc.to_dict() or {}
             doc_local = self.mes[uid]
             meds_cloud = datos_cloud.get("medidores") or []
             meds_local = doc_local.get("medidores") or []
@@ -1166,28 +1370,23 @@ class ServicioDatosPadron(ServicioDatos):
                         consumo_total += c
                 doc_local["consumo_total_m3"] = consumo_total
 
-            if callback_progreso and idx % 50 == 0:
-                pct = 50 + int((idx / max(1, total_docs)) * 40)
-                callback_progreso(pct, f"Consolidando lecturas ({idx}/{total_docs})...")
-
         # 4. Guardar en Excel local
         if callback_progreso:
-            callback_progreso(92, "Guardando lecturas actualizadas en el Excel local...")
+            callback_progreso(
+                80,
+                f"Descarga completa ({docs_recibidos} documentos). Guardando el Excel local...",
+            )
+        ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.config["ultima_descarga_lectores"] = ahora_str
         self.guardar_en_respaldo_local()
 
         duracion = time.perf_counter() - t_inicio
-        ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.config["ultima_descarga_lectores"] = ahora_str
-        try:
-            self.guardar_config(self.config)
-        except Exception:
-            pass
-
         if callback_progreso:
             callback_progreso(100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
 
         return {
             "periodo": p,
+            "documentos_descargados": docs_recibidos,
             "actualizados": actualizados,
             "conflictos_admin": conflictos_admin,
             "tiempo_segundos": round(duracion, 2),
@@ -1440,6 +1639,17 @@ class ServicioDatosPadron(ServicioDatos):
         fecha_vencimiento: str,
         lecturas_iniciales: Optional[Dict[str, int]] = None,
     ) -> Dict[str, Any]:
+        periodo_actual = (self.config.get("mes_actual") or {}).get("periodo")
+        mes_anterior = obtener_mes_anterior(
+            periodo,
+            getattr(self, "meses_encontrados", {}),
+            periodo_actual=periodo_actual or getattr(self, "periodo", None),
+            mes_actual=self.mes,
+        )
+        nuevos_docs = construir_documentos_mes(
+            self.usuarios, mes_anterior, lecturas_iniciales
+        )
+
         self.periodo = periodo
         self.config["mes_actual"] = {
             "periodo": periodo,
@@ -1447,35 +1657,13 @@ class ServicioDatosPadron(ServicioDatos):
             "fecha_emision": fecha_emision,
             "fecha_vencimiento": fecha_vencimiento,
         }
-        self.mes = {}
-        for uid, u in self.usuarios.items():
-            meds = []
-            for m in u.get("medidores") or []:
-                nro = m.get("nro_medidor") if isinstance(m, dict) else str(m)
-                lec_ant = (lecturas_iniciales or {}).get(nro, 0)
-                meds.append({
-                    "nro_medidor": nro,
-                    "lectura_anterior": lec_ant,
-                    "lectura_actual": None,
-                    "estado_lectura": "PENDIENTE",
-                    "novedad": "NORMAL",
-                    "nota": "",
-                })
-            self.mes[uid] = {
-                "_id": uid,
-                "id_usuario": uid,
-                "nro_conexion": u.get("nro_conexion", ""),
-                "nombre": u.get("nombre", ""),
-                "sector": u.get("sector", ""),
-                "direccion": u.get("direccion", ""),
-                "codigo_categoria": u.get("codigo_categoria", "A"),
-                "medidores": meds,
-                "total_a_pagar": 0.0,
-                "monto_pagado": 0.0,
-                "meses_adeudados": 1,
-            }
+        self.mes = nuevos_docs
         self.guardar_en_respaldo_local()
-        return {"periodo": periodo, "estado": "ABIERTO"}
+        return {
+            "periodo": periodo,
+            "usuarios_creados": len(nuevos_docs),
+            "estado": "ABIERTO",
+        }
 
     def cerrar_lecturas(self, periodo: Optional[str] = None) -> Dict[str, Any]:
         p = periodo or self.periodo

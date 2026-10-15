@@ -40,6 +40,142 @@ def todas_lecturas_completas(mes: Dict[str, Dict[str, Any]]) -> bool:
     )
 
 
+def obtener_mes_anterior(
+    periodo: str,
+    meses: Dict[str, Dict[str, Dict[str, Any]]],
+    periodo_actual: Optional[str] = None,
+    mes_actual: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Obtiene la base más reciente anterior al periodo que se va a crear."""
+    meses_disponibles = dict(meses or {})
+    if periodo_actual and periodo_actual < periodo and mes_actual:
+        meses_disponibles.setdefault(periodo_actual, mes_actual)
+    anteriores = [p for p in meses_disponibles if p < periodo]
+    if not anteriores:
+        return {}
+    return meses_disponibles[max(anteriores)] or {}
+
+
+def construir_documentos_mes(
+    usuarios: Dict[str, Dict[str, Any]],
+    mes_anterior: Dict[str, Dict[str, Any]],
+    lecturas_iniciales: Optional[Dict[str, int]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Crea documentos nuevos usando como arranque los datos vigentes del mes anterior."""
+    lecturas_iniciales = lecturas_iniciales or {}
+    nuevos_docs: Dict[str, Dict[str, Any]] = {}
+
+    def numero(valor: Any, defecto: Optional[float] = None) -> Optional[float]:
+        if valor in (None, ""):
+            return defecto
+        try:
+            return float(valor)
+        except (TypeError, ValueError):
+            return defecto
+
+    for uid, usuario in usuarios.items():
+        if not usuario.get("activo", True):
+            continue
+
+        doc_anterior = (mes_anterior or {}).get(uid) or {}
+        medidores_anteriores = {
+            str(m.get("nro_medidor") or "").strip(): m
+            for m in (doc_anterior.get("medidores") or [])
+            if isinstance(m, dict) and m.get("nro_medidor")
+        }
+        medidores_mes = []
+
+        for medidor in usuario.get("medidores") or []:
+            nro_valor = medidor.get("nro_medidor") if isinstance(medidor, dict) else medidor
+            nro = str(nro_valor or "").strip()
+            if not nro:
+                continue
+
+            anterior = medidores_anteriores.get(nro) or {}
+            lectura_previa = numero(anterior.get("lectura_actual"))
+            fecha_previa = anterior.get("fecha_lectura")
+            consumo_previo = None
+
+            if lectura_previa is not None:
+                lectura_base = numero(anterior.get("lectura_anterior"), 0.0) or 0.0
+                if "consumo" in anterior and anterior.get("consumo") is not None:
+                    consumo_previo = numero(anterior.get("consumo"))
+                else:
+                    novedad = str(anterior.get("novedad") or "").upper()
+                    consumo_previo = (
+                        lectura_previa
+                        if novedad == "CAMBIO_MEDIDOR" and lectura_previa < lectura_base
+                        else max(0.0, lectura_previa - lectura_base)
+                    )
+            else:
+                lectura_previa = numero(anterior.get("lectura_anterior"), 0.0)
+                fecha_previa = anterior.get("fecha_anterior")
+                consumo_previo = numero(anterior.get("consumo_anterior"))
+
+            if nro in lecturas_iniciales:
+                lectura_previa = numero(lecturas_iniciales[nro], 0.0)
+                fecha_previa = None
+                consumo_previo = None
+
+            medidores_mes.append({
+                "nro_medidor": nro,
+                "lectura_anterior": int(lectura_previa or 0),
+                "fecha_anterior": fecha_previa,
+                "consumo_anterior": consumo_previo,
+                "lectura_actual": None,
+                "fecha_lectura": None,
+                "estado_lectura": "PENDIENTE",
+                "novedad": "NORMAL",
+                "nota": "",
+                "registrado_por": None,
+            })
+
+        historial = list(doc_anterior.get("historial_m3") or [])
+        consumo_mes_anterior = numero(doc_anterior.get("consumo_total_m3"))
+        if consumo_mes_anterior is not None:
+            historial = (historial + [consumo_mes_anterior])[-5:]
+        else:
+            historial = historial[-5:]
+
+        total_anterior = numero(doc_anterior.get("total_a_pagar"))
+        if total_anterior is None:
+            deuda_previa = numero(doc_anterior.get("deuda_anterior"), 0.0) or 0.0
+            deuda_mes = numero(doc_anterior.get("deuda_actual"), 0.0) or 0.0
+            total_anterior = deuda_previa + deuda_mes
+        pagado = numero(doc_anterior.get("monto_pagado"), 0.0) or 0.0
+        saldo_pendiente = max(0.0, total_anterior - pagado)
+        meses_anteriores = numero(doc_anterior.get("meses_adeudados"), 0.0) or 0.0
+        meses_adeudados = int(meses_anteriores + 1) if saldo_pendiente > 0 else 1
+
+        def dato_actual(campo: str, defecto: Any = "") -> Any:
+            actual = usuario.get(campo)
+            return actual if actual not in (None, "") else doc_anterior.get(campo, defecto)
+
+        nuevos_docs[uid] = {
+            "nro_conexion": dato_actual("nro_conexion"),
+            "nombre": dato_actual("nombre"),
+            "sector": dato_actual("sector"),
+            "direccion": dato_actual("direccion"),
+            "codigo_categoria": dato_actual("codigo_categoria", "A"),
+            "medidores": medidores_mes,
+            "consumo_total_m3": None,
+            "historial_m3": historial,
+            "nro_recibo": None,
+            "monto_agua": None,
+            "monto_desague": None,
+            "cargo_fijo": None,
+            "deuda_anterior": saldo_pendiente,
+            "igv": 0.0,
+            "redondeo": 0.0,
+            "total_a_pagar": None,
+            "meses_adeudados": meses_adeudados,
+            "monto_pagado": 0.0,
+            "fecha_pago": None,
+        }
+
+    return nuevos_docs
+
+
 class ServicioDatos:
     """Interfaz base para el acceso a datos."""
 
@@ -673,48 +809,16 @@ class ServicioDatosMemoria(ServicioDatos):
         if not activos:
             raise ValueError("No se encontraron usuarios activos en el padrón para abrir el mes.")
 
-        lecturas_iniciales = lecturas_iniciales or {}
-        nuevos_docs = {}
-        for uid, u in activos.items():
-            meds_mes = []
-            for m in u.get("medidores", []):
-                nro = m if isinstance(m, str) else m.get("nro_medidor", "")
-                if nro:
-                    meds_mes.append(
-                        {
-                            "nro_medidor": nro,
-                            "lectura_anterior": int(lecturas_iniciales.get(nro, 0)),
-                            "fecha_anterior": None,
-                            "consumo_anterior": None,
-                            "lectura_actual": None,
-                            "fecha_lectura": None,
-                            "estado_lectura": "PENDIENTE",
-                            "novedad": "",
-                            "nota": "",
-                            "registrado_por": None,
-                        }
-                    )
-            nuevos_docs[uid] = {
-                "nro_conexion": u.get("nro_conexion", ""),
-                "nombre": u.get("nombre", ""),
-                "sector": u.get("sector", ""),
-                "direccion": u.get("direccion", ""),
-                "codigo_categoria": u.get("codigo_categoria", "A"),
-                "medidores": meds_mes,
-                "consumo_total_m3": None,
-                "historial_m3": [],
-                "nro_recibo": None,
-                "monto_agua": None,
-                "monto_desague": None,
-                "cargo_fijo": None,
-                "deuda_anterior": 0.0,
-                "igv": 0.0,
-                "redondeo": 0.0,
-                "total_a_pagar": None,
-                "meses_adeudados": 1,
-                "monto_pagado": 0.0,
-                "fecha_pago": None,
-            }
+        periodo_actual = (self.config.get("mes_actual") or {}).get("periodo")
+        mes_anterior = obtener_mes_anterior(
+            periodo,
+            getattr(self, "meses_encontrados", {}),
+            periodo_actual=periodo_actual or getattr(self, "periodo", None),
+            mes_actual=self.mes,
+        )
+        nuevos_docs = construir_documentos_mes(
+            activos, mes_anterior, lecturas_iniciales
+        )
 
         self.mes = nuevos_docs
         self.config["mes_actual"] = {

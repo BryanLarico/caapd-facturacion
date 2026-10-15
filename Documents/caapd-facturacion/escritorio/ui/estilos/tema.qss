@@ -739,12 +739,12 @@ QPushButton.filtro_btn:hover {
 
 QPushButton.filtro_btn[activo="true"] {
     background-color: #0369a1;
-    color: #ffffff;
-    border-color: #0369a1;
-    font-weight: bold;
+QMessageBox QLabel#qt_msgbox_label {
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 520px;
 }
-
-QPushButton.filtro_btn_aviso {
     border-color: #f59e0b;
     color: #b45309;
 }

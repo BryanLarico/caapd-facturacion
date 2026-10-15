@@ -7,7 +7,7 @@ banners de modo contingencia y cola offline, y control de cierre seguro.
 import os
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QEvent, QThread, QThreadPool, QTimer, Qt, Signal
+from PySide6.QtCore import QEvent, QThread, QThreadPool, QTimer, Qt, Signal, Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 import rutas
 from servicios.datos import ServicioDatos
 from servicios.metricas_monitoring import consultar_metricas_hoy
-from ui.hilos import Worker, mostrar_dialogo_error
+from ui.hilos import Worker, esperar_hilos, mostrar_dialogo_error
 from ui.paginas.cobros import PaginaCobros
 from ui.paginas.configuracion import PaginaConfiguracion
 from ui.paginas.inicio import PaginaInicio
@@ -59,6 +59,7 @@ class VentanaPrincipal(QMainWindow):
         self.botones_nav: Dict[str, QPushButton] = {}
         self._verificando_archivos: bool = False
         self._consultando_metricas: bool = False
+        self.sincronizando: bool = False
 
         self._construir_ui()
 
@@ -346,46 +347,80 @@ class VentanaPrincipal(QMainWindow):
     def _al_terminar_metricas(self) -> None:
         self._consultando_metricas = False
 
+    def set_sincronizando(self, activo: bool) -> None:
+        """Pausa la vigilancia de archivos mientras el propio programa escribe los Excel."""
+        self.sincronizando = bool(activo)
+        if not activo and hasattr(self.servicio, "reconocer_cambios_externos"):
+            # Los Excel acaban de ser escritos por el programa: no son cambios externos.
+            self.servicio.reconocer_cambios_externos()
+
     def _verificar_archivos_externos(self) -> None:
         """Comprueba si algún archivo en 'Base de datos/' fue modificado externamente."""
-        if getattr(self, "_verificando_archivos", False):
+        if self._verificando_archivos or self.sincronizando:
             return
-        if hasattr(self.servicio, "verificar_cambios_externos"):
-            hay_cambios, modificados = self.servicio.verificar_cambios_externos()
-            if hay_cambios:
-                self._verificando_archivos = True
-                self.timer_archivos.stop()
-                arch_str = ", ".join(modificados[:3])
+        # Si hay un Worker activo (sincronización, recarga, PDF...) esperar al siguiente ciclo.
+        if QThreadPool.globalInstance().activeThreadCount() > 0:
+            return
+        if not hasattr(self.servicio, "verificar_cambios_externos"):
+            return
 
-                # Reconocer cambios inmediatamente para evitar cualquier reaparición en bucle
-                if hasattr(self.servicio, "reconocer_cambios_externos"):
-                    self.servicio.reconocer_cambios_externos()
+        hay_cambios, modificados = self.servicio.verificar_cambios_externos()
+        if not hay_cambios:
+            return
 
-                msg = QMessageBox(self)
-                msg.setIcon(QMessageBox.Icon.Question)
-                msg.setWindowTitle("Archivos Modificados Externamente")
-                msg.setText("<b>Se detectaron cambios en los archivos de 'Base de datos':</b>")
-                msg.setInformativeText(
-                    f"Uno o más archivos fueron modificados externamente:\n\n"
-                    f"  • {arch_str}\n\n"
-                    f"¿Deseas recargar la base de datos en pantalla ahora?"
-                )
-                btn_si = msg.addButton("Sí", QMessageBox.ButtonRole.YesRole)
-                btn_no = msg.addButton("No", QMessageBox.ButtonRole.NoRole)
-                msg.setDefaultButton(btn_si)
-                msg.exec()
+        self._verificando_archivos = True
+        self.timer_archivos.stop()
+        arch_str = ", ".join(modificados[:3])
 
-                if msg.clickedButton() == btn_si:
-                    if hasattr(self.servicio, "cargar_desde_carpeta_base_datos"):
-                        self.servicio.cargar_desde_carpeta_base_datos()
-                        if hasattr(self.servicio, "reconocer_cambios_externos"):
-                            self.servicio.reconocer_cambios_externos()
-                        idx = self.stacked_widget.currentIndex()
-                        if 0 <= idx < len(self.PAGINAS):
-                            self.navegar_a(self.PAGINAS[idx])
+        # Reconocer cambios inmediatamente para evitar cualquier reaparición en bucle
+        if hasattr(self.servicio, "reconocer_cambios_externos"):
+            self.servicio.reconocer_cambios_externos()
 
-                self._verificando_archivos = False
-                self.timer_archivos.start()
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setWindowTitle("Archivos Modificados Externamente")
+        msg.setText("<b>Se detectaron cambios en los archivos de 'Base de datos':</b>")
+        msg.setInformativeText(
+            f"Uno o más archivos fueron modificados externamente:\n\n"
+            f"  • {arch_str}\n\n"
+            f"¿Deseas recargar la base de datos en pantalla ahora?"
+        )
+        btn_si = msg.addButton("Sí", QMessageBox.ButtonRole.YesRole)
+        msg.addButton("No", QMessageBox.ButtonRole.NoRole)
+        msg.setDefaultButton(btn_si)
+        msg.exec()
+
+        if msg.clickedButton() == btn_si and hasattr(self.servicio, "cargar_desde_carpeta_base_datos"):
+            # Recarga pesada (lee todos los Excel) -> en segundo plano, NUNCA en el hilo GUI.
+            self.sincronizando = True
+            self.mostrar_progreso(30, "Recargando base de datos...")
+            worker = Worker(self.servicio.cargar_desde_carpeta_base_datos)
+            worker.signals.resultado.connect(self._al_terminar_recarga_externa, Qt.ConnectionType.QueuedConnection)
+            worker.signals.error.connect(self._al_fallar_recarga_externa, Qt.ConnectionType.QueuedConnection)
+            QThreadPool.globalInstance().start(worker)
+        else:
+            self._verificando_archivos = False
+            self.timer_archivos.start()
+
+    @Slot(object)
+    def _al_terminar_recarga_externa(self, _res: Any) -> None:
+        self.set_sincronizando(False)
+        self.ocultar_progreso("¡Base de datos recargada!")
+        idx = self.stacked_widget.currentIndex()
+        if 0 <= idx < len(self.PAGINAS):
+            self.navegar_a(self.PAGINAS[idx])
+        if idx == 0:
+            self.pagina_inicio.cargar_datos_asincrono()
+        self._verificando_archivos = False
+        self.timer_archivos.start()
+
+    @Slot(str)
+    def _al_fallar_recarga_externa(self, err_msg: str) -> None:
+        self.set_sincronizando(False)
+        self.ocultar_progreso("")
+        mostrar_dialogo_error(self, "Error al recargar la base de datos", err_msg)
+        self._verificando_archivos = False
+        self.timer_archivos.start()
 
     def _accion_abrir_carpeta_base_datos(self) -> None:
         p = rutas.ruta_base_de_datos()
@@ -435,10 +470,14 @@ class VentanaPrincipal(QMainWindow):
         self.lbl_estado_progreso.setText("")
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Control de cierre inmediato y seguro: detiene temporizadores y sale sin demoras."""
+        """Cierre seguro: detiene temporizadores y espera a los hilos de trabajo."""
         self._verificando_archivos = True
+        self.sincronizando = True
         try:
             self.timer_archivos.stop()
         except Exception:
             pass
+        # Evita 'QThreadStorage: entry destroyed before end of thread' y cierres
+        # abruptos mientras un Worker aún escribe un Excel o habla con Firebase.
+        esperar_hilos(10000)
         event.accept()
