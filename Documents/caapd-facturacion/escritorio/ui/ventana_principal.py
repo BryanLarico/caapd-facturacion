@@ -426,13 +426,20 @@ class VentanaPrincipal(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Cierre seguro: detiene temporizadores y espera a los hilos de trabajo."""
+        if not esperar_hilos(1000):
+            QMessageBox.information(
+                self,
+                "Operación en curso",
+                "La aplicación no se cerró porque todavía hay una tarea en segundo plano. "
+                "Espera a que termine o falle y vuelve a cerrar el programa.",
+            )
+            event.ignore()
+            return
+
         self._verificando_archivos = True
         self.sincronizando = True
         try:
             self.timer_archivos.stop()
         except Exception:
             pass
-        # Evita 'QThreadStorage: entry destroyed before end of thread' y cierres
-        # abruptos mientras un Worker aún escribe un Excel o habla con Firebase.
-        esperar_hilos(10000)
         event.accept()

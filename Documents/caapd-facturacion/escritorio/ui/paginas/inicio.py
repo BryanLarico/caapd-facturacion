@@ -36,11 +36,16 @@ class PaginaInicio(QWidget):
     solicitar_navegacion = Signal(str)
     # Señal para notificar que las operaciones Firebase han cambiado
     datos_cargados = Signal()
+    _senal_progreso_sincronizacion = Signal(int, str)
 
     def __init__(self, servicio_datos: ServicioDatos, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.servicio = servicio_datos
         self.thread_pool = QThreadPool.globalInstance()
+        self._senal_progreso_sincronizacion.connect(
+            self._recibir_progreso_sincronizacion,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
         self._construir_ui()
 
@@ -206,14 +211,19 @@ class PaginaInicio(QWidget):
             ventana.set_sincronizando(True)  # pausa la vigilancia de archivos externos
 
         def progreso_callback(pct: int, txt: str) -> None:
-            if hasattr(ventana, "mostrar_progreso"):
-                ventana.mostrar_progreso(pct, txt)
+            self._senal_progreso_sincronizacion.emit(int(pct), str(txt or ""))
 
         worker = Worker(funcion_servicio, callback_progreso=progreso_callback)
         # Conexiones EN COLA explícitas a métodos de este QWidget: siempre corren en el hilo GUI.
         worker.signals.resultado.connect(slot_exito, Qt.ConnectionType.QueuedConnection)
         worker.signals.error.connect(self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
         self.thread_pool.start(worker)
+
+    @Slot(int, str)
+    def _recibir_progreso_sincronizacion(self, porcentaje: int, texto: str) -> None:
+        ventana = self.window()
+        if hasattr(ventana, "_mostrar_progreso_ui"):
+            ventana._mostrar_progreso_ui(porcentaje, texto)
 
     def _terminar_sincronizacion(self, texto_final: str) -> None:
         ventana = self.window()

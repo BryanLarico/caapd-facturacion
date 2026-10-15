@@ -161,16 +161,14 @@ def slot_seguro(fn: Callable[..., Any]) -> Callable[..., Any]:
     return envoltura
 
 
-def esperar_hilos(ms: int = 8000) -> None:
-    """Espera (máximo ms) a que terminen los Workers del pool global.
-    Llamar al cerrar la ventana/app para evitar
-    'QThreadStorage: entry destroyed before end of thread' y cierres abruptos."""
+def esperar_hilos(ms: int = 8000) -> bool:
+    """Espera como máximo ``ms`` y reporta si todos los Workers terminaron."""
     try:
         pool = QThreadPool.globalInstance()
-        pool.clear()  # descarta tareas que aún no empezaron
-        pool.waitForDone(int(ms))
+        return pool.waitForDone(int(ms))
     except Exception:
-        pass
+        _log.exception("No se pudo esperar la finalización de los Workers.")
+        return False
 
 
 def _crear_caja(padre: Optional[QWidget], icono: Any, titulo: str, mensaje: str, ancho_min: int) -> QMessageBox:

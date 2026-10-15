@@ -10,7 +10,6 @@ descargando las lecturas tomadas por los lectores móviles y guardándolas en el
 """
 from __future__ import annotations
 import datetime
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,6 +25,7 @@ from servicios.datos import (
     siguiente_periodo,
     todas_lecturas_completas,
 )
+from servicios.metricas_monitoring import consultar_metricas_hoy
 
 
 def buscar_archivos_base_datos(dir_bd: Optional[Path | str] = None) -> List[Path]:
@@ -1262,48 +1262,127 @@ class ServicioDatosPadron(ServicioDatos):
         - Guarda inmediatamente en el archivo Excel local.
         """
         import time
+        import firebase_client as fb
 
         t_inicio = time.perf_counter()
         p = periodo or self.periodo
 
-        def progreso(pct: int, texto: str) -> None:
-            """Informa el avance sin que un fallo de la interfaz detenga la descarga."""
-            if not callback_progreso:
-                return
-            try:
-                callback_progreso(int(pct), str(texto))
-            except Exception:
-                pass
+        actualizados = 0
+        conflictos_admin = []
+        db = fb.db()
+        col = db.collection(f"mes_{p}")
 
-        progreso(5, f"Preparando la descarga del mes {p}...")
-
-        # La pila de red de Firestore se ejecuta en un proceso aparte siempre que
-        # sea posible: si falla de forma grave, muere ese proceso y no el programa.
-        if not self._puede_descargar_en_subproceso():
-            raise RuntimeError(
-                "La descarga protegida no está disponible en esta instalación. "
-                "No se consultó Firebase desde el proceso de la interfaz para evitar "
-                "que un fallo nativo de la conexión cierre el programa. "
-                "Inicie la aplicación con Python o use una versión empaquetada "
-                "que incluya el proceso auxiliar."
+        if callback_progreso:
+            callback_progreso(
+                30,
+                "Conectando con Firestore; la descarga tiene un límite de 60 segundos...",
             )
-        descarga = self._descargar_docs_en_subproceso(p, progreso)
 
-        docs_nube = descarga.get("docs") or {}
-        docs_recibidos = int(descarga.get("recibidos") or 0)
-        self.ops["lecturas"] += docs_recibidos
+        total_docs_locales = len(self.mes)
+        docs_recibidos = 0
+        consulta = col.select(["medidores", "nombre"])
+        for idx, doc in enumerate(consulta.stream(timeout=60), 1):
+            docs_recibidos = idx
+            self.ops["lecturas"] += 1
+            uid = doc.id
+            if callback_progreso and (idx == 1 or idx % 5 == 0):
+                pct = 30 + int(
+                    min(idx, total_docs_locales) / max(1, total_docs_locales) * 45
+                )
+                callback_progreso(
+                    pct,
+                    f"Descargando y consolidando lecturas ({idx} documentos recibidos)...",
+                )
+            if uid not in self.mes:
+                continue
 
-        progreso(75, f"Consolidando {docs_recibidos} documento(s) con el padrón local...")
-        actualizados, conflictos_admin = fusionar_lecturas_nube(docs_nube, self.mes)
+            datos_cloud = doc.to_dict() or {}
+            doc_local = self.mes[uid]
+            meds_cloud = datos_cloud.get("medidores") or []
+            meds_local = doc_local.get("medidores") or []
 
-        # Guardar en el Excel local.
-        progreso(85, f"Descarga completa ({docs_recibidos} documentos). Guardando el Excel local...")
+            modificado_usuario = False
+
+            for mc in meds_cloud:
+                nro = str(mc.get("nro_medidor") or "")
+                ml = next((m for m in meds_local if str(m.get("nro_medidor") or "") == nro), None)
+                if not ml and len(meds_local) == 1:
+                    ml = meds_local[0]
+
+                if not ml:
+                    continue
+
+                lec_cloud = mc.get("lectura_actual")
+                if lec_cloud is None:
+                    continue
+
+                # Protección ADMIN: Si ya tiene lectura de ADMIN, verificar conflicto
+                reg_por = str(ml.get("registrado_por") or "").upper()
+                lec_local = ml.get("lectura_actual")
+                if reg_por == "ADMIN" and lec_local is not None:
+                    try:
+                        if int(lec_local) != int(lec_cloud):
+                            conflictos_admin.append({
+                                "id_usuario": uid,
+                                "nombre": doc_local.get("nombre", ""),
+                                "nro_medidor": nro,
+                                "lectura_admin": lec_local,
+                                "lectura_cloud": lec_cloud,
+                                "registrado_por_cloud": mc.get("registrado_por") or "Lector",
+                            })
+                            continue
+                    except Exception:
+                        pass
+
+                # Asignar lectura del lector
+                try:
+                    ml["lectura_actual"] = int(lec_cloud)
+                except Exception:
+                    ml["lectura_actual"] = lec_cloud
+                ml["estado_lectura"] = mc.get("estado_lectura", "LEIDO")
+                ml["novedad"] = mc.get("novedad", "NORMAL")
+                ml["nota"] = mc.get("nota", "")
+                ml["fecha_lectura"] = mc.get("fecha_lectura") or datetime.date.today().isoformat()
+                ml["registrado_por"] = mc.get("registrado_por") or "LECTOR"
+                actualizados += 1
+                modificado_usuario = True
+
+            # Recalcular consumo del usuario
+            if modificado_usuario or any(m.get("lectura_actual") is not None for m in meds_local):
+                consumo_total = 0
+                for m in meds_local:
+                    ant = m.get("lectura_anterior")
+                    act = m.get("lectura_actual")
+                    nov = str(m.get("novedad") or "").upper()
+                    if act is not None and ant is not None:
+                        try:
+                            act_i = int(act)
+                            ant_i = int(ant)
+                            if nov == "CAMBIO_MEDIDOR":
+                                c = act_i
+                            elif act_i >= ant_i:
+                                c = act_i - ant_i
+                            else:
+                                c = 0
+                        except Exception:
+                            c = 0
+                        m["consumo_m3"] = c
+                        consumo_total += c
+                doc_local["consumo_total_m3"] = consumo_total
+
+        # 4. Guardar en Excel local
+        if callback_progreso:
+            callback_progreso(
+                80,
+                f"Descarga completa ({docs_recibidos} documentos). Guardando el Excel local...",
+            )
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.config["ultima_descarga_lectores"] = ahora_str
         self.guardar_en_respaldo_local()
 
         duracion = time.perf_counter() - t_inicio
-        progreso(100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
+        if callback_progreso:
+            callback_progreso(100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
 
         return {
             "periodo": p,
@@ -1313,231 +1392,6 @@ class ServicioDatosPadron(ServicioDatos):
             "tiempo_segundos": round(duracion, 2),
             "exito": True,
         }
-
-    # Tiempos de la descarga aislada (segundos).
-    TIMEOUT_DESCARGA_TOTAL = 300.0
-    TIMEOUT_DESCARGA_SIN_SENAL = 90.0
-
-    @staticmethod
-    def _puede_descargar_en_subproceso() -> bool:
-        """True si se puede lanzar el proceso auxiliar de descarga.
-
-        Los ejecutables empaquetados necesitan incluir un auxiliar compatible;
-        no se hace fallback a Firestore en el proceso de la interfaz.
-        """
-        import os
-        if getattr(sys, "frozen", False):
-            return False
-        ejecutable = getattr(sys, "executable", "") or ""
-        return bool(ejecutable) and os.path.exists(ejecutable)
-
-    def _descargar_docs_en_subproceso(
-        self, periodo: str, progreso: Any
-    ) -> Dict[str, Any]:
-        """Descarga los documentos del mes en un proceso aparte.
-
-        La interfaz recibe avance continuo mientras el proceso trabaja. Si el proceso
-        muere por un fallo nativo o deja de responder, se informa con una excepción
-        normal: el programa sigue abierto y el padrón local no se modifica.
-        """
-        import json
-        import os
-        import queue
-        import shutil
-        import subprocess
-        import tempfile
-        import threading
-        import time
-
-        dir_tmp = Path(tempfile.mkdtemp(prefix="caapd_descarga_"))
-        ruta_salida = dir_tmp / "lecturas.json"
-        comando = [
-            sys.executable,
-            "-u",
-            "-m",
-            "servicios.descarga_lecturas_proc",
-            "--periodo",
-            str(periodo),
-            "--salida",
-            str(ruta_salida),
-            "--timeout",
-            str(int(self.TIMEOUT_DESCARGA_TOTAL)),
-        ]
-
-        creationflags = 0
-        if os.name == "nt":
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-        progreso(8, "Conectando con la nube de los lectores...")
-        try:
-            proc = subprocess.Popen(
-                comando,
-                cwd=str(rutas.DIR_BASE),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                bufsize=1,
-                creationflags=creationflags,
-            )
-        except Exception as e:
-            shutil.rmtree(dir_tmp, ignore_errors=True)
-            raise RuntimeError(
-                "No se pudo iniciar el proceso de descarga de lecturas.\n\n"
-                f"Detalle: {e}"
-            ) from e
-
-        cola: "queue.Queue[Optional[str]]" = queue.Queue()
-
-        def leer_salida() -> None:
-            try:
-                for linea in proc.stdout:  # type: ignore[union-attr]
-                    cola.put(linea)
-            except Exception:
-                pass
-            finally:
-                cola.put(None)
-
-        hilo_salida = threading.Thread(target=leer_salida, daemon=True)
-        hilo_salida.start()
-
-        total_local = max(1, len(self.mes))
-        t_inicio = time.monotonic()
-        ultima_senal = t_inicio
-        recibidos = 0
-        ultimas_lineas: List[str] = []
-        error_proc = ""
-        fase = "Conectando con la nube de los lectores..."
-        termino_ok = False
-
-        try:
-            while True:
-                ahora = time.monotonic()
-                if ahora - t_inicio > self.TIMEOUT_DESCARGA_TOTAL:
-                    raise TimeoutError(
-                        "La descarga superó el tiempo máximo de "
-                        f"{int(self.TIMEOUT_DESCARGA_TOTAL)} segundos."
-                    )
-                if ahora - ultima_senal > self.TIMEOUT_DESCARGA_SIN_SENAL:
-                    raise TimeoutError(
-                        "La nube dejó de responder durante "
-                        f"{int(self.TIMEOUT_DESCARGA_SIN_SENAL)} segundos."
-                    )
-
-                try:
-                    linea = cola.get(timeout=0.5)
-                except queue.Empty:
-                    segundos = int(ahora - t_inicio)
-                    pct = 10 if recibidos == 0 else min(70, 10 + int(recibidos / total_local * 60))
-                    progreso(pct, f"{fase} ({segundos} s)")
-                    continue
-
-                if linea is None:
-                    break
-
-                ultima_senal = time.monotonic()
-                texto = linea.strip()
-                if not texto:
-                    continue
-                ultimas_lineas.append(texto)
-                del ultimas_lineas[:-12]
-
-                try:
-                    evento = json.loads(texto)
-                except Exception:
-                    continue
-                if not isinstance(evento, dict):
-                    continue
-
-                tipo = evento.get("t")
-                if tipo == "fase":
-                    fase = str(evento.get("msg") or fase)
-                    progreso(10, fase)
-                elif tipo == "prog":
-                    recibidos = int(evento.get("n") or recibidos)
-                    pct = min(70, 10 + int(recibidos / total_local * 60))
-                    progreso(pct, f"Descargando lecturas ({recibidos} documento(s))...")
-                elif tipo == "fin":
-                    recibidos = int(evento.get("n") or recibidos)
-                    termino_ok = True
-                    progreso(72, f"Descarga recibida: {recibidos} documento(s).")
-                elif tipo == "error":
-                    error_proc = str(evento.get("msg") or "")
-
-            resultado: Dict[str, Any] = {}
-            try:
-                if ruta_salida.exists():
-                    resultado = json.loads(ruta_salida.read_text(encoding="utf-8")) or {}
-            except (OSError, ValueError) as e:
-                error_proc = error_proc or f"No se pudo leer el resultado de la descarga: {e}"
-
-            if not resultado.get("exito"):
-                detalle = (
-                    error_proc
-                    or str(resultado.get("error") or "")
-                    or ("\n".join(ultimas_lineas[-4:]) if ultimas_lineas else "")
-                    or "El proceso de descarga terminó de forma inesperada."
-                )
-                raise RuntimeError(
-                    "No se pudieron traer las lecturas de la nube.\n\n"
-                    f"Detalle: {detalle}\n\n"
-                    "El padrón Excel local NO se modificó. Revise la conexión a internet "
-                    "y las credenciales de Firebase, y vuelva a intentarlo."
-                )
-
-            if not termino_ok:
-                recibidos = int(resultado.get("recibidos") or recibidos)
-
-            return {
-                "docs": resultado.get("docs") or {},
-                "recibidos": int(resultado.get("recibidos") or recibidos),
-            }
-        finally:
-            try:
-                if proc.poll() is None:
-                    proc.kill()
-            except OSError:
-                pass
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=10)
-            finally:
-                try:
-                    if proc.stdout is not None:
-                        proc.stdout.close()
-                finally:
-                    try:
-                        hilo_salida.join(timeout=2)
-                    finally:
-                        shutil.rmtree(dir_tmp, ignore_errors=True)
-
-    def _descargar_docs_en_proceso(
-        self, periodo: str, progreso: Any
-    ) -> Dict[str, Any]:
-        """Descarga con cliente simulado en las pruebas unitarias."""
-        import firebase_client as fb
-
-        progreso(10, "Conectando con la nube de los lectores...")
-        db = fb.db()
-        col = db.collection(f"mes_{periodo}")
-
-        total_local = max(1, len(self.mes))
-        docs: Dict[str, Dict[str, Any]] = {}
-        recibidos = 0
-        consulta = col.select(["medidores", "nombre"])
-        for doc in consulta.stream(timeout=self.TIMEOUT_DESCARGA_TOTAL):
-            recibidos += 1
-            docs[str(doc.id)] = doc.to_dict() or {}
-            if recibidos == 1 or recibidos % 5 == 0:
-                pct = min(70, 10 + int(recibidos / total_local * 60))
-                progreso(pct, f"Descargando lecturas ({recibidos} documento(s))...")
-
-        progreso(72, f"Descarga recibida: {recibidos} documento(s).")
-        return {"docs": docs, "recibidos": recibidos}
 
     def sincronizar_desde_firebase(self, periodo: Optional[str] = None) -> Dict[str, Any]:
         """Compatibilidad con versiones previas: invoca traer_lecturas_de_lectores."""
@@ -1888,6 +1742,330 @@ class ServicioDatosPadron(ServicioDatos):
             "registrado_por": registrado_por,
         })
         return {"id_usuario": id_usuario, "nro_medidor": nro_medidor}
+
+    # -----------------------------------------------------------------------
+    # Emisión de Recibos y Cobros
+    # -----------------------------------------------------------------------
+    def verificar_estado_generacion_recibos(self, periodo: Optional[str] = None) -> Dict[str, Any]:
+        p = periodo or self.periodo
+        mes_act = self.config.get("mes_actual") or {}
+        estado = mes_act.get("estado") or "FACTURADO"
+
+        rec_gen = sum(1 for d in self.mes.values() if d.get("nro_recibo"))
+        tot_fac = sum(float(d.get("total_a_pagar") or 0.0)
+                      for d in self.mes.values())
+        pagados = sum(1 for d in self.mes.values() if float(d.get("monto_pagado") or 0) >= float(
+            d.get("total_a_pagar") or 0) and float(d.get("total_a_pagar") or 0) > 0)
+
+        faltantes = []
+        for uid, d in self.mes.items():
+            for m in d.get("medidores", []):
+                if m.get("lectura_actual") is None and m.get("estado_lectura") != "LEIDO":
+                    faltantes.append({
+                        "id_usuario": uid,
+                        "nro_conexion": d.get("nro_conexion"),
+                        "nombre": d.get("nombre"),
+                        "sector": d.get("sector"),
+                        "nro_medidor": m.get("nro_medidor"),
+                        "lectura_anterior": m.get("lectura_anterior", 0),
+                    })
+
+        puede_generar = (estado in ("CERRADO", "FACTURADO"))
+
+        return {
+            "periodo": p,
+            "estado": estado,
+            "puede_generar": puede_generar,
+            "faltantes": faltantes,
+            "total_usuarios": len(self.mes),
+            "recibos_generados": rec_gen,
+            "total_facturado": round(tot_fac, 2),
+            "pagados": pagados,
+            "pendientes": len(self.mes) - pagados,
+        }
+
+    def generar_recibo_usuario(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
+        doc = self.mes.get(id_usuario)
+        if not doc:
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+
+        for m in doc.get("medidores", []):
+            if m.get("lectura_actual") is None:
+                m["lectura_actual"] = m.get("lectura_anterior") or 0
+                m["estado_lectura"] = "ESTIMADO"
+
+        ultimo_recibo_num = int(self.config.get("ultimo_recibo") or 0)
+        if not doc.get("nro_recibo"):
+            ultimo_recibo_num += 1
+            doc["nro_recibo"] = f"{ultimo_recibo_num:09d}"
+            self.config["ultimo_recibo"] = ultimo_recibo_num
+
+        categorias = self.config.get("categorias", {})
+        cat_cod = doc.get("codigo_categoria", "A")
+        cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [
+            {"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
+
+        calc = calculos.calcular_recibo(
+            medidores=doc.get("medidores", []),
+            categoria=cat_obj,
+            igv_activo=False,
+            igv_porcentaje=0.18,
+            recibo_anterior=None,
+        )
+
+        doc.update({
+            "consumo_total_m3": calc["consumo_total_m3"],
+            "monto_agua": calc["monto_agua"],
+            "monto_desague": calc["monto_desague"],
+            "cargo_fijo": calc["cargo_fijo"],
+            "deuda_anterior": calc["deuda_anterior"],
+            "igv": calc["igv"],
+            "redondeo": calc["redondeo"],
+            "total_a_pagar": calc["total_a_pagar"],
+            "meses_adeudados": calc["meses_adeudados"],
+        })
+        if "monto_pagado" not in doc or doc.get("monto_pagado") is None:
+            doc["monto_pagado"] = 0.0
+            doc["fecha_pago"] = None
+
+        self.mes[id_usuario] = doc
+        self.guardar_en_respaldo_local()
+        return doc
+
+    def generar_recibos_mes(
+        self,
+        periodo: Optional[str] = None,
+        callback_progreso: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        p = periodo or self.periodo
+        total = len(self.mes)
+        procesados = 0
+
+        for uid in list(self.mes.keys()):
+            self.generar_recibo_usuario(p, uid)
+            procesados += 1
+            if callback_progreso:
+                callback_progreso(procesados, total)
+
+        if "mes_actual" in self.config:
+            self.config["mes_actual"]["estado"] = "FACTURADO"
+
+        self.guardar_en_respaldo_local()
+        return {"periodo": p, "total_generados": procesados}
+
+    def _historial_consumos(self, id_usuario: str, periodo: str, n: int = 5) -> List[Optional[float]]:
+        """
+        Reconstruye los consumos (m3) de los `n` meses ANTERIORES a `periodo` usando los
+        padrones ya cargados en memoria desde 'Base de datos/' (self.meses_encontrados).
+        Se usa como respaldo cuando la columna 'Historial m3' del Excel viene vacia.
+        Devuelve la lista en orden cronologico (mas antiguo primero), sin meses iniciales inexistentes.
+        """
+        try:
+            anio, mes = [int(p) for p in periodo.split("-")]
+        except Exception:
+            return []
+        serie: List[Optional[float]] = []
+        for k in range(n, 0, -1):
+            m_i, a_i = mes - k, anio
+            while m_i <= 0:
+                m_i += 12
+                a_i -= 1
+            per = f"{a_i:04d}-{m_i:02d}"
+            docs_per = self.meses_encontrados.get(per)
+            if docs_per is None:
+                # ese mes no existe en Base de datos/
+                serie.append(None)
+                continue
+            d = docs_per.get(id_usuario)
+            if not d:
+                # el usuario aun no existia ese mes (sin dato)
+                serie.append(None)
+                continue
+            v = d.get("consumo_total_m3")
+            try:
+                serie.append(float(v) if v not in (None, "") else None)
+            except (TypeError, ValueError):
+                serie.append(None)
+        # Quitar meses iniciales sin dato; los None intermedios se dibujan como "sin dato"
+        while serie and serie[0] is None:
+            serie.pop(0)
+        return serie
+
+    def _doc_para_pdf(self, doc: Dict[str, Any], id_usuario: str, periodo: str) -> Dict[str, Any]:
+        """Copia del doc con historial_m3 completado desde los padrones previos si esta vacio."""
+        d = dict(doc)
+        if not d.get("historial_m3"):
+            d["historial_m3"] = self._historial_consumos(id_usuario, periodo)
+        return d
+
+    def generar_pdf_recibo(self, periodo: str, id_usuario: str) -> str:
+        doc = self.mes.get(id_usuario)
+        if not doc:
+            raise ValueError(f"Usuario {id_usuario} no encontrado.")
+        from servicios.generador_pdf import generar_recibo_pdf_para_usuario
+        return str(generar_recibo_pdf_para_usuario(self._doc_para_pdf(doc, id_usuario, periodo), self.config, periodo))
+
+    def generar_zip_recibos(self, periodo: str, sector: Optional[str] = None) -> Optional[str]:
+        from servicios.generador_pdf import generar_recibo_pdf_para_usuario, empaquetar_recibos_en_zip
+        for uid, doc in self.mes.items():
+            if sector and doc.get("sector") != sector:
+                continue
+            if doc.get("nro_recibo"):
+                generar_recibo_pdf_para_usuario(self._doc_para_pdf(
+                    doc, uid, periodo), self.config, periodo)
+        ruta_zip = empaquetar_recibos_en_zip(periodo, sector)
+        return str(ruta_zip) if ruta_zip else None
+
+    def registrar_pago(
+        self,
+        periodo: str,
+        id_usuario: str,
+        monto_pagado: float,
+        fecha_pago: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        doc = self.mes.get(id_usuario)
+        if not doc:
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+        fecha = fecha_pago or datetime.date.today().isoformat()
+        monto = round(float(monto_pagado), 2)
+        doc["monto_pagado"] = monto
+        doc["fecha_pago"] = fecha
+
+        self.ops["escrituras"] += 1
+        self.guardar_en_respaldo_local()
+
+        encolar_cambio("pago", {
+            "periodo": periodo,
+            "id_usuario": id_usuario,
+            "monto_pagado": monto,
+            "fecha_pago": fecha,
+        })
+        return doc
+
+    def anular_pago(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
+        doc = self.mes.get(id_usuario)
+        if not doc:
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+        doc["monto_pagado"] = 0.0
+        doc["fecha_pago"] = None
+
+        self.ops["escrituras"] += 1
+        self.guardar_en_respaldo_local()
+
+        encolar_cambio("anular_pago", {
+            "periodo": periodo,
+            "id_usuario": id_usuario,
+        })
+        return doc
+
+    def exportar_reporte_morosos_excel(
+        self,
+        periodo: Optional[str] = None,
+        ruta_salida: Optional[str] = None,
+    ) -> str:
+        p = Path(ruta_salida) if ruta_salida else rutas.ruta_salida(
+            f"reporte_morosos_{periodo or self.periodo}.xlsx")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Lista de Corte"
+
+        ws["A1"] = f"CAAPD ISPACAS — LISTA DE USUARIOS CON CORTE DE SERVICIO ({periodo or self.periodo})"
+        ws["A1"].font = Font(name="Arial", size=12, bold=True, color="FFFFFF")
+        ws.merge_cells("A1:G1")
+        for col in range(1, 8):
+            ws.cell(row=1, column=col).fill = PatternFill(
+                start_color="DC2626", end_color="DC2626", fill_type="solid")
+
+        headers = ["Nro Conexión", "DNI", "Titular", "Sector",
+                   "Meses Deuda", "Total Deuda S/.", "Medidor"]
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=c, value=h)
+            cell.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+            cell.fill = PatternFill(
+                start_color="1E293B", end_color="1E293B", fill_type="solid")
+
+        r_idx = 4
+        for d in self.mes.values():
+            meses = int(d.get("meses_adeudados") or 0)
+            pagado = float(d.get("monto_pagado") or 0)
+            total = float(d.get("total_a_pagar") or 0)
+            if meses >= 3 and pagado < total:
+                med_str = ", ".join(m.get("nro_medidor", "")
+                                    for m in d.get("medidores", []))
+                ws.cell(row=r_idx, column=1, value=d.get("nro_conexion", ""))
+                ws.cell(row=r_idx, column=2, value=d.get("id_usuario", ""))
+                ws.cell(row=r_idx, column=3, value=d.get("nombre", ""))
+                ws.cell(row=r_idx, column=4, value=d.get("sector", ""))
+                ws.cell(row=r_idx, column=5, value=meses)
+                c_tot = ws.cell(row=r_idx, column=6, value=total)
+                c_tot.number_format = '"S/. "#,##0.00'
+                ws.cell(row=r_idx, column=7, value=med_str)
+                r_idx += 1
+
+        wb.save(str(p))
+        return str(p)
+
+    def _servicio_autenticacion_lectores(self) -> ServicioDatos:
+        servicio = getattr(self, "_servicio_auth_lectores", None)
+        if servicio is None:
+            from servicios.datos import ServicioDatosFirebase
+
+            servicio = ServicioDatosFirebase()
+            self._servicio_auth_lectores = servicio
+        return servicio
+
+    def listar_lectores(self) -> List[Dict[str, Any]]:
+        return self._servicio_autenticacion_lectores().listar_lectores()
+
+    def crear_lector(self, email: str, password: str, display_name: Optional[str] = None) -> Dict[str, Any]:
+        return self._servicio_autenticacion_lectores().crear_lector(
+            email, password, display_name
+        )
+
+    def actualizar_lector(
+        self,
+        uid: str,
+        display_name: Optional[str] = None,
+        password: Optional[str] = None,
+        disabled: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        return self._servicio_autenticacion_lectores().actualizar_lector(
+            uid=uid,
+            display_name=display_name,
+            password=password,
+            disabled=disabled,
+        )
+
+    def eliminar_lector(self, uid: str) -> None:
+        self._servicio_autenticacion_lectores().eliminar_lector(uid)
+
+    def get_ops(self) -> Dict[str, int]:
+        return self.ops
+
+    def hay_aviso_ops(self) -> Dict[str, Optional[str]]:
+        return {"lecturas": None, "escrituras": None}
+
+    def limpiar_cache(self, limpiar_config: bool = True) -> None:
+        """Recarga los datos únicamente desde la carpeta 'Base de datos/' o Padrón Excel local. Cero lecturas a Firestore."""
+        archivos_bd = buscar_archivos_base_datos()
+        if archivos_bd:
+            self.cargar_desde_carpeta_base_datos()
+            return
+
+        cargado = False
+        if self.ruta_excel and self.ruta_excel.exists():
+            cargado = self._cargar_desde_excel(self.ruta_excel)
+        if not cargado:
+            p_mes = buscar_archivo_padron_mes()
+            if p_mes and p_mes.exists():
+                self._cargar_desde_padron_excel(p_mes)
 
     # -----------------------------------------------------------------------
     # Emisión de Recibos y Cobros

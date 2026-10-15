@@ -4,8 +4,11 @@ tests/test_ui_inicio.py — Pruebas de interfaz gráfica con pytest-qt (offscree
 Verifica la apertura de la ventana principal, la navegación entre las 6 páginas,
 la barra de estado y los diferentes estados del panel de Inicio.
 """
+import threading
+
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QThread, Qt
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QPushButton
 
 from servicios.datos import ServicioDatosMemoria
@@ -133,6 +136,44 @@ def test_inicio_sin_mes_muestra_alerta_y_boton(qtbot, monkeypatch):
     monkeypatch.setattr(inicio, "abrir_dialogo_nuevo_mes", lambda: llamadas.append(True))
     btn_abrir.click()
     assert len(llamadas) == 1
+
+
+def test_progreso_de_sincronizacion_se_actualiza_en_hilo_gui(
+    qtbot, servicio_memoria, monkeypatch
+):
+    ventana = VentanaPrincipal(servicio_memoria)
+    qtbot.addWidget(ventana)
+    hilos_receptores = []
+    monkeypatch.setattr(
+        ventana,
+        "_mostrar_progreso_ui",
+        lambda _porcentaje, _texto: hilos_receptores.append(QThread.currentThread()),
+    )
+
+    hilo = threading.Thread(
+        target=lambda: ventana.pagina_inicio._senal_progreso_sincronizacion.emit(
+            45, "Descargando lecturas..."
+        )
+    )
+    hilo.start()
+    hilo.join()
+
+    qtbot.waitUntil(lambda: bool(hilos_receptores), timeout=2000)
+    assert hilos_receptores[0] == ventana.thread()
+
+
+def test_cierre_se_rechaza_mientras_haya_workers_activos(
+    qtbot, servicio_memoria, monkeypatch
+):
+    ventana = VentanaPrincipal(servicio_memoria)
+    qtbot.addWidget(ventana)
+    monkeypatch.setattr("ui.ventana_principal.esperar_hilos", lambda _ms: False)
+    monkeypatch.setattr("ui.ventana_principal.QMessageBox.information", lambda *_args: None)
+    evento = QCloseEvent()
+
+    ventana.closeEvent(evento)
+
+    assert not evento.isAccepted()
 
 
 def test_inicio_botones_segun_contexto_3b(qtbot, servicio_memoria):

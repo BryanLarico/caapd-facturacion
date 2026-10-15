@@ -589,6 +589,50 @@ def test_descarga_en_subproceso_timeout_limpia_y_termina_proceso(
     assert all(not ruta.exists() for ruta in rutas_temporales)
 
 
+def test_descarga_en_subproceso_no_confunde_heartbeat_con_avance(
+    servicio_prueba, monkeypatch
+):
+    rutas_temporales = []
+
+    class ProcesoConLatidosSinAvance:
+        def __init__(self, comando, **kwargs):
+            self.terminado = threading.Event()
+            self.stdout = self.Salida(self.terminado)
+            rutas_temporales.append(Path(comando[comando.index("--salida") + 1]).parent)
+
+        class Salida:
+            def __init__(self, terminado):
+                self.terminado = terminado
+
+            def __iter__(self):
+                while not self.terminado.wait(0.005):
+                    yield '{"t":"hb"}\n'
+
+            def close(self):
+                self.terminado.set()
+
+        def poll(self):
+            return 0 if self.terminado.is_set() else None
+
+        def wait(self, timeout):
+            return 0
+
+        def kill(self):
+            self.terminado.set()
+
+    monkeypatch.setattr(subprocess, "Popen", ProcesoConLatidosSinAvance)
+    servicio_prueba.TIMEOUT_DESCARGA_SIN_SENAL = 0.05
+    servicio_prueba.TIMEOUT_DESCARGA_TOTAL = 2
+
+    with pytest.raises(TimeoutError, match="no recibió avances"):
+        ServicioDatosPadron._descargar_docs_en_subproceso(
+            servicio_prueba, "2026-09", lambda *_: None
+        )
+
+    assert rutas_temporales
+    assert all(not ruta.exists() for ruta in rutas_temporales)
+
+
 def test_dialogo_confirmacion_requiere_escribir_confirmar(qapp, tmp_path):
     """Verifica que el paso '¿Está seguro?' solo habilite el envío si se escribe CONFIRMAR."""
     dir_bd = tmp_path / "Base de datos"
