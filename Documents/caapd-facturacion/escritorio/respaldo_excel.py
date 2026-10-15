@@ -23,7 +23,6 @@ def generar_respaldo_excel(
     mes_docs: Dict[str, Dict[str, Any]],
     periodo: Optional[str] = None,
     ruta_archivo: Optional[Path | str] = None,
-    es_prueba: bool = False,
 ) -> Path:
     """Genera un archivo Excel completo con todo lo necesario para reconstruir el sistema.
 
@@ -84,14 +83,6 @@ def generar_respaldo_excel(
         ("Checksum Verificación", f"{total_docs_mes}_{round(suma_total_pagar, 2):.2f}"),
     ]
 
-    try:
-        import rutas
-        if es_prueba or (hasattr(rutas, "es_entorno_prueba") and rutas.es_entorno_prueba()):
-            filas_leeme.append(("TIPO: ARCHIVO DE PRUEBA", "SI"))
-    except Exception:
-        if es_prueba:
-            filas_leeme.append(("TIPO: ARCHIVO DE PRUEBA", "SI"))
-
     ws_leeme.cell(row=4, column=1, value="PARÁMETRO").font = fuente_encabezado
     ws_leeme.cell(row=4, column=1).fill = fill_azul
     ws_leeme.cell(row=4, column=2, value="VALOR").font = fuente_encabezado
@@ -106,10 +97,6 @@ def generar_respaldo_excel(
         c2.border = borde_fino
         if param == "Suma Total a Pagar (S/.)":
             c2.number_format = '"S/. "#,##0.00'
-        if param == "TIPO: ARCHIVO DE PRUEBA":
-            c1.font = Font(name="Arial", size=10, bold=True, color="DC2626")
-            c2.font = Font(name="Arial", size=10, bold=True, color="DC2626")
-
     fila_inst = len(filas_leeme) + 6
     ws_leeme.cell(row=fila_inst, column=1, value="INSTRUCCIONES DE RESTAURACIÓN:").font = Font(name="Arial", size=11, bold=True, color="1E3A8A")
     instrucciones = [

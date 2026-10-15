@@ -21,21 +21,11 @@ try:
 except ImportError:
     pass
 
-if os.environ.get("CAAPD_ENTORNO", "").strip().lower() == "prueba":
-    try:
-        from config_local_prueba import FIREBASE_KEY_PATH
-    except ImportError:
-        try:
-            from config_local import FIREBASE_KEY_PATH
-        except ImportError:
-            FIREBASE_KEY_PATH = os.environ.get(
-                "FIREBASE_KEY_PATH", "serviceAccountKey.json")
-else:
-    try:
-        from config_local import FIREBASE_KEY_PATH
-    except ImportError:
-        FIREBASE_KEY_PATH = os.environ.get(
-            "FIREBASE_KEY_PATH", "serviceAccountKey.json")
+try:
+    from config_local import FIREBASE_KEY_PATH
+except ImportError:
+    FIREBASE_KEY_PATH = os.environ.get(
+        "FIREBASE_KEY_PATH", "serviceAccountKey.json")
 
 
 def obtener_proyecto_id() -> str:

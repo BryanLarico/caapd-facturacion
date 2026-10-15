@@ -3,8 +3,49 @@ tests/test_importador_mes.py — Pruebas de la importación mensual y padrones h
 """
 import os
 from unittest.mock import patch
+
+import openpyxl
 import pytest
-from servicios.importador_mes import importar_mes_desde_excel
+from servicios.importador_mes import importar_mes_desde_excel, mapear_columnas
+
+
+def test_importador_preserva_sin_acceso_y_registrado_por(tmp_path):
+    ruta_excel = tmp_path / "lecturas.xlsx"
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.append([
+        "Conexión", "DNI", "Nombre", "Sector", "Medidor",
+        "Lect. Anterior", "Lect. Actual", "Novedad",
+    ])
+    hoja.append([
+        "1", "70112233", "USUARIO", "BARRIO DE LUCMANI", "1001",
+        25, None, "SIN_ACCESO",
+    ])
+    libro.save(ruta_excel)
+
+    with patch("firebase_client.cargar_usuarios", return_value={}), \
+         patch("firebase_client.guardar_usuarios_lote"), \
+         patch("firebase_client.guardar_mes_lote") as mock_guardar_mes, \
+         patch("firebase_client.limpiar_cache"), \
+         patch("respaldo.on_datos_cambiados"):
+        importar_mes_desde_excel(ruta_excel, periodo="2026-08")
+
+    _, usuarios_mes = mock_guardar_mes.call_args.args
+    medidor = usuarios_mes["70112233"]["medidores"][0]
+    assert medidor["estado_lectura"] == "SIN_ACCESO"
+    assert medidor["registrado_por"] == "EXCEL_IMPORT"
+
+
+@pytest.mark.parametrize(
+    ("encabezado", "clave"),
+    [
+        ("Conexión", "conexion"),
+        ("DNI", "dni"),
+        ("Lectura anterior", "lectura_anterior"),
+    ],
+)
+def test_mapear_columnas(encabezado, clave):
+    assert clave in mapear_columnas([encabezado])
 
 
 def test_importar_plantilla_modelo():

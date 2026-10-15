@@ -440,25 +440,7 @@ class ServicioDatosPadron(ServicioDatos):
         """Guarda el estado actual en el archivo de respaldo Excel local y en Base de datos/."""
         p_obj = periodo or self.periodo or self.config.get(
             "mes_actual", {}).get("periodo") or "2026-10"
-        es_prueba = rutas.es_entorno_prueba()
 
-        # En entorno de prueba, SOLO escribe en escritorio/Base de datos PRUEBA/
-        if es_prueba:
-            destino_bd = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
-            self.ruta_excel = destino_bd
-            resp = respaldo_excel.generar_respaldo_excel(
-                config=self.config,
-                usuarios=self.usuarios,
-                mes_docs=self.mes,
-                periodo=p_obj,
-                ruta_archivo=destino_bd,
-                es_prueba=True,
-            )
-            if resp.exists():
-                self._archivos_mtime[str(resp)] = resp.stat().st_mtime
-            return resp
-
-        # Modo normal (producción)
         destino = rutas.ruta_respaldos(f"RESPALDO_{p_obj}.xlsx")
         self.ruta_excel = destino
         resp = respaldo_excel.generar_respaldo_excel(
@@ -467,7 +449,6 @@ class ServicioDatosPadron(ServicioDatos):
             mes_docs=self.mes,
             periodo=p_obj,
             ruta_archivo=destino,
-            es_prueba=False,
         )
         # Solo monitorear archivos en Base de datos/ (no respaldos/)
         try:
@@ -478,7 +459,6 @@ class ServicioDatosPadron(ServicioDatos):
                 mes_docs=self.mes,
                 periodo=p_obj,
                 ruta_archivo=destino_bd,
-                es_prueba=False,
             )
             if destino_bd.exists():
                 self._archivos_mtime[str(destino_bd)] = destino_bd.stat().st_mtime
@@ -887,14 +867,7 @@ class ServicioDatosPadron(ServicioDatos):
         t_inicio = time.perf_counter()
 
         if callback_progreso:
-<<<<<<< HEAD
             callback_progreso(5, "Iniciando respaldo de seguridad local...")
-=======
-            callback_progreso(
-                30, f"Escribiendo {total_usuarios} usuarios en Firebase...")
-        fb.guardar_usuarios_lote(self.usuarios)
-        total_escrituras += total_usuarios
->>>>>>> origin/Andres
 
         # 1. Respaldo previo de seguridad de Base de datos/*.xlsx
         dir_bd = rutas.ruta_base_de_datos()
@@ -958,20 +931,11 @@ class ServicioDatosPadron(ServicioDatos):
             batch.commit()
             self.ops["escrituras"] += len(chunk)
             if callback_progreso:
-<<<<<<< HEAD
                 pct = 20 + int((idx / max(1, len(chunks_subir))) * 40)
                 callback_progreso(pct, f"Subiendo usuarios del mes ({min(idx * batch_size, total_items)}/{total_items})...")
-=======
-                pct = 30 + int((i / (total_meses + 1)) * 50)
-                callback_progreso(
-                    pct, f"Escribiendo mes {periodo} ({len(docs_mes)} registros)...")
-            fb.guardar_mes_lote(periodo, docs_mes)
-            total_escrituras += len(docs_mes)
->>>>>>> origin/Andres
 
         # 4. Actualizar config/general
         if callback_progreso:
-<<<<<<< HEAD
             callback_progreso(65, "Actualizando configuración general en Firestore...")
         mes_actual_cfg = self.config.get("mes_actual") or {}
         datos_cfg_nube = {
@@ -986,12 +950,6 @@ class ServicioDatosPadron(ServicioDatos):
         }
         db.collection("config").document("general").set(datos_cfg_nube, merge=True)
         self.ops["escrituras"] += 1
-=======
-            callback_progreso(
-                90, "Actualizando configuración general en la nube...")
-        fb.guardar_config(self.config)
-        total_escrituras += 1
->>>>>>> origin/Andres
 
         # 5. Detectar sobrantes usando list_documents() (SOLO IDs, NUNCA stream())
         if callback_progreso:
@@ -1053,12 +1011,7 @@ class ServicioDatosPadron(ServicioDatos):
             pass
 
         if callback_progreso:
-<<<<<<< HEAD
             callback_progreso(100, f"¡Envío completado en {duracion:.2f} s!")
-=======
-            callback_progreso(
-                100, f"¡{total_escrituras} documentos sincronizados con éxito en Firebase!")
->>>>>>> origin/Andres
 
         return {
             "usuarios_subidos": total_items,
@@ -1202,45 +1155,12 @@ class ServicioDatosPadron(ServicioDatos):
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.config["ultima_descarga_lectores"] = ahora_str
         try:
-<<<<<<< HEAD
             self.guardar_config(self.config)
         except Exception:
             pass
 
         if callback_progreso:
             callback_progreso(100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
-=======
-            import firebase_client as fb
-            docs = fb.db().collection(fb.nombre_coleccion_mes(p)).stream()
-            for doc in docs:
-                datos = doc.to_dict()
-                uid = doc.id
-                if uid in self.mes:
-                    meds_cloud = datos.get("medidores") or []
-                    meds_local = self.mes[uid].get("medidores") or []
-                    for mc in meds_cloud:
-                        nro = mc.get("nro_medidor")
-                        ml = next((m for m in meds_local if m.get(
-                            "nro_medidor") == nro), None)
-                        if ml and mc.get("lectura_actual") is not None:
-                            ml["lectura_actual"] = mc.get("lectura_actual")
-                            ml["estado_lectura"] = mc.get(
-                                "estado_lectura", "LEIDO")
-                            ml["novedad"] = mc.get("novedad", "NORMAL")
-                            ml["nota"] = mc.get("nota", "")
-                            ml["fecha_lectura"] = mc.get("fecha_lectura")
-                            actualizados += 1
-
-                    if datos.get("monto_pagado", 0) > 0 and self.mes[uid].get("monto_pagado", 0) == 0:
-                        self.mes[uid]["monto_pagado"] = datos.get(
-                            "monto_pagado")
-                        self.mes[uid]["fecha_pago"] = datos.get("fecha_pago")
-
-            self.guardar_en_respaldo_local()
-
-        except Exception as e:
-            errores.append(str(e))
->>>>>>> origin/Andres
 
         return {
             "periodo": p,

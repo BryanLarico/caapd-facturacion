@@ -13,20 +13,20 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyMod
 from PySide6.QtGui import QColor, QFont
 
 import codigos
+from ui.estilos.paleta import PALETA
 
 COLUMNAS_LECTURAS = [
-    "Conexión",
+    "CONEXIÓN",
     "ID / DNI",
-    "Persona",
-    "Sector",
-    "Medidor",
-    "Lect. Anterior",
-    "Lect. Actual",
-    "Consumo (m³)",
-    "Estado",
-    "Observación",
-    "Nota",
-    "Registrado por",
+    "PERSONA",
+    "SECTOR",
+    "MEDIDOR",
+    "LECT. ANTERIOR",
+    "LECT. ACTUAL",
+    "CONSUMO (M³)",
+    "ESTADO",
+    "OBSERVACIÓN",
+    "NOTA",
 ]
 
 
@@ -49,6 +49,9 @@ class ModeloLecturas(QAbstractTableModel):
 
         row = self._datos[index.row()]
         col = index.column()
+
+        if role == Qt.ItemDataRole.ToolTipRole:
+            return self.data(index, Qt.ItemDataRole.DisplayRole)
 
         if role == Qt.ItemDataRole.DisplayRole:
             if col == 0:
@@ -93,8 +96,6 @@ class ModeloLecturas(QAbstractTableModel):
                 return nov.replace("_", " ").title()
             elif col == 10:
                 return str(row.get("nota") or "")
-            elif col == 11:
-                return str(row.get("registrado_por") or "—")
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in (0, 1, 4, 5, 6, 7, 8):
@@ -103,46 +104,46 @@ class ModeloLecturas(QAbstractTableModel):
 
         elif role == Qt.ItemDataRole.ForegroundRole:
             if col == 0:
-                return QColor("#0369a1")  # Azul primario conexión
+                return QColor(PALETA.TEXTO_LINK)
             elif col == 1:
-                return QColor("#b45309") if row.get("es_pendiente") else QColor("#0f172a")
+                return QColor(PALETA.AVISO) if row.get("es_pendiente") else QColor(PALETA.TEXTO)
             elif col == 2:
-                return QColor("#0f172a")  # Titular oscuro
-            elif col in (3, 10, 11):
-                return QColor("#334155")  # Sector / Nota / Registrado por
+                return QColor(PALETA.TEXTO)
+            elif col in (3, 10):
+                return QColor(PALETA.TEXTO_SUAVE)
             elif col == 4:
-                return QColor("#0284c7")  # Medidor
+                return QColor(PALETA.PRIMARIO_HOVER)
             elif col == 5:
-                return QColor("#475569")  # Lectura anterior
+                return QColor(PALETA.TEXTO_SUAVE)
             elif col == 6:
                 if row.get("lectura_actual") is None:
-                    return QColor("#94a3b8")  # Gris pendiente
-                return QColor("#0f172a")
+                    return QColor(PALETA.TEXTO_MUTED)
+                return QColor(PALETA.TEXTO)
             elif col == 7:
                 act = row.get("lectura_actual")
                 if act is not None:
                     ant = row.get("lectura_anterior") or 0
                     if act < ant and row.get("novedad") != "CAMBIO_MEDIDOR":
-                        return QColor("#dc2626")  # Rojo negativo
-                    return QColor("#16a34a")  # Verde
-                return QColor("#94a3b8")
+                        return QColor(PALETA.PELIGRO)
+                    return QColor(PALETA.EXITO)
+                return QColor(PALETA.TEXTO_MUTED)
             elif col == 8:
                 est = str(row.get("estado_lectura") or "PENDIENTE").upper()
                 if est == "LEIDO":
-                    return QColor("#16a34a")
+                    return QColor(PALETA.EXITO)
                 elif est == "SIN_ACCESO":
-                    return QColor("#dc2626")
-                return QColor("#d97706")  # Ámbar pendiente
+                    return QColor(PALETA.PELIGRO)
+                return QColor(PALETA.AVISO)
             elif col == 9:
                 nov = str(row.get("novedad") or "").strip()
                 if nov and nov != "NORMAL":
-                    return QColor("#b45309")
-                return QColor("#64748b")
-            return QColor("#1e293b")
+                    return QColor(PALETA.AVISO)
+                return QColor(PALETA.TEXTO_MUTED)
+            return QColor(PALETA.TEXTO)
 
         elif role == Qt.ItemDataRole.FontRole:
             if col in (0, 1, 4, 5, 6, 7):
-                f = QFont("Consolas", 10)
+                f = QFont(PALETA.FUENTE_MONO, PALETA.TAMANO_TABLA)
                 if col in (0, 6, 7):
                     f.setBold(True)
                 return f
@@ -215,7 +216,7 @@ class ProxyLecturas(QSortFilterProxyModel):
         # 3. Filtro por Estado
         est = str(item.get("estado_lectura") or "PENDIENTE").upper()
         if self.filtro_estado == "faltan":
-            if est != "PENDIENTE":
+            if est == "LEIDO":
                 return False
         elif self.filtro_estado == "sin_acceso":
             if est != "SIN_ACCESO":

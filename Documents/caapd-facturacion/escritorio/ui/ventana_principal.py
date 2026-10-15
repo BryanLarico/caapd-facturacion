@@ -48,8 +48,7 @@ class VentanaPrincipal(QMainWindow):
         super().__init__(parent)
         self.servicio = servicio_datos
 
-        titulo = "CAAPD Ispacas — Facturación [ENTORNO DE PRUEBA]" if rutas.es_entorno_prueba() else "CAAPD Ispacas — Facturación"
-        self.setWindowTitle(titulo)
+        self.setWindowTitle("CAAPD Ispacas — Facturación")
         self.resize(1180, 780)
         self.setMinimumSize(960, 600)
 
@@ -73,17 +72,6 @@ class VentanaPrincipal(QMainWindow):
         layout_principal = QVBoxLayout(widget_central)
         layout_principal.setContentsMargins(0, 0, 0, 0)
         layout_principal.setSpacing(0)
-
-        # 0. Banner permanente de Entorno de Prueba si CAAPD_ENTORNO=prueba
-        if rutas.es_entorno_prueba():
-            banner_prueba = QFrame()
-            banner_prueba.setStyleSheet("background-color: #FEF3C7; border-bottom: 2px solid #F59E0B; padding: 4px;")
-            l_pb = QHBoxLayout(banner_prueba)
-            l_pb.setContentsMargins(16, 4, 16, 4)
-            lbl_pb = QLabel("⚠️ <b>ENTORNO DE PRUEBA ACTIVO</b> — Bases de datos y respaldos aislados en 'Base de datos PRUEBA'")
-            lbl_pb.setStyleSheet("color: #92400E; font-size: 12px;")
-            l_pb.addWidget(lbl_pb)
-            layout_principal.addWidget(banner_prueba)
 
         # 1. Barra Superior de Navegación
         nav_superior = self._crear_barra_superior()

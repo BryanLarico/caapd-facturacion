@@ -96,30 +96,19 @@ def ruta_recibos(*partes: str) -> Path:
     return p
 
 
-# ============ DESDE AQUÍ TODO ES IGUAL A TU VERSIÓN ============
-def es_entorno_prueba() -> bool:
-    """Indica si el sistema se está ejecutando en modo de prueba (CAAPD_ENTORNO=prueba)."""
-    import os
-    return os.environ.get("CAAPD_ENTORNO", "").strip().lower() == "prueba"
-
-
 def ruta_respaldos(*partes: str) -> Path:
     """Devuelve la ruta dentro de respaldos/ (creándola si no existe)."""
-    if es_entorno_prueba():
-        dir_resp = DIR_BASE.joinpath("Base de datos PRUEBA", "respaldos")
-    else:
-        # Priorizar respaldos en la raíz si existe, sino en escritorio
-        dir_resp = DIR_BASE.parent.joinpath("respaldos") if DIR_BASE.parent.joinpath(
-            "respaldos").exists() else DIR_BASE.joinpath("respaldos")
+    # Priorizar respaldos en la raíz si existe, sino en escritorio
+    dir_resp = DIR_BASE.parent.joinpath("respaldos") if DIR_BASE.parent.joinpath(
+        "respaldos").exists() else DIR_BASE.joinpath("respaldos")
     p = dir_resp.joinpath(*partes)
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def ruta_base_de_datos(*partes: str) -> Path:
-    """Devuelve la ruta dentro de 'Base de datos/' (o 'Base de datos PRUEBA/' si CAAPD_ENTORNO=prueba)."""
-    nombre_carpeta = "Base de datos PRUEBA" if es_entorno_prueba() else "Base de datos"
-    dir_bd = DIR_BASE.joinpath(nombre_carpeta)
+    """Devuelve la ruta dentro de 'Base de datos/'."""
+    dir_bd = DIR_BASE.joinpath("Base de datos")
     dir_bd.mkdir(parents=True, exist_ok=True)
     p = dir_bd.joinpath(*partes)
     if partes:

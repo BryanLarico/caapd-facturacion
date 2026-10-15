@@ -1,23 +1,9 @@
-"""
-ui/paginas/configuracion.py — Pantalla de Configuración del Sistema (Fase 6).
-
-Permite visualizar y editar:
-1. Datos institucionales del Comité (empresa, resolución, teléfonos, dirección).
-2. Tarifas por categoría (A, B, C) con soporte para modo tramos y tarifas planas.
-3. Parámetros tributarios (IGV) y políticas de morosidad.
-4. Sectores / barrios de la comunidad.
-5. Catálogo de observaciones y novedades de medidores para la App y la PC.
-6. Gestión de respaldos Excel y contingencia.
-"""
 from __future__ import annotations
 import copy
 import json
-import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-from PySide6.QtCore import QThreadPool, Qt, QUrl
-from PySide6.QtGui import QColor, QDesktopServices, QFont
+from PySide6.QtCore import QLocale, QThreadPool, Qt
+from PySide6.QtGui import QDoubleValidator, QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -34,21 +20,65 @@ from PySide6.QtWidgets import (
     QListView,
     QMessageBox,
     QPushButton,
-    QRadioButton,
     QScrollArea,
     QSpinBox,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
-
-import respaldo
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
 from ui.hilos import Worker, mostrar_dialogo_error
+"""
+ui/paginas/configuracion.py — Pantalla de Configuración del Sistema (Fase 6).
+
+Permite visualizar y editar:
+1. Datos institucionales del Comité (empresa, resolución, teléfonos, dirección).
+2. Tarifas por categoría (A, B, C) con escala de rangos de consumo (modo rango único).
+3. Parámetros tributarios (IGV) y políticas de morosidad.
+4. Sectores / barrios de la comunidad.
+5. Catálogo de observaciones y novedades de medidores para la App y la PC.
+"""
+
+
+class DelegadoEdicionEnFila(QStyledItemDelegate):
+    """
+    Editor plano que ocupa exactamente la celda de la tabla.
+
+    Evita la 'caja flotante' que produce el estilo global de QLineEdit
+    (border-radius, padding y min-height definidos en tema.qss).
+
+    tipos_columna: {indice_columna: "entero" | "entero_opcional" | "decimal"}
+    """
+
+    def __init__(self, tipos_columna: Dict[int, str], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._tipos = tipos_columna
+
+    def createEditor(self, parent, option, index):  # noqa: N802
+        editor = QLineEdit(parent)
+        editor.setFrame(False)
+        editor.setStyleSheet(
+            "QLineEdit { border: none; border-radius: 0; padding: 0 8px; margin: 0; "
+            "min-height: 0; background-color: #ffffff; color: #0f172a; font-size: 13px; }"
+        )
+        tipo = self._tipos.get(index.column())
+        if tipo in ("entero", "entero_opcional"):
+            editor.setValidator(QIntValidator(0, 999999, editor))
+        elif tipo == "decimal":
+            validador = QDoubleValidator(0.0, 9999.0, 2, editor)
+            validador.setNotation(QDoubleValidator.Notation.StandardNotation)
+            validador.setLocale(QLocale.c())  # acepta punto decimal (1.50)
+            editor.setValidator(validador)
+        editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return editor
+
+    def updateEditorGeometry(self, editor, option, index):  # noqa: N802
+        editor.setGeometry(option.rect)
 
 
 class PaginaConfiguracion(QWidget):
@@ -66,6 +96,14 @@ class PaginaConfiguracion(QWidget):
         self.config_actual: Dict[str, Any] = {}
         self.config_cargada: bool = False
         self._worker = None
+
+        # Control de cambios pendientes (habilita/deshabilita "Guardar Configuración")
+        # True mientras se llena el formulario
+        self._poblando: bool = False
+        # snapshot del formulario sin cambios
+        self._config_base: Optional[Dict[str, Any]] = None
+        # categoría visible en la pestaña Tarifas
+        self._cat_key_actual: str = "A"
 
         self._construir_ui()
 
@@ -101,7 +139,8 @@ class PaginaConfiguracion(QWidget):
         self.btn_recargar = QPushButton("🔄 Recargar")
         self.btn_recargar.setProperty("class", "boton boton_secundario")
         self.btn_recargar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_recargar.clicked.connect(lambda: self.cargar_datos_asincrono(forzar=True))
+        self.btn_recargar.clicked.connect(
+            lambda: self.cargar_datos_asincrono(forzar=True))
         fila_encabezado.addWidget(self.btn_recargar)
 
         # Botón Guardar
@@ -117,6 +156,9 @@ class PaginaConfiguracion(QWidget):
             QPushButton:disabled { background-color: #94a3b8; }
         """)
         self.btn_guardar.clicked.connect(self._accion_guardar_configuracion)
+        # deshabilitado hasta que exista algún cambio
+        self.btn_guardar.setEnabled(False)
+        self.btn_guardar.setToolTip("No hay cambios pendientes por guardar")
         fila_encabezado.addWidget(self.btn_guardar)
 
         layout_principal.addLayout(fila_encabezado)
@@ -165,21 +207,23 @@ class PaginaConfiguracion(QWidget):
         self.tabs.addTab(self._crear_tab_tarifas(), "💧 Tarifas y Categorías")
 
         # Pestaña 2: Impuestos y Mora
-        self.tabs.addTab(self._crear_tab_impuestos(), "💰 Impuestos (IGV) y Mora")
+        self.tabs.addTab(self._crear_tab_impuestos(),
+                         "💰 Impuestos (IGV) y Mora")
 
         # Pestaña 3: Sectores
         self.tabs.addTab(self._crear_tab_sectores(), "📍 Sectores / Barrios")
 
         # Pestaña 4: Observaciones de Medidor
-        self.tabs.addTab(self._crear_tab_observaciones(), "📋 Catálogo de Novedades")
-
-        # Pestaña 5: Respaldo y Contingencia
-        self.tabs.addTab(self._crear_tab_respaldo(), "📦 Respaldo y Contingencia")
+        self.tabs.addTab(self._crear_tab_observaciones(),
+                         "📋 Catálogo de Novedades")
 
         layout_principal.addWidget(self.tabs, stretch=1)
 
+        # Conectar señales de todos los campos para detectar cambios
+        self._conectar_senales_cambios()
+
     # -----------------------------------------------------------------------
-    # TAB 1: DATOS INSTITUCIONALES DEL COMITÉ
+    # TAB 1: DATOS INSTITUCIONALES DEL COMITÉ (oculta, se conserva internamente)
     # -----------------------------------------------------------------------
     def _crear_tab_empresa(self) -> QWidget:
         scroll = QScrollArea()
@@ -199,7 +243,8 @@ class PaginaConfiguracion(QWidget):
         f_lay.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.txt_empresa_nombre = QLineEdit()
-        self.txt_empresa_nombre.setPlaceholderText("Nombre completo del comité de agua")
+        self.txt_empresa_nombre.setPlaceholderText(
+            "Nombre completo del comité de agua")
         f_lay.addRow("Nombre del Comité:", self.txt_empresa_nombre)
 
         self.txt_empresa_resolucion = QLineEdit()
@@ -207,15 +252,18 @@ class PaginaConfiguracion(QWidget):
         f_lay.addRow("Resolución de Creación:", self.txt_empresa_resolucion)
 
         self.txt_empresa_telefono = QLineEdit()
-        self.txt_empresa_telefono.setPlaceholderText("Teléfono institucional o celular de contacto")
+        self.txt_empresa_telefono.setPlaceholderText(
+            "Teléfono institucional o celular de contacto")
         f_lay.addRow("Teléfono de Contacto:", self.txt_empresa_telefono)
 
         self.txt_empresa_whatsapp = QLineEdit()
-        self.txt_empresa_whatsapp.setPlaceholderText("Número de WhatsApp para avisos (opcional)")
+        self.txt_empresa_whatsapp.setPlaceholderText(
+            "Número de WhatsApp para avisos (opcional)")
         f_lay.addRow("WhatsApp de Cobranza:", self.txt_empresa_whatsapp)
 
         self.txt_empresa_direccion = QLineEdit()
-        self.txt_empresa_direccion.setPlaceholderText("Dirección institucional, distrito, provincia, región")
+        self.txt_empresa_direccion.setPlaceholderText(
+            "Dirección institucional, distrito, provincia, región")
         f_lay.addRow("Dirección Legal:", self.txt_empresa_direccion)
 
         lay.addWidget(grp_comite)
@@ -267,16 +315,20 @@ class PaginaConfiguracion(QWidget):
         # Selector de Categoría A, B o C
         fila_sel = QHBoxLayout()
         lbl_cat_tit = QLabel("Seleccione la Categoría a configurar:")
-        lbl_cat_tit.setStyleSheet("font-weight: bold; font-size: 13px; color: #0f172a;")
+        lbl_cat_tit.setStyleSheet(
+            "font-weight: bold; font-size: 13px; color: #0f172a;")
         fila_sel.addWidget(lbl_cat_tit)
 
         self.combo_categoria = QComboBox()
         self.combo_categoria.setView(QListView())
         self.combo_categoria.setMinimumWidth(260)
         self.combo_categoria.addItem("Categoría A — Doméstico", "A")
-        self.combo_categoria.addItem("Categoría B — Negocio pequeño / Comercial", "B")
-        self.combo_categoria.addItem("Categoría C — Hotel / Restaurante / Especial", "C")
-        self.combo_categoria.currentIndexChanged.connect(self._al_cambiar_categoria_seleccionada)
+        self.combo_categoria.addItem(
+            "Categoría B — Negocio pequeño / Comercial", "B")
+        self.combo_categoria.addItem(
+            "Categoría C — Hotel / Restaurante / Especial", "C")
+        self.combo_categoria.currentIndexChanged.connect(
+            self._al_cambiar_categoria_seleccionada)
         fila_sel.addWidget(self.combo_categoria)
         fila_sel.addStretch(1)
 
@@ -305,17 +357,8 @@ class PaginaConfiguracion(QWidget):
         self.spin_cat_tarifa_desague.setValue(0.00)
         self.spin_cat_tarifa_desague.setSingleStep(0.50)
         self.spin_cat_tarifa_desague.setPrefix("S/. ")
-        f_cat.addRow("Tarifa Desagüe / Alcantarillado:", self.spin_cat_tarifa_desague)
-
-        # Modo de Rangos
-        fila_modo = QHBoxLayout()
-        self.rb_modo_tramos = QRadioButton("Modo Tramos (Escalonado progresivo por volumen)")
-        self.rb_modo_unico = QRadioButton("Modo Rango Único (Tarifa plana según volumen alcanzado)")
-        self.rb_modo_unico.setChecked(True)
-        fila_modo.addWidget(self.rb_modo_tramos)
-        fila_modo.addWidget(self.rb_modo_unico)
-        fila_modo.addStretch(1)
-        f_cat.addRow("Método de Facturación:", fila_modo)
+        f_cat.addRow("Tarifa Desagüe / Alcantarillado:",
+                     self.spin_cat_tarifa_desague)
 
         lay.addWidget(self.grp_cat)
 
@@ -348,10 +391,25 @@ class PaginaConfiguracion(QWidget):
             "Consumo Hasta (m³ — vacío = Sin Límite)",
             "Precio por m³ (S/.)",
         ])
-        self.tabla_rangos.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.tabla_rangos.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabla_rangos.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tabla_rangos.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch)
+        self.tabla_rangos.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tabla_rangos.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
         self.tabla_rangos.setMinimumHeight(180)
+        # Edición directa en la fila (sin caja flotante)
+        self.tabla_rangos.verticalHeader().setDefaultSectionSize(36)
+        self.tabla_rangos.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+            | QAbstractItemView.EditTrigger.AnyKeyPressed
+        )
+        self.tabla_rangos.setItemDelegate(
+            DelegadoEdicionEnFila(
+                {0: "entero", 1: "entero_opcional", 2: "decimal"}, self.tabla_rangos)
+        )
         lay_r.addWidget(self.tabla_rangos)
 
         lay.addWidget(grp_rangos)
@@ -381,7 +439,8 @@ class PaginaConfiguracion(QWidget):
         f_igv.setSpacing(12)
         f_igv.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
-        self.chk_igv_activo = QCheckBox("Activar cálculo y cobro de IGV en los recibos mensuales")
+        self.chk_igv_activo = QCheckBox(
+            "Activar cálculo y cobro de IGV en los recibos mensuales")
         self.chk_igv_activo.setStyleSheet("font-weight: 500; font-size: 13px;")
         f_igv.addRow("Aplicación de IGV:", self.chk_igv_activo)
 
@@ -401,7 +460,8 @@ class PaginaConfiguracion(QWidget):
         lay.addWidget(grp_igv)
 
         # Políticas de Morosidad y Corte
-        grp_mora = QGroupBox("Niveles Oficiales de Morosidad y Corte de Servicio")
+        grp_mora = QGroupBox(
+            "Niveles Oficiales de Morosidad y Corte de Servicio")
         grp_mora.setStyleSheet("font-weight: bold; color: #0f172a;")
         lay_m = QVBoxLayout(grp_mora)
         lay_m.setContentsMargins(16, 20, 16, 20)
@@ -426,7 +486,8 @@ class PaginaConfiguracion(QWidget):
             h = QHBoxLayout(f)
             h.setContentsMargins(4, 4, 4, 4)
             lbl_b = QLabel(nivel)
-            lbl_b.setStyleSheet(f"background-color: {color_fg}; color: #ffffff; font-weight: bold; padding: 4px 8px; border-radius: 4px;")
+            lbl_b.setStyleSheet(
+                f"background-color: {color_fg}; color: #ffffff; font-weight: bold; padding: 4px 8px; border-radius: 4px;")
             h.addWidget(lbl_b)
             lbl_m = QLabel(f"<b>{meses}:</b> {desc}")
             lbl_m.setStyleSheet("color: #1e293b; font-size: 13px;")
@@ -434,9 +495,12 @@ class PaginaConfiguracion(QWidget):
             h.addStretch(1)
             return f
 
-        lay_m.addWidget(_item_mora("#e0f2fe", "#0284c7", "NIVEL AZUL", "1 Mes Adeudado", "Estado regular / Al día. El recibo se emite con normalidad."))
-        lay_m.addWidget(_item_mora("#ffedd5", "#ea580c", "NIVEL NARANJA", "2 Meses Adeudados", "Aviso preventivo destacado en color naranja en el recibo de cobro."))
-        lay_m.addWidget(_item_mora("#fee2e2", "#dc2626", "NIVEL ROJO", "3 o más Meses", "En lista de corte de servicio. Requiere regularización prioritaria en el reporte de morosos."))
+        lay_m.addWidget(_item_mora("#e0f2fe", "#0284c7", "NIVEL AZUL", "1 Mes Adeudado",
+                        "Estado regular / Al día. El recibo se emite con normalidad."))
+        lay_m.addWidget(_item_mora("#ffedd5", "#ea580c", "NIVEL NARANJA", "2 Meses Adeudados",
+                        "Aviso preventivo destacado en color naranja en el recibo de cobro."))
+        lay_m.addWidget(_item_mora("#fee2e2", "#dc2626", "NIVEL ROJO", "3 o más Meses",
+                        "En lista de corte de servicio. Requiere regularización prioritaria en el reporte de morosos."))
 
         lay.addWidget(grp_mora)
         lay.addStretch(1)
@@ -477,27 +541,25 @@ class PaginaConfiguracion(QWidget):
         self.btn_eliminar_sector.clicked.connect(self._accion_eliminar_sector)
         fila_btn.addWidget(self.btn_eliminar_sector)
 
-        self.btn_subir_sector = QPushButton("⬆️ Subir")
-        self.btn_subir_sector.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_subir_sector.clicked.connect(lambda: self._mover_sector(-1))
-        fila_btn.addWidget(self.btn_subir_sector)
-
-        self.btn_bajar_sector = QPushButton("⬇️ Bajar")
-        self.btn_bajar_sector.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_bajar_sector.clicked.connect(lambda: self._mover_sector(1))
-        fila_btn.addWidget(self.btn_bajar_sector)
-
         fila_btn.addStretch(1)
         lay.addLayout(fila_btn)
 
         self.tabla_sectores = QTableWidget(0, 2)
-        self.tabla_sectores.setHorizontalHeaderLabels(["N°", "Nombre del Sector / Barrio"])
-        self.tabla_sectores.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.tabla_sectores.setHorizontalHeaderLabels(
+            ["N°", "Nombre del Sector / Barrio"])
+        self.tabla_sectores.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Fixed)
         self.tabla_sectores.setColumnWidth(0, 60)
-        self.tabla_sectores.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.tabla_sectores.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabla_sectores.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tabla_sectores.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch)
+        self.tabla_sectores.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tabla_sectores.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
         self.tabla_sectores.setMinimumHeight(240)
+        self.tabla_sectores.verticalHeader().setDefaultSectionSize(36)
+        self.tabla_sectores.setItemDelegate(
+            DelegadoEdicionEnFila({}, self.tabla_sectores))
         lay.addWidget(self.tabla_sectores)
 
         lay.addStretch(1)
@@ -535,7 +597,8 @@ class PaginaConfiguracion(QWidget):
         self.btn_eliminar_obs = QPushButton("🗑️ Eliminar Novedad")
         self.btn_eliminar_obs.setProperty("class", "boton boton_peligro")
         self.btn_eliminar_obs.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_eliminar_obs.clicked.connect(self._accion_eliminar_observacion)
+        self.btn_eliminar_obs.clicked.connect(
+            self._accion_eliminar_observacion)
         fila_btn.addWidget(self.btn_eliminar_obs)
 
         fila_btn.addStretch(1)
@@ -547,14 +610,22 @@ class PaginaConfiguracion(QWidget):
             "Descripción en App Móvil y Recibos",
             "¿Alerta Crítica al Cobrar?",
         ])
-        self.tabla_observaciones.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.tabla_observaciones.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Interactive)
         self.tabla_observaciones.setColumnWidth(0, 180)
-        self.tabla_observaciones.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.tabla_observaciones.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.tabla_observaciones.horizontalHeader().setSectionResizeMode(1,
+                                                                         QHeaderView.ResizeMode.Stretch)
+        self.tabla_observaciones.horizontalHeader().setSectionResizeMode(2,
+                                                                         QHeaderView.ResizeMode.Fixed)
         self.tabla_observaciones.setColumnWidth(2, 170)
-        self.tabla_observaciones.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tabla_observaciones.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tabla_observaciones.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tabla_observaciones.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
         self.tabla_observaciones.setMinimumHeight(240)
+        self.tabla_observaciones.verticalHeader().setDefaultSectionSize(36)
+        self.tabla_observaciones.setItemDelegate(
+            DelegadoEdicionEnFila({}, self.tabla_observaciones))
         lay.addWidget(self.tabla_observaciones)
 
         lay.addStretch(1)
@@ -563,90 +634,7 @@ class PaginaConfiguracion(QWidget):
         return scroll
 
     # -----------------------------------------------------------------------
-    # TAB 6: GESTIÓN DE RESPALDOS Y CONTINGENCIA
-    # -----------------------------------------------------------------------
-    def _crear_tab_respaldo(self) -> QWidget:
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-
-        contenido = QWidget()
-        lay = QVBoxLayout(contenido)
-        lay.setContentsMargins(24, 20, 24, 20)
-        lay.setSpacing(16)
-
-        grp_info = QGroupBox("Estado del Respaldo Local en Excel")
-        grp_info.setStyleSheet("font-weight: bold; color: #0f172a;")
-        lay_i = QVBoxLayout(grp_info)
-        lay_i.setContentsMargins(16, 18, 16, 18)
-        lay_i.setSpacing(10)
-
-        self.lbl_info_respaldo_archivo = QLabel("Archivo de respaldo: —")
-        self.lbl_info_respaldo_archivo.setStyleSheet("font-weight: bold; color: #0369a1; font-size: 13px;")
-        lay_i.addWidget(self.lbl_info_respaldo_archivo)
-
-        self.lbl_info_respaldo_fecha = QLabel("Último respaldo generado: Pendiente")
-        self.lbl_info_respaldo_fecha.setStyleSheet("color: #475569; font-size: 13px;")
-        lay_i.addWidget(self.lbl_info_respaldo_fecha)
-
-        self.lbl_info_respaldo_docs = QLabel("Total de documentos respaldados: 0")
-        self.lbl_info_respaldo_docs.setStyleSheet("color: #475569; font-size: 13px;")
-        lay_i.addWidget(self.lbl_info_respaldo_docs)
-
-        fila_acciones = QHBoxLayout()
-        fila_acciones.setSpacing(10)
-
-        btn_respaldar_manual = QPushButton("💾 Respaldar Ahora a Excel")
-        btn_respaldar_manual.setProperty("class", "boton boton_primario")
-        btn_respaldar_manual.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_respaldar_manual.clicked.connect(self._accion_ejecutar_respaldo_manual)
-        fila_acciones.addWidget(btn_respaldar_manual)
-
-        btn_abrir_carpeta = QPushButton("📂 Abrir Carpeta de Respaldos")
-        btn_abrir_carpeta.setProperty("class", "boton boton_secundario")
-        btn_abrir_carpeta.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_abrir_carpeta.clicked.connect(self._accion_abrir_carpeta_respaldos)
-        fila_acciones.addWidget(btn_abrir_carpeta)
-
-        btn_ver_manual = QPushButton("📖 Ver Manual de Contingencia")
-        btn_ver_manual.setProperty("class", "boton boton_secundario")
-        btn_ver_manual.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_ver_manual.clicked.connect(self._accion_abrir_manual_contingencia)
-        fila_acciones.addWidget(btn_ver_manual)
-
-        fila_acciones.addStretch(1)
-        lay_i.addLayout(fila_acciones)
-
-        lay.addWidget(grp_info)
-
-        # Tarjeta explicativa de contingencia
-        grp_guia = QGroupBox("Guía Rápida de Contingencia para la Secretaria")
-        grp_guia.setStyleSheet("font-weight: bold; color: #0f172a;")
-        lay_g = QVBoxLayout(grp_guia)
-        lay_g.setContentsMargins(16, 16, 16, 16)
-        lay_g.setSpacing(8)
-
-        txt_guia = (
-            "• <b>Sin conexión a Internet:</b> El sistema no se bloquea. Puedes continuar cobrando normalmente. "
-            "Los pagos se guardan localmente y se subirán a la nube automáticamente al retornar la red.<br>"
-            "• <b>Respaldo en memoria USB:</b> Cada viernes se recomienda copiar los archivos de la carpeta "
-            "<code>respaldos/</code> a una memoria USB o Google Drive.<br>"
-            "• <b>Restauración de emergencia:</b> Si se requiere restaurar los datos en una nueva máquina o tras "
-            "una pérdida accidental, se ejecuta el script <code>scripts/restaurar_excel.py</code>."
-        )
-        lbl_guia = QLabel(txt_guia)
-        lbl_guia.setStyleSheet("color: #334155; font-size: 12px; line-height: 1.4;")
-        lbl_guia.setWordWrap(True)
-        lay_g.addWidget(lbl_guia)
-
-        lay.addWidget(grp_guia)
-        lay.addStretch(1)
-
-        scroll.setWidget(contenido)
-        return scroll
-
-    # -----------------------------------------------------------------------
-    # CARGA Y GUARDADO ASÍNCRONO
+    # CARGA ASÍNCRONA
     # -----------------------------------------------------------------------
     def cargar_datos_asincrono(self, forzar: bool = False) -> None:
         """Carga la configuración desde el servicio en segundo plano."""
@@ -663,17 +651,17 @@ class PaginaConfiguracion(QWidget):
         def al_terminar(cfg: Dict[str, Any]) -> None:
             self.indicador_carga.detener()
             self.btn_recargar.setEnabled(True)
-            self.btn_guardar.setEnabled(True)
             self.config_actual = copy.deepcopy(cfg or {})
             self.config_cargada = True
             self._poblar_formulario(self.config_actual)
-            self._actualizar_info_respaldo()
+            self._establecer_linea_base()  # a partir de aquí no hay cambios pendientes
 
         def al_error(err: str) -> None:
             self.indicador_carga.detener()
             self.btn_recargar.setEnabled(True)
-            self.btn_guardar.setEnabled(True)
-            self.alerta_flash.set_mensaje(f"Error al cargar configuración: {err}", "peligro")
+            self._verificar_cambios()
+            self.alerta_flash.set_mensaje(
+                f"Error al cargar configuración: {err}", "peligro")
             mostrar_dialogo_error(self, "Error de Configuración", str(err))
 
         self._worker = Worker(tarea)
@@ -683,48 +671,69 @@ class PaginaConfiguracion(QWidget):
 
     def _poblar_formulario(self, cfg: Dict[str, Any]) -> None:
         """Llena todos los campos de la interfaz con el diccionario de configuración."""
-        # 1. Empresa
-        emp = cfg.get("empresa") or {}
-        self.txt_empresa_nombre.setText(str(emp.get("nombre") or ""))
-        self.txt_empresa_resolucion.setText(str(emp.get("resolucion") or ""))
-        self.txt_empresa_telefono.setText(str(emp.get("telefono") or ""))
-        self.txt_empresa_whatsapp.setText(str(emp.get("whatsapp") or ""))
-        self.txt_empresa_direccion.setText(str(emp.get("direccion") or ""))
-        self.spin_dias_vencimiento.setValue(int(cfg.get("dias_vencimiento") or 15))
-        self.spin_ultimo_recibo.setValue(int(cfg.get("ultimo_recibo") or 0))
+        self._poblando = True
+        try:
+            # 1. Empresa
+            emp = cfg.get("empresa") or {}
+            self.txt_empresa_nombre.setText(str(emp.get("nombre") or ""))
+            self.txt_empresa_resolucion.setText(
+                str(emp.get("resolucion") or ""))
+            self.txt_empresa_telefono.setText(str(emp.get("telefono") or ""))
+            self.txt_empresa_whatsapp.setText(str(emp.get("whatsapp") or ""))
+            self.txt_empresa_direccion.setText(str(emp.get("direccion") or ""))
+            self.spin_dias_vencimiento.setValue(
+                int(cfg.get("dias_vencimiento") or 15))
+            self.spin_ultimo_recibo.setValue(
+                int(cfg.get("ultimo_recibo") or 0))
 
-        # 2. IGV
-        igv = cfg.get("igv") or {}
-        self.chk_igv_activo.setChecked(bool(igv.get("activo", False)))
-        porc = float(igv.get("porcentaje") or 0.18) * 100.0
-        self.spin_igv_porcentaje.setValue(round(porc, 2))
+            # 2. IGV
+            igv = cfg.get("igv") or {}
+            self.chk_igv_activo.setChecked(bool(igv.get("activo", False)))
+            porc = float(igv.get("porcentaje") or 0.18) * 100.0
+            self.spin_igv_porcentaje.setValue(round(porc, 2))
 
-        # 3. Categorías
-        self._al_cambiar_categoria_seleccionada()
+            # 3. Categorías
+            self._cat_key_actual = self.combo_categoria.currentData() or "A"
+            self._cargar_categoria_en_formulario(self._cat_key_actual)
 
-        # 4. Sectores
-        sectores = cfg.get("sectores") or []
-        self._poblar_sectores(sectores)
+            # 4. Sectores
+            self._poblar_sectores(cfg.get("sectores") or [])
 
-        # 5. Observaciones
-        obs = cfg.get("observaciones") or []
-        self._poblar_observaciones(obs)
+            # 5. Observaciones
+            self._poblar_observaciones(cfg.get("observaciones") or [])
+        finally:
+            self._poblando = False
 
     def _al_cambiar_categoria_seleccionada(self) -> None:
-        cat_key = self.combo_categoria.currentData() or "A"
+        """Al cambiar el combo: guarda en caché la categoría anterior y carga la nueva."""
+        if self._poblando:
+            return
+        nueva_key = self.combo_categoria.currentData() or "A"
+
+        # Conservar lo editado en la categoría que se estaba viendo
+        if self.config_cargada:
+            self._guardar_categoria_actual_en_cache(self._cat_key_actual)
+
+        self._poblando = True
+        try:
+            self._cat_key_actual = nueva_key
+            self._cargar_categoria_en_formulario(nueva_key)
+        finally:
+            self._poblando = False
+        self._verificar_cambios()
+
+    def _cargar_categoria_en_formulario(self, cat_key: str) -> None:
+        """Vuelca los datos de una categoría (A/B/C) en los campos y la tabla de rangos."""
         categorias = self.config_actual.get("categorias") or {}
         cat_data = categorias.get(cat_key) or {}
 
-        self.txt_cat_nombre.setText(str(cat_data.get("nombre") or f"Categoría {cat_key}"))
+        self.txt_cat_nombre.setText(
+            str(cat_data.get("nombre") or f"Categoría {cat_key}"))
         cargo_fijo_val = cat_data.get("cargo_fijo")
-        self.spin_cat_cargo_fijo.setValue(float(5.00 if cargo_fijo_val is None else cargo_fijo_val))
-        self.spin_cat_tarifa_desague.setValue(float(cat_data.get("tarifa_desague") or 0.0))
-
-        modo = str(cat_data.get("modo_rangos") or "unico").lower()
-        if modo == "tramos":
-            self.rb_modo_tramos.setChecked(True)
-        else:
-            self.rb_modo_unico.setChecked(True)
+        self.spin_cat_cargo_fijo.setValue(
+            float(5.00 if cargo_fijo_val is None else cargo_fijo_val))
+        self.spin_cat_tarifa_desague.setValue(
+            float(cat_data.get("tarifa_desague") or 0.0))
 
         rangos_defecto = [
             {"m3_desde": 1, "m3_hasta": 10, "precio_m3": 1.0},
@@ -745,7 +754,8 @@ class PaginaConfiguracion(QWidget):
             d_val = r.get("m3_desde")
             desde_val = str(d_val) if d_val is not None else "0"
             h_val = r.get("m3_hasta")
-            hasta_val = str(h_val) if (h_val is not None and str(h_val).strip() != "" and str(h_val).lower() != "none") else ""
+            hasta_val = str(h_val) if (h_val is not None and str(
+                h_val).strip() != "" and str(h_val).lower() != "none") else ""
             precio_val = f"{float(r.get('precio_m3', 1.0)):.2f}"
 
             item_desde = QTableWidgetItem(desde_val)
@@ -753,7 +763,8 @@ class PaginaConfiguracion(QWidget):
             item_hasta = QTableWidgetItem(hasta_val)
             item_hasta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item_precio = QTableWidgetItem(precio_val)
-            item_precio.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item_precio.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
             self.tabla_rangos.setItem(row, 0, item_desde)
             self.tabla_rangos.setItem(row, 1, item_hasta)
@@ -787,8 +798,10 @@ class PaginaConfiguracion(QWidget):
             item_txt = QTableWidgetItem(txt)
 
             item_chk = QTableWidgetItem()
-            item_chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            item_chk.setCheckState(Qt.CheckState.Checked if alerta else Qt.CheckState.Unchecked)
+            item_chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable |
+                              Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            item_chk.setCheckState(
+                Qt.CheckState.Checked if alerta else Qt.CheckState.Unchecked)
             item_chk.setText("Alerta al cobrar" if alerta else "Normal")
 
             self.tabla_observaciones.setItem(row, 0, item_cod)
@@ -798,8 +811,8 @@ class PaginaConfiguracion(QWidget):
     # -----------------------------------------------------------------------
     # ACCIONES DE EDICIÓN LOCAL
     # -----------------------------------------------------------------------
-    def _guardar_categoria_actual_en_cache(self) -> None:
-        cat_key = self.combo_categoria.currentData() or "A"
+    def _guardar_categoria_actual_en_cache(self, cat_key: Optional[str] = None) -> None:
+        cat_key = cat_key or self._cat_key_actual
         if "categorias" not in self.config_actual:
             self.config_actual["categorias"] = {}
 
@@ -820,15 +833,15 @@ class PaginaConfiguracion(QWidget):
             except Exception:
                 precio = 1.0
 
-            rangos.append({"m3_desde": desde, "m3_hasta": hasta, "precio_m3": precio})
-
-        modo = "unico" if self.rb_modo_unico.isChecked() else "tramos"
+            rangos.append(
+                {"m3_desde": desde, "m3_hasta": hasta, "precio_m3": precio})
 
         self.config_actual["categorias"][cat_key] = {
             "nombre": self.txt_cat_nombre.text().strip() or f"Categoría {cat_key}",
             "cargo_fijo": round(self.spin_cat_cargo_fijo.value(), 2),
             "tarifa_desague": round(self.spin_cat_tarifa_desague.value(), 2),
-            "modo_rangos": modo,
+            # siempre rango único (calculos.py sigue leyendo esta clave)
+            "modo_rangos": "unico",
             "rangos": rangos if rangos else [
                 {"m3_desde": 1, "m3_hasta": 10, "precio_m3": 1.0},
                 {"m3_desde": 11, "m3_hasta": 15, "precio_m3": 1.5},
@@ -842,14 +855,24 @@ class PaginaConfiguracion(QWidget):
         self.tabla_rangos.setItem(row, 0, QTableWidgetItem(str(row * 10)))
         self.tabla_rangos.setItem(row, 1, QTableWidgetItem(""))
         self.tabla_rangos.setItem(row, 2, QTableWidgetItem("1.00"))
+        for c in range(3):
+            it = self.tabla_rangos.item(row, c)
+            if it:
+                it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tabla_rangos.selectRow(row)
+        self.tabla_rangos.editItem(self.tabla_rangos.item(
+            row, 0))  # empieza a editar en la fila
+        self._verificar_cambios()
 
     def _accion_eliminar_rango(self) -> None:
         row = self.tabla_rangos.currentRow()
         if row >= 0:
             if self.tabla_rangos.rowCount() <= 1:
-                QMessageBox.warning(self, "Aviso", "Debe existir al menos un rango de consumo.")
+                QMessageBox.warning(
+                    self, "Aviso", "Debe existir al menos un rango de consumo.")
                 return
             self.tabla_rangos.removeRow(row)
+            self._verificar_cambios()
 
     def _accion_agregar_sector(self) -> None:
         nom, ok = QInputDialog.getText(
@@ -869,12 +892,14 @@ class PaginaConfiguracion(QWidget):
             item_nom = QTableWidgetItem(nombre_limpio)
             self.tabla_sectores.setItem(row, 0, item_num)
             self.tabla_sectores.setItem(row, 1, item_nom)
+            self._verificar_cambios()
 
     def _accion_eliminar_sector(self) -> None:
         row = self.tabla_sectores.currentRow()
         if row >= 0:
             if self.tabla_sectores.rowCount() <= 1:
-                QMessageBox.warning(self, "Aviso", "Debe existir al menos un sector en la comunidad.")
+                QMessageBox.warning(
+                    self, "Aviso", "Debe existir al menos un sector en la comunidad.")
                 return
             sec_nom = self.tabla_sectores.item(row, 1).text()
             conf = QMessageBox.question(
@@ -888,16 +913,7 @@ class PaginaConfiguracion(QWidget):
                 self.tabla_sectores.removeRow(row)
                 for i in range(self.tabla_sectores.rowCount()):
                     self.tabla_sectores.item(i, 0).setText(str(i + 1))
-
-    def _mover_sector(self, direccion: int) -> None:
-        row = self.tabla_sectores.currentRow()
-        target = row + direccion
-        if 0 <= target < self.tabla_sectores.rowCount():
-            nom_act = self.tabla_sectores.item(row, 1).text()
-            nom_tar = self.tabla_sectores.item(target, 1).text()
-            self.tabla_sectores.item(row, 1).setText(nom_tar)
-            self.tabla_sectores.item(target, 1).setText(nom_act)
-            self.tabla_sectores.selectRow(target)
+                self._verificar_cambios()
 
     def _accion_agregar_observacion(self) -> None:
         cod, ok1 = QInputDialog.getText(
@@ -922,68 +938,88 @@ class PaginaConfiguracion(QWidget):
         self.tabla_observaciones.insertRow(row)
 
         item_chk = QTableWidgetItem()
-        item_chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+        item_chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable |
+                          Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         item_chk.setCheckState(Qt.CheckState.Unchecked)
         item_chk.setText("Normal")
 
         self.tabla_observaciones.setItem(row, 0, QTableWidgetItem(cod_limpio))
         self.tabla_observaciones.setItem(row, 1, QTableWidgetItem(txt_limpio))
         self.tabla_observaciones.setItem(row, 2, item_chk)
+        self._verificar_cambios()
 
     def _accion_eliminar_observacion(self) -> None:
         row = self.tabla_observaciones.currentRow()
         if row >= 0:
             cod = self.tabla_observaciones.item(row, 0).text()
             if cod == "NORMAL":
-                QMessageBox.warning(self, "Aviso", "El estado NORMAL no puede ser eliminado.")
+                QMessageBox.warning(
+                    self, "Aviso", "El estado NORMAL no puede ser eliminado.")
                 return
             self.tabla_observaciones.removeRow(row)
+            self._verificar_cambios()
 
     # -----------------------------------------------------------------------
-    # GUARDAR EN SERVIDOR Y RESPALDO
+    # DETECCIÓN DE CAMBIOS PENDIENTES
     # -----------------------------------------------------------------------
-    def _accion_guardar_configuracion(self) -> None:
-        """Valida y guarda todos los cambios en Firestore y dispara respaldo."""
-        if not self.servicio:
-            QMessageBox.warning(self, "Aviso", "No hay conexión al servicio de datos.")
-            return
+    def _conectar_senales_cambios(self) -> None:
+        """Conecta todos los campos editables a _verificar_cambios."""
+        for w in (
+            self.txt_empresa_nombre,
+            self.txt_empresa_resolucion,
+            self.txt_empresa_telefono,
+            self.txt_empresa_whatsapp,
+            self.txt_empresa_direccion,
+            self.txt_cat_nombre,
+        ):
+            w.textChanged.connect(self._verificar_cambios)
+        for w in (
+            self.spin_dias_vencimiento,
+            self.spin_ultimo_recibo,
+            self.spin_igv_porcentaje,
+            self.spin_cat_cargo_fijo,
+            self.spin_cat_tarifa_desague,
+        ):
+            w.valueChanged.connect(self._verificar_cambios)
+        self.chk_igv_activo.toggled.connect(self._verificar_cambios)
+        for t in (self.tabla_rangos, self.tabla_sectores, self.tabla_observaciones):
+            t.itemChanged.connect(self._verificar_cambios)
 
-        # 1. Guardar categoría actual
+    def _construir_config_desde_formulario(self) -> Dict[str, Any]:
+        """Arma el diccionario de configuración completo a partir de lo que hay en pantalla."""
         self._guardar_categoria_actual_en_cache()
 
-        # 2. Extraer datos del formulario
         emp_cfg = copy.deepcopy(self.config_actual.get("empresa") or {})
         nom_emp = self.txt_empresa_nombre.text().strip() or emp_cfg.get("nombre") or (
             "COMITÉ DE ADMINISTRACIÓN DE AGUA POTABLE Y DESAGÜE DE LA COMUNIDAD CAMPESINA DE ISPACAS"
         )
-        res_emp = self.txt_empresa_resolucion.text().strip() or emp_cfg.get("resolucion") or "192-2017"
-        tel_emp = self.txt_empresa_telefono.text().strip() or emp_cfg.get("telefono") or "986054179"
+        res_emp = self.txt_empresa_resolucion.text().strip(
+        ) or emp_cfg.get("resolucion") or "192-2017"
+        tel_emp = self.txt_empresa_telefono.text().strip(
+        ) or emp_cfg.get("telefono") or "986054179"
         ws_emp = self.txt_empresa_whatsapp.text().strip() or emp_cfg.get("whatsapp") or None
-        dir_emp = self.txt_empresa_direccion.text().strip() or emp_cfg.get("direccion") or ""
+        dir_emp = self.txt_empresa_direccion.text(
+        ).strip() or emp_cfg.get("direccion") or ""
 
-        sectores_lista = []
+        sectores_lista: List[str] = []
         for r in range(self.tabla_sectores.rowCount()):
             it = self.tabla_sectores.item(r, 1)
             if it and it.text().strip():
                 sectores_lista.append(it.text().strip().upper())
 
-        if not sectores_lista:
-            mostrar_dialogo_error(self, "Validación", "Debe existir al menos un sector registrado.")
-            self.tabs.setCurrentIndex(2)
-            return
-
-        obs_lista = []
+        obs_lista: List[Dict[str, Any]] = []
         for r in range(self.tabla_observaciones.rowCount()):
             it_cod = self.tabla_observaciones.item(r, 0)
             it_txt = self.tabla_observaciones.item(r, 1)
             it_chk = self.tabla_observaciones.item(r, 2)
             c = it_cod.text().strip() if it_cod else ""
             t = it_txt.text().strip() if it_txt else c
-            es_alerta = (it_chk.checkState() == Qt.CheckState.Checked) if it_chk else False
+            es_alerta = (it_chk.checkState() ==
+                         Qt.CheckState.Checked) if it_chk else False
             if c:
-                obs_lista.append({"codigo": c, "texto": t, "alerta": es_alerta})
+                obs_lista.append(
+                    {"codigo": c, "texto": t, "alerta": es_alerta})
 
-        # Armar diccionario final
         nueva_cfg = copy.deepcopy(self.config_actual)
         nueva_cfg["empresa"] = {
             "nombre": nom_emp,
@@ -1000,20 +1036,90 @@ class PaginaConfiguracion(QWidget):
         }
         nueva_cfg["sectores"] = sectores_lista
         nueva_cfg["observaciones"] = obs_lista
+        return nueva_cfg
 
-        # Confirmación
+    @staticmethod
+    def _huella(cfg: Any) -> str:
+        """Representación estable para comparar configuraciones."""
+        return json.dumps(cfg, sort_keys=True, ensure_ascii=False, default=str)
+
+    def _establecer_linea_base(self) -> None:
+        """Toma el estado actual del formulario como 'sin cambios pendientes'."""
+        self._config_base = self._construir_config_desde_formulario()
+        self._verificar_cambios()
+
+    def _hay_cambios(self) -> bool:
+        if not self.config_cargada or self._config_base is None:
+            return False
+        return self._huella(self._construir_config_desde_formulario()) != self._huella(self._config_base)
+
+    def _verificar_cambios(self, *_args: Any) -> None:
+        """Habilita 'Guardar Configuración' solo si hay cambios pendientes."""
+        if self._poblando:
+            return
+        hay = self._hay_cambios()
+        self.btn_guardar.setEnabled(hay)
+        self.btn_guardar.setToolTip(
+            "Guardar los cambios pendientes" if hay else "No hay cambios pendientes por guardar"
+        )
+
+    def _secciones_modificadas(self, nueva_cfg: Dict[str, Any]) -> List[str]:
+        """Devuelve los nombres de las secciones que cambiaron respecto a la línea base."""
+        base = self._config_base or {}
+        etiquetas = [
+            (("empresa", "dias_vencimiento", "ultimo_recibo"), "Datos generales"),
+            (("categorias",), "Tarifas y Categorías"),
+            (("igv",), "IGV"),
+            (("sectores",), "Sectores / Barrios"),
+            (("observaciones",), "Catálogo de Novedades"),
+        ]
+        cambios: List[str] = []
+        for claves, nombre in etiquetas:
+            if any(self._huella(base.get(k)) != self._huella(nueva_cfg.get(k)) for k in claves):
+                cambios.append(nombre)
+        return cambios
+
+    # -----------------------------------------------------------------------
+    # GUARDAR EN SERVIDOR
+    # -----------------------------------------------------------------------
+    def _accion_guardar_configuracion(self) -> None:
+        """Valida y guarda únicamente si hay cambios pendientes."""
+        if not self.servicio:
+            QMessageBox.warning(
+                self, "Aviso", "No hay conexión al servicio de datos.")
+            return
+
+        if not self._hay_cambios():
+            self.alerta_flash.set_mensaje(
+                "No hay cambios pendientes por guardar.", "info")
+            self._verificar_cambios()
+            return
+
+        nueva_cfg = self._construir_config_desde_formulario()
+
+        if not nueva_cfg["sectores"]:
+            mostrar_dialogo_error(
+                self, "Validación", "Debe existir al menos un sector registrado.")
+            self.tabs.setCurrentIndex(2)
+            return
+
+        secciones = self._secciones_modificadas(nueva_cfg)
+        detalle = ", ".join(
+            secciones) if secciones else "Configuración general"
+
         conf = QMessageBox.question(
             self,
             "Confirmar Guardado",
-            "¿Desea guardar los cambios en la configuración del sistema?\n\n"
-            "Los nuevos parámetros se aplicarán de inmediato a los recibos y a la app móvil.",
+            f"Se guardarán cambios en: {detalle}.\n\n"
+            "Los nuevos parámetros se aplicarán de inmediato a los recibos y a la app móvil.\n"
+            "¿Desea continuar?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
         if conf != QMessageBox.StandardButton.Yes:
             return
 
-        self.indicador_carga.iniciar("Guardando configuración en Firestore...")
+        self.indicador_carga.iniciar("Guardando configuración...")
         self.btn_guardar.setEnabled(False)
 
         def tarea() -> None:
@@ -1021,91 +1127,22 @@ class PaginaConfiguracion(QWidget):
 
         def al_terminar(_res: Any) -> None:
             self.indicador_carga.detener()
-            self.btn_guardar.setEnabled(True)
-            self.config_actual = nueva_cfg
+            self.config_actual = copy.deepcopy(nueva_cfg)
+            self._establecer_linea_base()  # el botón vuelve a quedar deshabilitado
             self.alerta_flash.set_mensaje(
-                "✅ ¡Configuración guardada y sincronizada exitosamente!",
+                f"Configuración guardada correctamente. Secciones actualizadas: {detalle}.",
                 "exito",
             )
-            self._actualizar_info_respaldo()
 
         def al_error(err: str) -> None:
             self.indicador_carga.detener()
-            self.btn_guardar.setEnabled(True)
-            self.alerta_flash.set_mensaje(f"Error al guardar configuración: {err}", "peligro")
-            mostrar_dialogo_error(self, "Error al guardar configuración", str(err))
+            self._verificar_cambios()
+            self.alerta_flash.set_mensaje(
+                f"Error al guardar configuración: {err}", "peligro")
+            mostrar_dialogo_error(
+                self, "Error al guardar configuración", str(err))
 
         self._worker = Worker(tarea)
         self._worker.signals.resultado.connect(al_terminar)
         self._worker.signals.error.connect(al_error)
         self.thread_pool.start(self._worker)
-
-    # -----------------------------------------------------------------------
-    # RESPALDO MANUAL Y CONTINGENCIA
-    # -----------------------------------------------------------------------
-    def _actualizar_info_respaldo(self) -> None:
-        info = respaldo.obtener_info_ultimo_respaldo()
-        fecha_h = info.get("fecha_hora") or "Pendiente"
-        ruta_p = info.get("ruta") or "RESPALDO_2026-10.xlsx"
-        docs_cnt = info.get("total_docs") or 0
-
-        self.lbl_info_respaldo_archivo.setText(f"Archivo de respaldo: {os.path.basename(ruta_p)}")
-        self.lbl_info_respaldo_fecha.setText(f"Último respaldo generado: {fecha_h}")
-        self.lbl_info_respaldo_docs.setText(f"Total de registros respaldados: {docs_cnt}")
-
-    def _accion_ejecutar_respaldo_manual(self) -> None:
-        self.indicador_carga.iniciar("Generando respaldo Excel...")
-
-        def tarea() -> Optional[Path]:
-            return respaldo.ejecutar_respaldo_ahora()
-
-        def al_terminar(ruta_generada: Optional[Path]) -> None:
-            self.indicador_carga.detener()
-            if ruta_generada and os.path.exists(ruta_generada):
-                self._actualizar_info_respaldo()
-                self.alerta_flash.set_mensaje(
-                    f"📦 Respaldo manual completado exitosamente: {os.path.basename(str(ruta_generada))}",
-                    "exito",
-                )
-                resp = QMessageBox.question(
-                    self,
-                    "Respaldo Completado",
-                    f"El archivo de respaldo fue generado exitosamente en:\n\n{ruta_generada}\n\n¿Desea abrir la carpeta de respaldos?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.Yes,
-                )
-                if resp == QMessageBox.StandardButton.Yes:
-                    self._accion_abrir_carpeta_respaldos()
-            else:
-                mostrar_dialogo_error(self, "Error de Respaldo", "No se pudo generar el archivo de respaldo.")
-
-        def al_error(err: str) -> None:
-            self.indicador_carga.detener()
-            mostrar_dialogo_error(self, "Error al generar respaldo", str(err))
-
-        self._worker = Worker(tarea)
-        self._worker.signals.resultado.connect(al_terminar)
-        self._worker.signals.error.connect(al_error)
-        self.thread_pool.start(self._worker)
-
-    def _accion_abrir_carpeta_respaldos(self) -> None:
-        dir_resp = respaldo._obtener_directorio_respaldos()
-        dir_resp.mkdir(parents=True, exist_ok=True)
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(dir_resp)))
-
-    def _accion_abrir_manual_contingencia(self) -> None:
-        try:
-            import rutas
-            base = rutas.DIR_BASE.parent
-        except Exception:
-            base = Path(__file__).resolve().parent.parent.parent.parent
-
-        ruta_manual = base / "docs" / "PLAN_CONTINGENCIA.md"
-        if ruta_manual.exists():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(ruta_manual)))
-        else:
-            QMessageBox.information(
-                self,
-                "Manual de Contingencia",
-                "El manual se encuentra en docs/PLAN_CONTINGENCIA.md.",
-            )

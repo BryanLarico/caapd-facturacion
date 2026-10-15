@@ -11,10 +11,11 @@ Cubre:
 """
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QHeaderView, QMessageBox
 
 from servicios.datos import ServicioDatosMemoria
 from ui.paginas.lecturas_dialogo import DialogoLectura
+from ui.paginas.lecturas import PaginaLecturas
 from ui.paginas.lecturas_modelo import ModeloLecturas, ProxyLecturas
 from ui.paginas.mes_dialogo import DialogoAbrirMes
 
@@ -249,15 +250,115 @@ def test_modelo_lecturas_y_proxy_filtros(qtbot, servicio_mock):
     # Restablecer sector y filtrar por estado Faltan
     proxy.set_filtro_sector("todos")
     proxy.set_filtro_estado("faltan")
-    assert proxy.rowCount() == 1  # Solo Maria
+    assert proxy.rowCount() == 2  # Maria y Carlos (SIN_ACCESO también falta)
 
-    # Filtrar por Sin acceso
+    # El filtro de SIN_ACCESO sigue disponible en el modelo aunque ya no haya botón.
     proxy.set_filtro_estado("sin_acceso")
     assert proxy.rowCount() == 1  # Solo Carlos
 
     # Filtrar por Con observacion
     proxy.set_filtro_estado("con_observacion")
     assert proxy.rowCount() == 1  # Solo Carlos (CASA_CERRADA)
+
+
+def test_pantalla_lecturas_sin_filtro_sin_acceso_y_con_registrado_por(qtbot, servicio_mock):
+    pagina = PaginaLecturas(servicio_mock)
+    qtbot.addWidget(pagina)
+    config = servicio_mock.cargar_config()
+    config["mes_actual"] = {
+        "periodo": "2026-10",
+        "estado": "ABIERTO",
+        "fecha_emision": "2026-10-01",
+        "fecha_vencimiento": "2026-10-20",
+    }
+    documentos = {
+        "70112233": {
+            "nro_conexion": "000001",
+            "nombre": "JUAN PEREZ QUISPE",
+            "sector": "BARRIO DE CHAUPI",
+            "medidores": [{
+                "nro_medidor": "001001",
+                "lectura_anterior": 50,
+                "lectura_actual": 65,
+                "estado_lectura": "LEIDO",
+                "novedad": "NORMAL",
+                "registrado_por": "LECTOR",
+            }],
+        },
+        "70223344": {
+            "nro_conexion": "000002",
+            "nombre": "MARIA LOPEZ FLORES",
+            "sector": "BARRIO DE PACHAYZA",
+            "medidores": [{
+                "nro_medidor": "002001",
+                "lectura_anterior": 120,
+                "lectura_actual": None,
+                "estado_lectura": "PENDIENTE",
+                "novedad": "NORMAL",
+                "registrado_por": "ADMIN",
+            }],
+        },
+        "70334455": {
+            "nro_conexion": "000003",
+            "nombre": "CARLOS SOSA",
+            "sector": "BARRIO DE LUCMANI",
+            "medidores": [{
+                "nro_medidor": "003001",
+                "lectura_anterior": 80,
+                "lectura_actual": None,
+                "estado_lectura": "SIN_ACCESO",
+                "novedad": "CASA_CERRADA",
+                "registrado_por": "LECTOR",
+            }],
+        },
+    }
+
+    pagina._al_recibir_datos((config, "2026-10", documentos))
+
+    assert not hasattr(pagina, "btn_filtro_sin_acceso")
+    assert pagina.btn_filtro_todos.text() == "Todos (3)"
+    assert pagina.btn_filtro_faltan.text() == "⏳ Faltan (2)"
+    assert (
+        int(pagina.btn_filtro_todos.text().split("(")[1][:-1])
+        == int(pagina.btn_filtro_faltan.text().split("(")[1][:-1]) + 1
+    )
+
+    assert pagina.modelo_base.columnCount() == 11
+    encabezados = [
+        pagina.modelo_base.headerData(i, Qt.Orientation.Horizontal)
+        for i in range(pagina.modelo_base.columnCount())
+    ]
+    assert encabezados == [
+        "CONEXIÓN", "ID / DNI", "PERSONA", "SECTOR", "MEDIDOR",
+        "LECT. ANTERIOR", "LECT. ACTUAL", "CONSUMO (M³)", "ESTADO",
+        "OBSERVACIÓN", "NOTA",
+    ]
+
+    fila_sin_acceso = next(
+        i for i, item in enumerate(pagina.lista_items_completa)
+        if item["estado_lectura"] == "SIN_ACCESO"
+    )
+    estado_index = pagina.modelo_base.index(fila_sin_acceso, 8)
+    assert pagina.modelo_base.data(estado_index) == "Sin acceso"
+    assert pagina.modelo_base.data(
+        estado_index, Qt.ItemDataRole.ToolTipRole) == "Sin acceso"
+    assert pagina.modelo_base.obtener_item(fila_sin_acceso)["registrado_por"] == "LECTOR"
+    sector_index = pagina.modelo_base.index(fila_sin_acceso, 3)
+    assert pagina.modelo_base.data(
+        sector_index, Qt.ItemDataRole.ToolTipRole) == "BARRIO DE LUCMANI"
+
+    header = pagina.tabla.horizontalHeader()
+    for column in (0, 1, 3, 4, 5, 6, 7, 8):
+        assert header.sectionResizeMode(
+            column) == QHeaderView.ResizeMode.ResizeToContents
+    assert header.sectionResizeMode(2) == QHeaderView.ResizeMode.Stretch
+    pagina.resize(1366, 760)
+    pagina.show()
+    qtbot.wait(100)
+    assert sum(
+        header.sectionSize(column)
+        for column in range(pagina.modelo_base.columnCount())
+    ) <= pagina.tabla.viewport().width()
 
 
 def test_dialogo_abrir_mes_ui(qtbot, servicio_mock):

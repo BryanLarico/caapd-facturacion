@@ -80,6 +80,7 @@ class Paleta:
     TAMANO_XL: int = 18
     TAMANO_2XL: int = 22
     TAMANO_3XL: int = 28
+    TAMANO_TABLA: int = 10
 
 
 # Instancia única reutilizable

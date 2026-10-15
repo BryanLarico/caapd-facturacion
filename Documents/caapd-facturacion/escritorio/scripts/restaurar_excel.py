@@ -61,17 +61,11 @@ def restaurar_datos(
     periodo = datos_respaldo.get("periodo") or "2026-10"
     metadatos = datos_respaldo.get("metadatos") or {}
 
-    # Protección de seguridad: rechazar archivos de prueba fuera del entorno de prueba
-    try:
-        import rutas
-        es_entorno_p = rutas.es_entorno_prueba()
-    except Exception:
-        es_entorno_p = False
-
-    if metadatos.get("es_prueba") and not es_entorno_p:
+    # Protección de seguridad para respaldos antiguos marcados como datos de prueba.
+    if metadatos.get("es_prueba"):
         raise PermissionError(
             "ACCESO DENEGADO: El archivo está marcado como 'TIPO: ARCHIVO DE PRUEBA' "
-            "y no puede restaurarse en la base de datos real fuera del entorno de prueba."
+            "y no puede restaurarse en la base de datos."
         )
 
     secciones = {"config", "usuarios", "mes"}

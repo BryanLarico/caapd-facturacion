@@ -111,79 +111,79 @@ QLabel#pie_aviso {
 /* --- Encabezado de Sección --- */
 QLabel#encabezado_titulo {
     color: #0369a1;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: bold;
 }
 
 QLabel#encabezado_subtitulo {
     color: #475569;
-    font-size: 12px;
+    font-size: 14px;
 }
 
 /* --- Tarjetas (Base blanca) --- */
 QFrame.tarjeta {
     background-color: #ffffff;
     border: 1px solid #e0f2fe;
-    border-radius: 12px;
-    padding: 14px;
+    border-radius: 14px;
+    padding: 18px;
 }
 
 QLabel#tarjeta_titulo {
     color: #0369a1;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: bold;
     border-bottom: 2px solid #e0f2fe;
-    padding-bottom: 4px;
-    margin-bottom: 6px;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 /* --- Banner Mes Actual --- */
 QFrame#banner_mes {
     background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #0369a1, stop:1 #06b6d4);
-    border-radius: 10px;
-    padding: 10px 16px;
+    border-radius: 14px;
+    padding: 20px 24px;
 }
 
 QLabel#banner_periodo {
     color: #ffffff;
-    font-size: 19px;
+    font-size: 22px;
     font-weight: bold;
 }
 
 QLabel#banner_detalles {
     color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
+    font-size: 14px;
 }
 
 /* --- Tarjetas Estadísticas (Inicio) --- */
 QFrame#stat_card_azul {
     background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #0369a1, stop:1 #0ea5e9);
-    border-radius: 10px;
-    padding: 6px 12px;
+    border-radius: 12px;
+    padding: 10px 14px;
 }
 
 QFrame#stat_card_verde {
     background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #16a34a, stop:1 #22c55e);
-    border-radius: 10px;
-    padding: 6px 12px;
+    border-radius: 12px;
+    padding: 10px 14px;
 }
 
 QFrame#stat_card_naranja {
     background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #d97706, stop:1 #f59e0b);
-    border-radius: 10px;
-    padding: 6px 12px;
+    border-radius: 12px;
+    padding: 10px 14px;
 }
 
 QLabel.stat_numero {
     color: #ffffff;
-    font-size: 22px;
+    font-size: 26px;
     font-weight: bold;
     qproperty-alignment: AlignCenter;
 }
 
 QLabel.stat_label {
     color: rgba(255, 255, 255, 0.92);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.8px;
@@ -192,11 +192,11 @@ QLabel.stat_label {
 
 /* --- Botones --- */
 QPushButton.boton {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     border: none;
-    border-radius: 7px;
-    padding: 6px 14px;
+    border-radius: 8px;
+    padding: 8px 16px;
     min-height: 20px;
 }
 
@@ -253,16 +253,15 @@ QPushButton.boton_peligro:hover {
 }
 
 QPushButton.boton_grande {
-    font-size: 13px;
-    font-weight: 600;
-    padding: 6px 14px;
-    min-height: 20px;
+    font-size: 15px;
+    font-weight: bold;
+    padding: 10px 20px;
 }
 
 /* --- Alertas --- */
 QFrame.alerta {
     border-radius: 8px;
-    padding: 12px 18px;
+    padding: 0px;              /* los márgenes los pone el layout interno (14,10,14,10) */
     border-left: 5px solid;
 }
 
@@ -355,6 +354,38 @@ QTableView {
     outline: none;
 }
 
+QFrame#banner_info_lecturas {
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 10px 16px;
+}
+
+QFrame#banner_info_lecturas[estado="sin_mes"] {
+    background-color: #fefce8;
+    border-color: #fef08a;
+}
+
+QLabel#info_mes_lecturas {
+    color: #166534;
+    font-size: 13px;
+}
+
+QLabel#info_mes_lecturas[estado="sin_mes"] {
+    color: #854d0e;
+}
+
+QLabel#avance_lecturas {
+    color: #15803d;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+QLabel#conteo_registros_lecturas {
+    color: #64748b;
+    font-size: 13px;
+}
+
 QTableView::item {
     padding: 6px 10px;
     border-bottom: 1px solid #f8fafc;
@@ -369,6 +400,17 @@ QTableView::item:hover {
     background-color: #f0f9ff;
 }
 
+QTableView QLineEdit,
+QTableWidget QLineEdit {
+    border: none;
+    border-radius: 0;
+    padding: 0 8px;
+    margin: 0;
+    min-height: 0;
+    background-color: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+}
 QHeaderView::section {
     background-color: #0369a1;
     color: #ffffff;
@@ -394,6 +436,65 @@ QLineEdit, QTextEdit {
 QLineEdit:focus, QTextEdit:focus {
     border-color: #0369a1;
     background-color: #f8fafc;
+}
+
+/* ===================================================================
+   Checkbox y casillas de verificación en tablas/listas
+   (Regla: fondo BLANCO, borde celeste, check azul — nunca fondo morado)
+   =================================================================== */
+QCheckBox {
+    spacing: 8px;
+    color: #0f172a;
+    background: transparent;
+}
+
+QCheckBox::indicator,
+QTableView::indicator,
+QListView::indicator,
+QTreeView::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #bae6fd;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:hover,
+QTableView::indicator:hover,
+QListView::indicator:hover,
+QTreeView::indicator:hover {
+    border-color: #0369a1;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:checked,
+QTableView::indicator:checked,
+QListView::indicator:checked,
+QTreeView::indicator:checked {
+    background-color: #ffffff;
+    border-color: #0369a1;
+    image: url("recursos/check.svg");
+}
+
+QCheckBox::indicator:disabled,
+QTableView::indicator:disabled,
+QListView::indicator:disabled,
+QTreeView::indicator:disabled {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+/* Botones de opción (por si se usan en otras pantallas): también fondo blanco */
+QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #bae6fd;
+    border-radius: 9px;
+    background-color: #ffffff;
+}
+QRadioButton::indicator:checked {
+    border: 5px solid #0369a1;
+    background-color: #ffffff;
 }
 
 /* ===================================================================
@@ -448,14 +549,13 @@ QComboBox QAbstractItemView {
     border-radius: 8px;
     padding: 4px;
     outline: none;
-    min-width: 240px;
 }
 
 QComboBox QAbstractItemView::item {
     background-color: #ffffff;
     color: #000000;
-    min-height: 26px;
-    padding: 6px 12px;
+    min-height: 28px;
+    padding: 6px 10px;
     border-radius: 4px;
 }
 
@@ -468,33 +568,6 @@ QComboBox QAbstractItemView::item:selected {
     background-color: #e0f2fe;
     color: #000000;
     font-weight: 500;
-}
-
-/* --- QCheckBox (Texto de alto contraste y caja clara) --- */
-QCheckBox {
-    color: #1e293b;
-    font-size: 13px;
-    font-weight: 500;
-    spacing: 8px;
-    background: transparent;
-}
-
-QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border: 1.5px solid #0369a1;
-    border-radius: 4px;
-    background-color: #ffffff;
-}
-
-QCheckBox::indicator:hover {
-    border-color: #0284c7;
-    background-color: #f0f9ff;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #0369a1;
-    border-color: #0369a1;
 }
 
 /* --- QMenu y Menús Contextuales --- */
@@ -690,7 +763,6 @@ QLabel.chip_texto {
 QDialog, QMessageBox {
     background-color: #ffffff;
     color: #0f172a;
-    min-width: 480px;
 }
 
 QDialog QLabel, QMessageBox QLabel {
@@ -701,17 +773,9 @@ QDialog QLabel, QMessageBox QLabel {
 
 QMessageBox QLabel#qt_msgbox_label {
     color: #0f172a;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    min-width: 420px;
-    padding-right: 16px;
-}
-
-QMessageBox QLabel#qt_msgbox_informativelabel {
-    color: #475569;
-    font-size: 12px;
-    min-width: 420px;
-    padding-right: 16px;
+    min-width: 320px;
 }
 
 QMessageBox QPushButton {
@@ -787,5 +851,3 @@ QHeaderView::section {
 QHeaderView::section:hover {
     background-color: #0369a1;
 }
-
-

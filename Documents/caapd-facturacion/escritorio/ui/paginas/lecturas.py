@@ -95,13 +95,6 @@ class PaginaLecturas(QWidget):
         self.btn_abrir_mes.clicked.connect(self._abrir_modal_mes)
         fila_encabezado.addWidget(self.btn_abrir_mes)
 
-        # Botón Importar Excel de Mes
-        self.btn_importar_excel = QPushButton("📥 Importar Excel")
-        self.btn_importar_excel.setProperty("class", "boton boton_secundario")
-        self.btn_importar_excel.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_importar_excel.clicked.connect(self._abrir_modal_importar_excel)
-        fila_encabezado.addWidget(self.btn_importar_excel)
-
         # Botón Actualizar
         self.btn_actualizar = QPushButton("🔄 Actualizar")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
@@ -119,16 +112,17 @@ class PaginaLecturas(QWidget):
         # 3. Banner de estado del mes activo / sin mes
         self.banner_mes = QFrame()
         self.banner_mes.setObjectName("banner_info_lecturas")
-        self.banner_mes.setStyleSheet("background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 16px;")
+        self.banner_mes.setProperty("estado", "activo")
         layout_banner = QHBoxLayout(self.banner_mes)
         layout_banner.setContentsMargins(8, 6, 8, 6)
 
         self.lbl_info_mes = QLabel("Periodo activo: <b>Cargando...</b>")
-        self.lbl_info_mes.setStyleSheet("color: #166534; font-size: 13px;")
+        self.lbl_info_mes.setObjectName("info_mes_lecturas")
+        self.lbl_info_mes.setProperty("estado", "activo")
         layout_banner.addWidget(self.lbl_info_mes, stretch=1)
 
         self.lbl_avance_total = QLabel("Avance general: 0 de 0 (0%)")
-        self.lbl_avance_total.setStyleSheet("color: #15803d; font-weight: bold; font-size: 13px;")
+        self.lbl_avance_total.setObjectName("avance_lecturas")
         layout_banner.addWidget(self.lbl_avance_total)
 
         layout_principal.addWidget(self.banner_mes)
@@ -156,12 +150,10 @@ class PaginaLecturas(QWidget):
         # Filtros rápidos por estado
         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
         self.btn_filtro_faltan = self._crear_boton_filtro("⏳ Faltan (0)", "faltan")
-        self.btn_filtro_sin_acceso = self._crear_boton_filtro("🚫 Sin acceso (0)", "sin_acceso")
         self.btn_filtro_observados = self._crear_boton_filtro("⚠️ Con observación (0)", "con_observacion")
 
         fila_filtros.addWidget(self.btn_filtro_todos)
         fila_filtros.addWidget(self.btn_filtro_faltan)
-        fila_filtros.addWidget(self.btn_filtro_sin_acceso)
         fila_filtros.addWidget(self.btn_filtro_observados)
         fila_filtros.addStretch(1)
 
@@ -182,30 +174,26 @@ class PaginaLecturas(QWidget):
         self.tabla.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.verticalHeader().setDefaultSectionSize(40)
+        self.tabla.setWordWrap(False)
         self.tabla.doubleClicked.connect(self._al_doble_clic_fila)
 
         # Ajuste de cabeceras
         header = self.tabla.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Nombre expande
-        header.resizeSection(0, 85)   # Conexión
-        header.resizeSection(1, 105)  # ID
-        header.resizeSection(3, 140)  # Sector
-        header.resizeSection(4, 110)  # Medidor
-        header.resizeSection(5, 95)   # Anterior
-        header.resizeSection(6, 95)   # Actual
-        header.resizeSection(7, 105)  # Consumo
-        header.resizeSection(8, 100)  # Estado
-        header.resizeSection(9, 130)  # Novedad
-        header.resizeSection(10, 140) # Nota
-        header.resizeSection(11, 110) # Registrado por
+        for column in (0, 1, 3, 4, 5, 6, 7, 8):
+            header.setSectionResizeMode(
+                column, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(9, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(10, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(9, 125)
+        header.resizeSection(10, 145)
 
         layout_principal.addWidget(self.tabla, stretch=1)
 
         # 7. Barra de estado inferior y botones contextuales
         fila_acciones = QHBoxLayout()
         self.lbl_conteo_registros = QLabel("Mostrando 0 registros")
-        self.lbl_conteo_registros.setStyleSheet("color: #64748b; font-size: 13px;")
+        self.lbl_conteo_registros.setObjectName("conteo_registros_lecturas")
         fila_acciones.addWidget(self.lbl_conteo_registros)
 
         fila_acciones.addStretch(1)
@@ -351,9 +339,8 @@ class PaginaLecturas(QWidget):
 
         if not periodo or not mes_dict:
             # No hay mes activo o está vacío
-            self.banner_mes.setStyleSheet("background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 10px 16px;")
+            self._establecer_estado_banner("sin_mes")
             self.lbl_info_mes.setText("⚠️ <b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
-            self.lbl_info_mes.setStyleSheet("color: #854d0e; font-size: 13px;")
             self.lbl_avance_total.setText("")
             self.btn_estado_mes.setEnabled(False)
             self.btn_abrir_mes.setEnabled(True)
@@ -366,12 +353,11 @@ class PaginaLecturas(QWidget):
         # Hay mes activo
         emision = mes_act.get("fecha_emision") or "—"
         venc = mes_act.get("fecha_vencimiento") or "—"
-        self.banner_mes.setStyleSheet("background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 16px;")
+        self._establecer_estado_banner("activo")
         self.lbl_info_mes.setText(
             f"Periodo: <b>{periodo}</b> &nbsp;·&nbsp; Estado: <b>{self.estado_mes}</b> &nbsp;·&nbsp; "
             f"Emisión: {emision} &nbsp;·&nbsp; Vencimiento: {venc}"
         )
-        self.lbl_info_mes.setStyleSheet("color: #166534; font-size: 13px;")
         self.btn_abrir_mes.setEnabled(self.estado_mes == "FACTURADO")
 
         # Botón de estado del mes
@@ -424,6 +410,13 @@ class PaginaLecturas(QWidget):
         self._construir_pestanas_sectores(filas)
         self._actualizar_contadores()
         self._actualizar_conteo_visibles()
+
+    def _establecer_estado_banner(self, estado: str) -> None:
+        for widget in (self.banner_mes, self.lbl_info_mes):
+            widget.setProperty("estado", estado)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            widget.update()
 
     def _al_fallar_carga(self, err_msg: str) -> None:
         self.alerta_flash.set_mensaje(f"Error al cargar lecturas: {err_msg}", "peligro")
@@ -489,7 +482,6 @@ class PaginaLecturas(QWidget):
         botones = [
             ("todos", self.btn_filtro_todos),
             ("faltan", self.btn_filtro_faltan),
-            ("sin_acceso", self.btn_filtro_sin_acceso),
             ("con_observacion", self.btn_filtro_observados),
         ]
         for c, btn in botones:
@@ -505,8 +497,10 @@ class PaginaLecturas(QWidget):
 
     def _actualizar_contadores(self) -> None:
         total = len(self.lista_items_completa)
-        faltan = sum(1 for f in self.lista_items_completa if f.get("estado_lectura") == "PENDIENTE")
-        sin_acc = sum(1 for f in self.lista_items_completa if f.get("estado_lectura") == "SIN_ACCESO")
+        faltan = sum(
+            1 for f in self.lista_items_completa
+            if str(f.get("estado_lectura") or "PENDIENTE").upper() != "LEIDO"
+        )
         obs = sum(
             1 for f in self.lista_items_completa
             if (f.get("novedad") and f.get("novedad") != "NORMAL") or f.get("nota")
@@ -514,7 +508,6 @@ class PaginaLecturas(QWidget):
 
         self.btn_filtro_todos.setText(f"Todos ({total})")
         self.btn_filtro_faltan.setText(f"⏳ Faltan ({faltan})")
-        self.btn_filtro_sin_acceso.setText(f"🚫 Sin acceso ({sin_acc})")
         self.btn_filtro_observados.setText(f"⚠️ Con observación ({obs})")
 
     def _al_cambiar_busqueda(self, texto: str) -> None:
@@ -606,10 +599,3 @@ class PaginaLecturas(QWidget):
         diag = DialogoAbrirMes(self.servicio, self)
         if diag.exec() == QMessageBox.DialogCode.Accepted:
             self.actualizar_datos()
-
-    def _abrir_modal_importar_excel(self) -> None:
-        from ui.paginas.importar_mes_dialogo import DialogoImportarMesExcel
-        diag = DialogoImportarMesExcel(self.servicio, self)
-        if diag.exec() == QMessageBox.DialogCode.Accepted:
-            self.actualizar_datos()
-

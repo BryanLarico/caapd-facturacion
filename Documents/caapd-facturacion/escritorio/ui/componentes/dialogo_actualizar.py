@@ -241,8 +241,7 @@ class DialogoActualizarBaseDatos(QDialog):
         import firebase_client as fb
 
         archivos = self.archivos_excel
-        # 1. Comprobar si algún archivo tiene 'TIPO: ARCHIVO DE PRUEBA'
-        es_entorno_prueba = rutas.es_entorno_prueba()
+        # Rechazar respaldos antiguos marcados como datos de prueba.
         tiene_archivo_prueba = False
 
         for a in archivos:
@@ -261,15 +260,14 @@ class DialogoActualizarBaseDatos(QDialog):
             if tiene_archivo_prueba:
                 break
 
-        if tiene_archivo_prueba and not es_entorno_prueba:
+        if tiene_archivo_prueba:
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Icon.Critical)
             msg.setWindowTitle("Acceso Denegado por Seguridad")
             msg.setText("<b>Se detectó un archivo marcado como 'TIPO: ARCHIVO DE PRUEBA':</b>")
             msg.setInformativeText(
                 "Por seguridad, los archivos de prueba NO se pueden subir al proyecto de producción real.\n\n"
-                "Para utilizarlos y sincronizar sin alterar la base de producción, inicie la aplicación en Entorno de Prueba ejecutando:\n"
-                "• <b>iniciar_prueba.bat</b>"
+                "Retire esa marca solo después de verificar que el archivo contiene datos reales."
             )
             msg.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg.exec()

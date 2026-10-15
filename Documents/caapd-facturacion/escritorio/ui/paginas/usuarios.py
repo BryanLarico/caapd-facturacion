@@ -148,6 +148,8 @@ class PaginaUsuarios(QWidget):
         self.tabla.setAlternatingRowColors(True)
         self.tabla.setSortingEnabled(True)
         self.tabla.verticalHeader().setVisible(False)
+        self.tabla.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tabla.horizontalHeader().setStretchLastSection(False)
         self.tabla.horizontalHeader().setHighlightSections(False)
         self.tabla.doubleClicked.connect(self._al_doble_clic_fila)
@@ -256,37 +258,23 @@ class PaginaUsuarios(QWidget):
         self._ajustar_anchos_columnas()
 
     def _ajustar_anchos_columnas(self) -> None:
-        """Distribuye anchos de columna de forma responsive:
-        - Reduce el exceso en Apellidos y Nombres (~58% del espacio flexible).
-        - Otorga más espacio a Medidores (~42% del espacio flexible, mín. 180px) para evitar truncar números o listas.
-        - Asegura Sector y Dirección con ancho suficiente para lectura íntegra (mín. 175px).
-        """
-        self.tabla.setColumnWidth(0, 75)
-        self.tabla.setColumnWidth(1, 110)
-        self.tabla.setColumnWidth(6, 55)
-        self.tabla.setColumnWidth(7, 85)
+        """Ajusta la tabla al ancho disponible, sin crear desplazamiento horizontal."""
+        ancho = max(0, self.tabla.viewport().width())
+        self.tabla.setColumnWidth(0, 68)
+        self.tabla.setColumnWidth(1, 96)
+        self.tabla.setColumnWidth(6, 46)
+        self.tabla.setColumnWidth(7, 76)
 
-        w_sec = max(175, self.tabla.sizeHintForColumn(3))
-        w_dir = max(175, self.tabla.sizeHintForColumn(4))
-        self.tabla.setColumnWidth(3, w_sec)
-        self.tabla.setColumnWidth(4, w_dir)
+        restante = max(0, ancho - 68 - 96 - 46 - 76)
+        w_sector = int(restante * 0.14)
+        w_direccion = int(restante * 0.18)
+        w_medidores = int(restante * 0.22)
+        w_nombre = restante - w_sector - w_direccion - w_medidores
 
-        ancho_disp = self.tabla.viewport().width()
-        if ancho_disp <= 0:
-            ancho_disp = self.tabla.width() - 25
-
-        fijas = 75 + 110 + w_sec + w_dir + 55 + 85
-        restante = ancho_disp - fijas
-
-        if restante > 390:
-            w_med = max(180, int(restante * 0.42))
-            w_nom = restante - w_med
-        else:
-            w_nom = 230
-            w_med = 180
-
-        self.tabla.setColumnWidth(2, w_nom)
-        self.tabla.setColumnWidth(5, w_med)
+        self.tabla.setColumnWidth(2, w_nombre)
+        self.tabla.setColumnWidth(3, w_sector)
+        self.tabla.setColumnWidth(4, w_direccion)
+        self.tabla.setColumnWidth(5, w_medidores)
 
     def _al_fallar_carga(self, err_msg: str) -> None:
         self.alerta_flash.set_mensaje(f"Error al cargar usuarios: {err_msg}", "peligro")
