@@ -43,6 +43,7 @@ class PaginaLectores(QWidget):
         self.thread_pool = QThreadPool.globalInstance()
 
         self.lista_lectores_completa: List[Dict[str, Any]] = []
+        self._carga_en_curso = False
 
         # Temporizador para debounce del buscador
         self.timer_busqueda = QTimer(self)
@@ -53,7 +54,6 @@ class PaginaLectores(QWidget):
         self._filtro_activo = "todos"
 
         self._construir_ui()
-        self.cargar_datos_asincrono()
 
     def _construir_ui(self) -> None:
         layout_principal = QVBoxLayout(self)
@@ -221,7 +221,11 @@ class PaginaLectores(QWidget):
         return btn
 
     def cargar_datos_asincrono(self, forzar: bool = False) -> None:
-        """Carga en segundo plano la lista de lectores desde Firebase Auth."""
+        """Carga lectores desde Firebase Auth cuando se abre o actualiza esta página."""
+        if self._carga_en_curso:
+            return
+
+        self._carga_en_curso = True
         self.indicador_carga.iniciar("Cargando lectores autorizados...")
         self.btn_actualizar.setEnabled(False)
 
@@ -231,11 +235,10 @@ class PaginaLectores(QWidget):
         worker = Worker(tarea)
         worker.signals.resultado.connect(self._al_recibir_datos)
         worker.signals.error.connect(self._al_fallar_carga)
+        worker.signals.finalizado.connect(self._al_finalizar_carga)
         self.thread_pool.start(worker)
 
     def _al_recibir_datos(self, resultado: Any) -> None:
-        self.indicador_carga.detener()
-        self.btn_actualizar.setEnabled(True)
         lectores = list(resultado or [])
         self.lista_lectores_completa = [
             lector for lector in lectores if self._tiene_correo(lector)
@@ -269,10 +272,13 @@ class PaginaLectores(QWidget):
         return bool(usuario and dominio)
 
     def _al_fallar_carga(self, err: str) -> None:
-        self.indicador_carga.detener()
-        self.btn_actualizar.setEnabled(True)
         self.alerta_flash.set_mensaje(f"Error al cargar lectores: {err}", "peligro")
         mostrar_dialogo_error(self, "Error al cargar lectores", str(err))
+
+    def _al_finalizar_carga(self) -> None:
+        self._carga_en_curso = False
+        self.indicador_carga.detener()
+        self.btn_actualizar.setEnabled(True)
 
     def _al_cambiar_texto_busqueda(self, texto: str) -> None:
         self.btn_limpiar_busqueda.setVisible(bool(texto))

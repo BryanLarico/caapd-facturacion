@@ -95,6 +95,25 @@ def test_barra_estado_muestra_contadores(qtbot, servicio_memoria):
     )
 
 
+def test_barra_estado_no_inicia_consultas_de_red(qtbot, servicio_memoria, monkeypatch):
+    def consulta_remota_no_permitida():
+        raise AssertionError("El inicio no debe consultar Google ni Firebase")
+
+    monkeypatch.setattr(
+        "servicios.metricas_monitoring.consultar_metricas_hoy",
+        consulta_remota_no_permitida,
+    )
+    ventana = VentanaPrincipal(servicio_memoria)
+    qtbot.addWidget(ventana)
+
+    hilos_activos = ventana.pagina_inicio.thread_pool.activeThreadCount()
+    ventana.actualizar_barra_estado()
+
+    assert ventana.lbl_lecturas.text() == "Lecturas: 12"
+    assert ventana.lbl_escrituras.text() == "Escrituras: 4"
+    assert ventana.pagina_inicio.thread_pool.activeThreadCount() == hilos_activos
+
+
 def test_inicio_sin_mes_muestra_alerta_y_boton(qtbot, monkeypatch):
     # Servicio sin mes_actual
     servicio = ServicioDatosMemoria(config={"mes_actual": {}}, ops={"lecturas": 0, "escrituras": 0})

@@ -18,7 +18,11 @@ Cubre:
 5. Cierre y reapertura de lecturas con reflejo en Firebase.
 """
 from __future__ import annotations
+import json
+import io
 import os
+import subprocess
+import threading
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -51,6 +55,11 @@ def servicio_prueba(tmp_path):
     s.ops = {"lecturas": 0, "escrituras": 0}
     s.base_dir = dir_bd
     s._archivos_mtime = {}
+    # Simula la descarga aislada usando el cliente Firestore simulado en este proceso.
+    s._puede_descargar_en_subproceso = lambda: True
+    s._descargar_docs_en_subproceso = (
+        lambda periodo, progreso: s._descargar_docs_en_proceso(periodo, progreso)
+    )
     s.periodo = "2026-09"
     s.config = {
         "mes_actual": {
@@ -400,9 +409,8 @@ def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
         ],
     }
     def stream_documentos(timeout):
-        assert timeout == 60
+        assert timeout == servicio_prueba.TIMEOUT_DESCARGA_TOTAL
         yield doc_cloud
-        assert servicio_prueba.mes["30770229"]["medidores"][0]["lectura_actual"] == 975
 
     consulta = col_mes.select.return_value
     consulta.stream.side_effect = stream_documentos
@@ -429,8 +437,10 @@ def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
     assert m_local["registrado_por"] == "lector@ispacas.pe"
     assert servicio_prueba.config.get("ultima_descarga_lectores") is not None
     col_mes.select.assert_called_once_with(["medidores", "nombre"])
-    consulta.stream.assert_called_once_with(timeout=60)
-    assert any("1 documentos recibidos" in texto for _, texto in progresos)
+    consulta.stream.assert_called_once_with(
+        timeout=servicio_prueba.TIMEOUT_DESCARGA_TOTAL
+    )
+    assert any("1 documento(s)" in texto for _, texto in progresos)
     assert progresos[-1][0] == 100
 
 
@@ -475,6 +485,108 @@ def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
     m_local = servicio_prueba.mes["30771152"]["medidores"][0]
     assert m_local["lectura_actual"] == 118
     assert m_local["registrado_por"] == "ADMIN"
+
+
+def test_descarga_en_subproceso_procesa_eventos_y_limpia_temporal(
+    servicio_prueba, monkeypatch
+):
+    resultado_esperado = {
+        "exito": True,
+        "docs": {"30771152": {"medidores": []}},
+        "recibidos": 1,
+    }
+
+    temporales = []
+
+    class ProcesoFalso:
+        def __init__(self, comando, **kwargs):
+            self.stdout = io.StringIO(
+                "".join(
+                    [
+                        '{"t":"fase","msg":"Leyendo lecturas"}\n',
+                        '{"t":"prog","n":1}\n',
+                        '{"t":"fin","n":1}\n',
+                    ]
+                )
+            )
+            ruta_salida = Path(comando[comando.index("--salida") + 1])
+            temporales.append(ruta_salida.parent)
+            ruta_salida.write_text(json.dumps(resultado_esperado), encoding="utf-8")
+
+        def poll(self):
+            return 0
+
+        def wait(self, timeout):
+            return 0
+
+        def kill(self):
+            raise AssertionError("No se debe terminar un proceso ya finalizado")
+
+    monkeypatch.setattr(subprocess, "Popen", ProcesoFalso)
+    progresos = []
+
+    resultado = ServicioDatosPadron._descargar_docs_en_subproceso(
+        servicio_prueba,
+        "2026-09",
+        lambda porcentaje, texto: progresos.append((porcentaje, texto)),
+    )
+
+    assert resultado == {
+        "docs": resultado_esperado["docs"],
+        "recibidos": 1,
+    }
+    assert any("Leyendo lecturas" in texto for _, texto in progresos)
+    assert any("1 documento(s)" in texto for _, texto in progresos)
+    assert temporales
+    assert all(not ruta.exists() for ruta in temporales)
+
+
+def test_descarga_en_subproceso_timeout_limpia_y_termina_proceso(
+    servicio_prueba, monkeypatch
+):
+    rutas_temporales = []
+
+    class ProcesoColgado:
+        def __init__(self, comando, **kwargs):
+            self.evento_terminacion = threading.Event()
+            self.stdout = self.SalidaBloqueante(self.evento_terminacion)
+            rutas_temporales.append(Path(comando[comando.index("--salida") + 1]).parent)
+            self.terminado = False
+
+        class SalidaBloqueante:
+            def __init__(self, evento_terminacion):
+                self.evento_terminacion = evento_terminacion
+
+            def __iter__(self):
+                self.evento_terminacion.wait()
+                if False:
+                    yield ""
+
+            def close(self):
+                self.evento_terminacion.set()
+
+        def poll(self):
+            return 0 if self.terminado else None
+
+        def wait(self, timeout):
+            if not self.terminado:
+                raise subprocess.TimeoutExpired("descarga", timeout)
+            return 0
+
+        def kill(self):
+            self.terminado = True
+            self.evento_terminacion.set()
+
+    monkeypatch.setattr(subprocess, "Popen", ProcesoColgado)
+    servicio_prueba.TIMEOUT_DESCARGA_TOTAL = 0
+
+    with pytest.raises(TimeoutError, match="tiempo máximo"):
+        ServicioDatosPadron._descargar_docs_en_subproceso(
+            servicio_prueba, "2026-09", lambda *_: None
+        )
+
+    assert rutas_temporales
+    assert all(not ruta.exists() for ruta in rutas_temporales)
 
 
 def test_dialogo_confirmacion_requiere_escribir_confirmar(qapp, tmp_path):

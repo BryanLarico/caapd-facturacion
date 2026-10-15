@@ -12,6 +12,7 @@ Blindaje contra cierres silenciosos (crash nativo) de PySide6 + QThreadPool:
 """
 from __future__ import annotations
 
+import functools
 import logging
 import traceback
 from typing import Any, Callable, Optional, Set
@@ -127,6 +128,37 @@ class Worker(QRunnable):
             self._emitir(self.signals.resultado, res)
         finally:
             self._emitir(self.signals.finalizado)
+
+
+def slot_seguro(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Evita que una excepción dentro de un slot cierre el programa.
+
+    En PySide6 6.12 una excepción que escapa de un slot llega al código C++ de Qt y
+    termina el proceso con «Fatal Python error: Aborted», sin ventana de error. Este
+    envoltorio registra el fallo en logs/hilos.log y lo muestra en un diálogo normal,
+    de modo que la ventana permanece abierta.
+    """
+    @functools.wraps(fn)
+    def envoltura(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            nombre = getattr(fn, "__qualname__", None) or getattr(fn, "__name__", "slot")
+            _log.error("Error en slot '%s': %s\n%s", nombre, e, traceback.format_exc())
+            padre = args[0] if args and isinstance(args[0], QWidget) else None
+            try:
+                mostrar_dialogo_error(
+                    padre,
+                    "Se produjo un error en la operación",
+                    f"La operación no se completó, pero el programa sigue abierto.\n\n"
+                    f"Detalle: {e.__class__.__name__}: {e}\n\n"
+                    f"El detalle técnico quedó guardado en logs/hilos.log.",
+                )
+            except Exception:
+                pass
+            return None
+
+    return envoltura
 
 
 def esperar_hilos(ms: int = 8000) -> None:

@@ -12,7 +12,7 @@ Funcionalidades de Fase 3:
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from PySide6.QtCore import QThreadPool, QTimer, Qt, Slot
+from PySide6.QtCore import QThreadPool, QTimer, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -40,10 +40,16 @@ from ui.paginas.mes_dialogo import DialogoAbrirMes
 class PaginaLecturas(QWidget):
     """Pantalla completa de consulta, auditoría y corrección de lecturas del mes."""
 
+    _senal_progreso_sincronizacion = Signal(int, str)
+
     def __init__(self, servicio_datos: ServicioDatos, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.servicio = servicio_datos
         self.thread_pool = QThreadPool.globalInstance()
+        self._senal_progreso_sincronizacion.connect(
+            self._recibir_progreso_sincronizacion,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
         self.lista_items_completa: List[Dict[str, Any]] = []
         self.config_actual: Dict[str, Any] = {}
@@ -296,13 +302,19 @@ class PaginaLecturas(QWidget):
             ventana.set_sincronizando(True)
 
         def progreso_callback(pct: int, txt: str) -> None:
-            if hasattr(ventana, "mostrar_progreso"):
-                ventana.mostrar_progreso(pct, txt)
+            self._senal_progreso_sincronizacion.emit(int(pct), str(txt or ""))
 
         worker = Worker(funcion_servicio, callback_progreso=progreso_callback)
         worker.signals.resultado.connect(slot_exito, Qt.ConnectionType.QueuedConnection)
         worker.signals.error.connect(self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
         self.thread_pool.start(worker)
+
+    @Slot(int, str)
+    def _recibir_progreso_sincronizacion(self, porcentaje: int, texto: str) -> None:
+        """Actualiza el progreso desde el hilo gráfico tras recibir la señal encolada."""
+        ventana = self.window()
+        if hasattr(ventana, "mostrar_progreso"):
+            ventana.mostrar_progreso(porcentaje, texto)
 
     def _terminar_sincronizacion(self, texto_final: str) -> None:
         ventana = self.window()

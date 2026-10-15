@@ -54,14 +54,26 @@ def test_modelo_y_proxy_lectores():
     assert proxy.data(proxy.index(0, 1)) == "Maria Flores"
 
 
-def test_pagina_lectores_creacion_y_carga(qtbot, servicio_memoria):
+def test_pagina_lectores_creacion_y_carga(qtbot, servicio_memoria, monkeypatch):
     servicio_memoria.crear_lector("test@caapd.org", "123456", "Test Lector")
+    llamadas_listar = []
+    listar_lectores_original = servicio_memoria.listar_lectores
+
+    def listar_lectores():
+        llamadas_listar.append(True)
+        return listar_lectores_original()
+
+    monkeypatch.setattr(servicio_memoria, "listar_lectores", listar_lectores)
 
     pagina = PaginaLectores(servicio_memoria)
     qtbot.addWidget(pagina)
 
-    # Esperar carga
+    # La pantalla no debe consultar Firebase al construirse; se carga al abrirla.
+    assert pagina.lista_lectores_completa == []
+    assert llamadas_listar == []
+    pagina.cargar_datos_asincrono()
     qtbot.waitUntil(lambda: len(pagina.lista_lectores_completa) == 1, timeout=2000)
+    assert llamadas_listar == [True]
 
     assert pagina.modelo_base.rowCount() == 1
     assert pagina.btn_accion_editar.isEnabled() is False
@@ -90,6 +102,7 @@ def test_pagina_lectores_oculta_registros_sin_correo_sin_borrarlos(qtbot, servic
 
     pagina = PaginaLectores(servicio_memoria)
     qtbot.addWidget(pagina)
+    pagina.cargar_datos_asincrono()
     qtbot.waitUntil(
         lambda: pagina.modelo_base.rowCount() == 1
         and not pagina.alerta_flash.isHidden(),
@@ -156,6 +169,7 @@ def test_cambio_estado_optimista_instantaneo(qtbot, servicio_memoria):
     pagina = PaginaLectores(servicio_memoria)
     qtbot.addWidget(pagina)
 
+    pagina.cargar_datos_asincrono()
     qtbot.waitUntil(lambda: len(pagina.lista_lectores_completa) == 1, timeout=2000)
 
     # Seleccionar fila 0

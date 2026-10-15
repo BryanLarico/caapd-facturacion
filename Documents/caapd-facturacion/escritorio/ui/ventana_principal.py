@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
 
 import rutas
 from servicios.datos import ServicioDatos
-from servicios.metricas_monitoring import consultar_metricas_hoy
 from ui.hilos import Worker, esperar_hilos, mostrar_dialogo_error
 from ui.paginas.cobros import PaginaCobros
 from ui.paginas.configuracion import PaginaConfiguracion
@@ -58,7 +57,6 @@ class VentanaPrincipal(QMainWindow):
 
         self.botones_nav: Dict[str, QPushButton] = {}
         self._verificando_archivos: bool = False
-        self._consultando_metricas: bool = False
         self.sincronizando: bool = False
 
         self._construir_ui()
@@ -287,23 +285,8 @@ class VentanaPrincipal(QMainWindow):
             btn.style().polish(btn)
 
     def actualizar_barra_estado(self) -> None:
-        """Actualiza la barra inferior SIN congelar la interfaz.
-
-        Los datos locales (contadores de sesión) se pintan al instante.
-        La consulta a Google Cloud Monitoring (red, hasta ~20 s) se ejecuta en un Worker y,
-        cuando responde, actualiza las etiquetas en el hilo GUI.
-        """
-        # 1. Datos locales inmediatos (sin red)
+        """Actualiza los contadores de sesión sin iniciar consultas de red."""
         self._pintar_contadores_locales()
-
-        # 2. Métricas reales de la nube en segundo plano (una consulta a la vez)
-        if self._consultando_metricas:
-            return
-        self._consultando_metricas = True
-        worker = Worker(consultar_metricas_hoy)
-        worker.signals.resultado.connect(self._al_recibir_metricas)
-        worker.signals.finalizado.connect(self._al_terminar_metricas)
-        QThreadPool.globalInstance().start(worker)
 
     def _pintar_contadores_locales(self) -> None:
         """Muestra el contador de sesión local (se usa mientras no hay métricas de la nube)."""
@@ -318,34 +301,6 @@ class VentanaPrincipal(QMainWindow):
         )
         self.lbl_lecturas.setToolTip(tooltip)
         self.lbl_escrituras.setToolTip(tooltip)
-
-    def _al_recibir_metricas(self, met_cloud: Dict[str, Any]) -> None:
-        """Slot (hilo GUI): pinta las métricas reales de Google Cloud Monitoring si están disponibles."""
-        if not isinstance(met_cloud, dict) or not met_cloud.get("disponible"):
-            err = (met_cloud or {}).get("error") if isinstance(met_cloud, dict) else None
-            err = err or "Rol 'Monitoring Viewer' pendiente en GCP"
-            tooltip = (
-                "Contador de sesión local. Para ver el consumo total en la nube, asigna el rol "
-                f"'Monitoring Viewer' en Google Cloud Console ({err})."
-            )
-            self.lbl_lecturas.setToolTip(tooltip)
-            self.lbl_escrituras.setToolTip(tooltip)
-            return
-
-        n_lect = met_cloud.get("lecturas", 0)
-        n_escr = met_cloud.get("escrituras", 0)
-        desde = met_cloud.get("desde_pacifico", "hoy")
-        self.lbl_lecturas.setText(f"🔥 Hoy: {n_lect:,} lecturas".replace(",", " "))
-        self.lbl_escrituras.setText(f"🔥 Hoy: {n_escr:,} escrituras".replace(",", " "))
-        tooltip = (
-            f"Métricas reales de Google Cloud Monitoring (desde 00:00 Pacífico: {desde}). "
-            "No consume cuota de Firestore."
-        )
-        self.lbl_lecturas.setToolTip(tooltip)
-        self.lbl_escrituras.setToolTip(tooltip)
-
-    def _al_terminar_metricas(self) -> None:
-        self._consultando_metricas = False
 
     def set_sincronizando(self, activo: bool) -> None:
         """Pausa la vigilancia de archivos mientras el propio programa escribe los Excel."""
