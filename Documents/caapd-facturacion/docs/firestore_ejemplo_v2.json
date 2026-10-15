@@ -1,0 +1,181 @@
+{
+  "_nota": "Ejemplo de estructura. La segunda persona es ficticia.",
+  "config/general": {
+    "empresa": {
+      "nombre": "COMITÉ DE ADMINISTRACIÓN DE AGUA POTABLE Y DESAGÜE DE LA COMUNIDAD CAMPESINA DE ISPACAS",
+      "resolucion": "192-2017",
+      "telefono": "986054179",
+      "whatsapp": null,
+      "direccion": "Calle 5 de Agosto s/n - Distrito de Yanaquihua - Provincia de Condesuyos - Región Arequipa"
+    },
+    "igv": {
+      "activo": false,
+      "porcentaje": 0.18
+    },
+    "dias_vencimiento": 15,
+    "ultimo_recibo": 58393,
+    "sectores": [
+      "BARRIO DE CHAUPI",
+      "BARRIO DE PACHAYZA",
+      "BARRIO DE LUCMANI",
+      "HUAQUILLO",
+      "CHAUPICERCA",
+      "AYACUCHO"
+    ],
+    "categorias": {
+      "A": {
+        "nombre": "Doméstico",
+        "tarifa_desague": 0.0,
+        "cargo_fijo": 1.5,
+        "rangos": [
+          {
+            "m3_desde": 0,
+            "m3_hasta": null,
+            "precio_m3": 1.0
+          }
+        ]
+      },
+      "B": {
+        "nombre": "Negocio pequeño",
+        "tarifa_desague": null,
+        "cargo_fijo": null,
+        "rangos": []
+      },
+      "C": {
+        "nombre": "Hotel o Restaurante",
+        "tarifa_desague": null,
+        "cargo_fijo": null,
+        "rangos": []
+      }
+    },
+    "mora": [
+      {
+        "meses_min": 1,
+        "nombre": "AZUL",
+        "color": "#1E88E5",
+        "corte": false
+      },
+      {
+        "meses_min": 2,
+        "nombre": "NARANJA",
+        "color": "#FB8C00",
+        "corte": false
+      },
+      {
+        "meses_min": 3,
+        "nombre": "ROJO",
+        "color": "#E53935",
+        "corte": true
+      }
+    ],
+    "mes_actual": {
+      "periodo": "2026-09",
+      "fecha_emision": "2026-09-08",
+      "fecha_vencimiento": "2026-09-23",
+      "estado": "ABIERTO"
+    }
+  },
+  "usuarios/76807817": {
+    "nro_conexion": "000796",
+    "nombre": "ALVAREZ CHUQUIYANQUI, MARIBEL NAYELI",
+    "sector": "BARRIO DE LUCMANI",
+    "direccion": "AUCAYPATA S/N",
+    "codigo_categoria": "A",
+    "activo": true,
+    "medidores": [
+      "22392996"
+    ]
+  },
+  "usuarios/07654321-1": {
+    "nro_conexion": "000123",
+    "nombre": "EJEMPLO QUISPE, JUAN (FICTICIO)",
+    "sector": "BARRIO DE CHAUPI",
+    "direccion": "CHAUPI S/N",
+    "codigo_categoria": "A",
+    "activo": true,
+    "medidores": [
+      "000100",
+      "003200"
+    ]
+  },
+  "mes_2026-09/76807817": {
+    "nro_conexion": "000796",
+    "nombre": "ALVAREZ CHUQUIYANQUI, MARIBEL NAYELI",
+    "sector": "BARRIO DE LUCMANI",
+    "direccion": "AUCAYPATA S/N",
+    "codigo_categoria": "A",
+    "medidores": [
+      {
+        "nro_medidor": "22392996",
+        "lectura_anterior": 58,
+        "fecha_anterior": "2026-08-08",
+        "lectura_actual": 80,
+        "fecha_lectura": "2026-09-07",
+        "novedad": ""
+      }
+    ],
+    "consumo_total_m3": 22,
+    "historial_m3": [
+      4,
+      5,
+      9,
+      12,
+      16
+    ],
+    "nro_recibo": "000058392",
+    "monto_agua": 22.0,
+    "monto_desague": 0.0,
+    "cargo_fijo": 1.5,
+    "deuda_anterior": 0.0,
+    "igv": 0.0,
+    "redondeo": 0.0,
+    "total_a_pagar": 23.5,
+    "meses_adeudados": 1,
+    "monto_pagado": 23.5,
+    "fecha_pago": "2026-09-12"
+  },
+  "mes_2026-09/07654321-1": {
+    "nro_conexion": "000123",
+    "nombre": "EJEMPLO QUISPE, JUAN (FICTICIO)",
+    "sector": "BARRIO DE CHAUPI",
+    "direccion": "CHAUPI S/N",
+    "codigo_categoria": "A",
+    "medidores": [
+      {
+        "nro_medidor": "000100",
+        "lectura_anterior": 120,
+        "fecha_anterior": "2026-08-07",
+        "lectura_actual": 131,
+        "fecha_lectura": "2026-09-07",
+        "novedad": ""
+      },
+      {
+        "nro_medidor": "003200",
+        "lectura_anterior": 55,
+        "fecha_anterior": "2026-08-07",
+        "lectura_actual": 59,
+        "fecha_lectura": "2026-09-07",
+        "novedad": ""
+      }
+    ],
+    "consumo_total_m3": 15,
+    "historial_m3": [
+      10,
+      12,
+      11,
+      14,
+      18
+    ],
+    "nro_recibo": "000058393",
+    "monto_agua": 15.0,
+    "monto_desague": 0.0,
+    "cargo_fijo": 1.5,
+    "deuda_anterior": 18.5,
+    "igv": 0.0,
+    "redondeo": 0.0,
+    "total_a_pagar": 35.0,
+    "meses_adeudados": 2,
+    "monto_pagado": 0,
+    "fecha_pago": null
+  }
+}

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema de facturación de agua potable - CAAPD Ispacas">
+    <title>{% block titulo %}CAAPD Ispacas{% endblock %} — Facturación</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilo.css') }}">
+</head>
+<body>
+<div class="contenedor-pagina">
+
+    <!-- Barra de navegación superior -->
+    <nav class="nav-superior" aria-label="Navegación principal">
+        <span class="nav-logo">💧 <span>CAAPD</span> Ispacas</span>
+        <ul class="nav-enlaces">
+            <li>
+                <a href="{{ url_for('inicio') }}"
+                   class="{% if request.endpoint == 'inicio' %}activo{% endif %}"
+                   id="nav-inicio">
+                   🏠 Inicio
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('usuarios') }}"
+                   class="{% if request.endpoint == 'usuarios' %}activo{% endif %}"
+                   id="nav-usuarios">
+                   👤 Usuarios
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('lecturas') }}"
+                   class="{% if request.endpoint == 'lecturas' %}activo{% endif %}"
+                   id="nav-lecturas">
+                   📊 Lecturas
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('recibos') }}"
+                   class="{% if request.endpoint == 'recibos' %}activo{% endif %}"
+                   id="nav-recibos">
+                   🧾 Recibos
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('cobros') }}"
+                   class="{% if request.endpoint == 'cobros' %}activo{% endif %}"
+                   id="nav-cobros">
+                   💰 Cobros
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('configuracion') }}"
+                   class="{% if request.endpoint == 'configuracion' %}activo{% endif %}"
+                   id="nav-configuracion">
+                   ⚙️ Configuración
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Mensajes flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="padding: 0 var(--espacio-xl);">
+            {% for categoria, mensaje in messages %}
+                <div class="alerta alerta-{{ categoria if categoria in ['exito','aviso','peligro','info'] else 'info' }}" role="alert">
+                    <span class="alerta-icono">
+                        {% if categoria == 'exito' %}✅
+                        {% elif categoria == 'aviso' %}⚠️
+                        {% elif categoria == 'peligro' %}❌
+                        {% else %}ℹ️{% endif %}
+                    </span>
+                    <span>{{ mensaje }}</span>
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Contenido principal -->
+    <main class="contenido-principal" id="contenido-principal">
+        {% block contenido %}{% endblock %}
+    </main>
+
+    <!-- Pie de página con contador de operaciones Firebase -->
+    <footer class="pie-pagina" role="contentinfo">
+        <span>CAAPD Ispacas © 2026</span>
+        <div class="pie-ops" aria-label="Operaciones Firebase esta sesión">
+            <span>
+                Lecturas:
+                <strong>{{ ops.lecturas | default(0) }}</strong>
+                {% if avisos_ops.lecturas %}
+                    <span class="aviso-limite" title="{{ avisos_ops.lecturas }}">⚠</span>
+                {% endif %}
+            </span>
+            <span>
+                Escrituras:
+                <strong>{{ ops.escrituras | default(0) }}</strong>
+                {% if avisos_ops.escrituras %}
+                    <span class="aviso-limite" title="{{ avisos_ops.escrituras }}">⚠</span>
+                {% endif %}
+            </span>
+            <span>Límite diario: 50 000 lect. / 20 000 escrit.</span>
+        </div>
+    </footer>
+
+</div><!-- fin .contenedor-pagina -->
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

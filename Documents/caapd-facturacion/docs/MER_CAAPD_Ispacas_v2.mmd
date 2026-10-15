@@ -1,0 +1,71 @@
+erDiagram
+  categoria ||--o{ usuario : "clasifica"
+  categoria ||--o{ rango_tarifa : "define"
+  usuario ||--o{ medidor : "posee"
+  periodo ||--o{ lectura : "contiene"
+  medidor ||--o{ lectura : "registra"
+  periodo ||--o{ recibo : "emite"
+  usuario ||--o{ recibo : "recibe"
+  usuario {
+    string id_usuario PK
+    string nro_conexion UK
+    string nombre
+    string sector
+    string direccion
+    string codigo_categoria FK
+    bool activo
+  }
+  medidor {
+    string nro_medidor PK
+    string id_usuario FK
+    bool activo
+  }
+  categoria {
+    string codigo PK
+    string nombre
+    decimal tarifa_desague
+    decimal cargo_fijo
+  }
+  rango_tarifa {
+    string codigo_categoria PK, FK
+    decimal m3_desde PK
+    decimal m3_hasta "NULL"
+    decimal precio_m3
+  }
+  periodo {
+    string periodo PK
+    date fecha_emision
+    date fecha_vencimiento
+    string estado
+  }
+  lectura {
+    string periodo PK, FK
+    string nro_medidor PK, FK
+    decimal lectura_anterior
+    date fecha_anterior "NULL"
+    decimal lectura_actual "NULL"
+    date fecha_lectura "NULL"
+    decimal consumo_m3 "NULL"
+    string novedad "NULL"
+  }
+  recibo {
+    string periodo PK, FK
+    string id_usuario PK, FK
+    string nro_recibo UK
+    decimal consumo_total_m3
+    decimal monto_agua
+    decimal monto_desague
+    decimal cargo_fijo
+    decimal deuda_anterior
+    decimal igv
+    decimal redondeo
+    decimal total_a_pagar
+    int meses_adeudados
+    decimal monto_pagado
+    date fecha_pago "NULL"
+  }
+  parametro {
+    string clave PK
+    string valor
+    string descripcion "NULL"
+  }

@@ -1,0 +1,42 @@
+# ===========================================================================
+# .gitignore — Módulo Escritorio CAAPD Facturación
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Credenciales y Configuración Local (NUNCA SUBIR)
+# ---------------------------------------------------------------------------
+*firebase-adminsdk*.json
+*service_account*.json
+*serviceAccount*.json
+caapd-ispacas-*.json
+config_local.py
+config_local_prueba.py
+*.pem
+*.key
+.env
+.env.*
+
+# Permitir JSON de datos de prueba o documentación
+!datos/*.json
+!docs/*.json
+!salida/semilla_mes_previo.json
+
+# ---------------------------------------------------------------------------
+# Entornos Virtuales y Temporales
+# ---------------------------------------------------------------------------
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Archivos de trabajo temporales y notas grandes
+scratch_*.txt
+*.log
+
+# ---------------------------------------------------------------------------
+# Salidas generadas
+# ---------------------------------------------------------------------------
+salida/*.pdf
+salida/recibos_muestra/

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MER v2 · Facturación de agua CAAPD Ispacas</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f2937; --muted:#6b7280; --line:#d1d5db; --card:#f9fafb; --accent:#1f3864; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --fg:#e5e7eb; --muted:#9ca3af; --line:#374151; --card:#1a1f26; --accent:#9db7e8; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:16px 20px 8px; }
+  h1 { margin:0; font-size:20px; color:var(--accent); }
+  p.sub { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:8px 20px 12px; border-bottom:1px solid var(--line); }
+  button, label.chk { font:inherit; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  label.chk { display:flex; gap:6px; align-items:center; }
+  #zoomlbl { font-size:13px; color:var(--muted); min-width:44px; text-align:center; }
+  #box { overflow:auto; height:calc(100vh - 130px); min-height:420px; padding:16px; }
+  #box svg { display:block; margin:0 auto; }
+  details { margin:0; border-top:1px solid var(--line); padding:8px 20px 16px; }
+  summary { cursor:pointer; font-size:13px; color:var(--accent); }
+  textarea { width:100%; height:240px; margin-top:8px; font-family:Consolas, monospace; font-size:12px; background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px; }
+  #err { color:#b91c1c; padding:12px 20px; display:none; font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MER v2 · Facturación de agua CAAPD Ispacas</h1>
+  <p class="sub">8 entidades, 47 atributos y 7 relaciones. Claves: PK llave primaria, FK foránea, UK único. "NULL" = campo opcional.</p>
+</header>
+<div class="bar">
+  <button id="zin" aria-label="Acercar">+</button>
+  <span id="zoomlbl">100%</span>
+  <button id="zout" aria-label="Alejar">−</button>
+  <button id="zfit">Ajustar al ancho</button>
+  <label class="chk"><input type="checkbox" id="solo"> Solo llaves</label>
+  <button id="dl">Descargar SVG</button>
+</div>
+<div id="err"></div>
+<div id="box" role="img" aria-label="Diagrama entidad-relación del sistema de facturación de agua"></div>
+<details>
+  <summary>Código Mermaid (copiar y pegar en mermaid.live o en tu propia página)</summary>
+  <button id="copy" style="margin-top:8px">Copiar código</button>
+  <textarea id="code" readonly spellcheck="false"></textarea>
+</details>
+
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+
+const MODELO = {"entidades": [{"n": "usuario", "t": "Maestra", "a": [["id_usuario", "string", "PK", "Sí"], ["nro_conexion", "string", "UK", "Sí"], ["nombre", "string", "", "Sí"], ["sector", "string", "", "Sí"], ["direccion", "string", "", "Sí"], ["codigo_categoria", "string", "FK", "Sí"], ["activo", "bool", "", "Sí"]]}, {"n": "medidor", "t": "Maestra", "a": [["nro_medidor", "string", "PK", "Sí"], ["id_usuario", "string", "FK", "Sí"], ["activo", "bool", "", "Sí"]]}, {"n": "categoria", "t": "Catálogo", "a": [["codigo", "string", "PK", "Sí"], ["nombre", "string", "", "Sí"], ["tarifa_desague", "decimal", "", "Sí"], ["cargo_fijo", "decimal", "", "Sí"]]}, {"n": "rango_tarifa", "t": "Catálogo", "a": [["codigo_categoria", "string", "PK, FK", "Sí"], ["m3_desde", "decimal", "PK", "Sí"], ["m3_hasta", "decimal", "", "No"], ["precio_m3", "decimal", "", "Sí"]]}, {"n": "periodo", "t": "Transaccional", "a": [["periodo", "string", "PK", "Sí"], ["fecha_emision", "date", "", "Sí"], ["fecha_vencimiento", "date", "", "Sí"], ["estado", "string", "", "Sí"]]}, {"n": "lectura", "t": "Transaccional", "a": [["periodo", "string", "PK, FK", "Sí"], ["nro_medidor", "string", "PK, FK", "Sí"], ["lectura_anterior", "decimal", "", "Sí"], ["fecha_anterior", "date", "", "No"], ["lectura_actual", "decimal", "", "No"], ["fecha_lectura", "date", "", "No"], ["consumo_m3", "decimal", "", "No"], ["novedad", "string", "", "No"]]}, {"n": "recibo", "t": "Transaccional", "a": [["periodo", "string", "PK, FK", "Sí"], ["id_usuario", "string", "PK, FK", "Sí"], ["nro_recibo", "string", "UK", "Sí"], ["consumo_total_m3", "decimal", "", "Sí"], ["monto_agua", "decimal", "", "Sí"], ["monto_desague", "decimal", "", "Sí"], ["cargo_fijo", "decimal", "", "Sí"], ["deuda_anterior", "decimal", "", "Sí"], ["igv", "decimal", "", "Sí"], ["redondeo", "decimal", "", "Sí"], ["total_a_pagar", "decimal", "", "Sí"], ["meses_adeudados", "int", "", "Sí"], ["monto_pagado", "decimal", "", "Sí"], ["fecha_pago", "date", "", "No"]]}, {"n": "parametro", "t": "Configuración", "a": [["clave", "string", "PK", "Sí"], ["valor", "string", "", "Sí"], ["descripcion", "string", "", "No"]]}], "relaciones": [["categoria", "usuario", "1 : N", "clasifica"], ["categoria", "rango_tarifa", "1 : N", "define"], ["usuario", "medidor", "1 : 0..N", "posee"], ["periodo", "lectura", "1 : N", "contiene"], ["medidor", "lectura", "1 : N", "registra"], ["periodo", "recibo", "1 : N", "emite"], ["usuario", "recibo", "1 : N", "recibe"]]};
+
+const CARD = { "1 : N":"||--o{", "1 : 0..N":"||--o{", "0..1 : N":"|o--o{", "1 : 1..N":"||--|{" };
+
+function construirCodigo(soloLlaves) {
+  const out = ["erDiagram"];
+  for (const [a, b, c, v] of MODELO.relaciones) out.push(`  ${a} ${CARD[c]} ${b} : "${v}"`);
+  for (const e of MODELO.entidades) {
+    out.push(`  ${e.n} {`);
+    for (const [nombre, tipo, clave, oblig] of e.a) {
+      if (soloLlaves && !clave) continue;
+      out.push(`    ${tipo} ${nombre}` + (clave ? ` ${clave}` : "") + (oblig === "No" ? ' "NULL"' : ""));
+    }
+    out.push("  }");
+  }
+  return out.join("\n");
+}
+
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  securityLevel: 'loose',
+  fontFamily: 'Arial, Helvetica, sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    lineColor: dark ? '#9ca3af' : '#6b7280',
+    textColor: dark ? '#e5e7eb' : '#1f2937',
+    primaryColor: dark ? '#1f2a44' : '#e8eef9',
+    primaryTextColor: dark ? '#e5e7eb' : '#1f2937',
+    primaryBorderColor: dark ? '#9db7e8' : '#1f3864',
+    mainBkg: dark ? '#1f2a44' : '#e8eef9',
+    secondBkg: dark ? '#18213a' : '#f3f6fc',
+    tertiaryColor: dark ? '#111418' : '#ffffff',
+  },
+});
+
+const box = document.getElementById('box');
+const lbl = document.getElementById('zoomlbl');
+let zoom = 1, base = { w: 0, h: 0 }, svgEl = null, contador = 0;
+
+function aplicarZoom() {
+  if (!svgEl) return;
+  svgEl.setAttribute('width', Math.round(base.w * zoom));
+  svgEl.setAttribute('height', Math.round(base.h * zoom));
+  svgEl.style.maxWidth = 'none';
+  lbl.textContent = Math.round(zoom * 100) + '%';
+}
+function ajustar() {
+  if (!svgEl) return;
+  zoom = Math.max(0.2, Math.min(2, (box.clientWidth - 32) / base.w));
+  aplicarZoom();
+}
+
+async function dibujar() {
+  const codigo = construirCodigo(document.getElementById('solo').checked);
+  document.getElementById('code').value = construirCodigo(false);
+  try {
+    const { svg } = await mermaid.render('mer-svg-' + (++contador), codigo);
+    box.innerHTML = svg;
+    svgEl = box.querySelector('svg');
+    const vb = svgEl.viewBox.baseVal;
+    base = { w: vb.width, h: vb.height };
+    ajustar();
+    document.getElementById('err').style.display = 'none';
+  } catch (e) {
+    const err = document.getElementById('err');
+    err.textContent = 'No se pudo dibujar el diagrama: ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+document.getElementById('zin').onclick = () => { zoom = Math.min(3, zoom * 1.2); aplicarZoom(); };
+document.getElementById('zout').onclick = () => { zoom = Math.max(0.2, zoom / 1.2); aplicarZoom(); };
+document.getElementById('zfit').onclick = ajustar;
+document.getElementById('solo').onchange = dibujar;
+document.getElementById('copy').onclick = async (ev) => {
+  const t = document.getElementById('code').value;
+  try { await navigator.clipboard.writeText(t); ev.target.textContent = 'Copiado'; }
+  catch { document.getElementById('code').select(); ev.target.textContent = 'Selecciona y copia (Ctrl+C)'; }
+  setTimeout(() => ev.target.textContent = 'Copiar código', 1800);
+};
+document.getElementById('dl').onclick = () => {
+  if (!svgEl) return;
+  const xml = new XMLSerializer().serializeToString(svgEl);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
+  a.download = 'MER_CAAPD_Ispacas_v2.svg';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+addEventListener('resize', () => { if (zoom <= 1) ajustar(); });
+
+dibujar();
+</script>
+</body>
+</html>

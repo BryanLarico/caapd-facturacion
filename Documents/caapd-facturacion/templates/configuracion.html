@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block titulo %}Configuración{% endblock %}
+{% block contenido %}
+<div class="encabezado-seccion">
+    <h1>Configuración</h1>
+    <p>Tarifas, IGV, sectores y parámetros del sistema</p>
+</div>
+<div class="alerta alerta-info">
+    <span class="alerta-icono">ℹ️</span>
+    <span>Esta pantalla estará disponible en la Fase 6.</span>
+</div>
+
+<!-- Vista preliminar de la configuración actual -->
+{% if config %}
+<div class="tarjeta mt-md">
+    <div class="tarjeta-titulo">Configuración actual (solo lectura)</div>
+    <table class="tabla">
+        <thead>
+            <tr>
+                <th>Parámetro</th>
+                <th>Valor</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="texto-negrita">Nombre del comité</td>
+                <td>{{ config.empresa.nombre }}</td>
+            </tr>
+            <tr>
+                <td class="texto-negrita">Resolución</td>
+                <td>{{ config.empresa.resolucion }}</td>
+            </tr>
+            <tr>
+                <td class="texto-negrita">Teléfono</td>
+                <td>{{ config.empresa.telefono }}</td>
+            </tr>
+            <tr>
+                <td class="texto-negrita">WhatsApp</td>
+                <td>{{ config.empresa.whatsapp or '(sin configurar)' }}</td>
+            </tr>
+            <tr>
+                <td class="texto-negrita">IGV activo</td>
+                <td>
+                    {% if config.igv.activo %}
+                        <span class="badge badge-verde">SÍ — {{ (config.igv.porcentaje * 100) | int }}%</span>
+                    {% else %}
+                        <span class="badge badge-gris">NO</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="texto-negrita">Días de vencimiento</td>
+                <td>{{ config.dias_vencimiento }}</td>
+            </tr>
+            <tr>
+                <td class="texto-negrita">Último número de recibo</td>
+                <td class="texto-mono">{{ config.ultimo_recibo }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

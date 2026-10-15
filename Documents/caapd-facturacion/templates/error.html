@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Error {{ codigo }}{% endblock %}
+{% block contenido %}
+<div class="estado-vacio" style="padding-top: 4rem;">
+    <p style="font-size: 4rem;">{{ '🔍' if codigo == 404 else '⚠️' }}</p>
+    <p style="font-size: 1.5rem; font-weight: 700; color: var(--color-primario);">Error {{ codigo }}</p>
+    <p style="margin-bottom: var(--espacio-xl);">{{ mensaje }}</p>
+    <a href="{{ url_for('inicio') }}" class="boton boton-primario boton-grande">🏠 Volver al inicio</a>
+</div>
+{% endblock %}

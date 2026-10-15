@@ -1,0 +1,109 @@
+# ===========================================================================
+# .gitignore — CAAPD Facturación (Sistema Web, Escritorio y Móvil)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# 1. Credenciales y Secretos de Firebase (CRÍTICO - NUNCA SUBIR A GITHUB)
+# ---------------------------------------------------------------------------
+*firebase-adminsdk*.json
+*service_account*.json
+*serviceAccount*.json
+caapd-ispacas-*.json
+config_local.py
+config_local_prueba.py
+**/config_local.py
+**/config_local_prueba.py
+*.pem
+*.key
+.env
+.env.*
+
+# Permitir archivos JSON de ejemplo y configuración móvil necesarios
+!docs/firestore_ejemplo_v2.json
+!docs/*.json
+!Android_Studio/app/google-services.json
+
+# ---------------------------------------------------------------------------
+# 2. Entornos Virtuales de Python
+# ---------------------------------------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+**/venv/
+**/.venv/
+
+# ---------------------------------------------------------------------------
+# 3. Archivos de compilación y caché de Python
+# ---------------------------------------------------------------------------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ---------------------------------------------------------------------------
+# 4. Archivos temporales, logs y scratch de desarrollo
+# ---------------------------------------------------------------------------
+*.log
+**/*.log
+scratch/
+**/scratch/
+escritorio/scratch_*.txt
+*.tmp
+
+# ---------------------------------------------------------------------------
+# 5. Salidas generadas y respaldos
+# ---------------------------------------------------------------------------
+respaldos/
+**/respaldos/
+recibos/
+**/recibos/
+salida/*.pdf
+**/salida/*.pdf
+salida/recibos_muestra/
+**/salida/recibos_muestra/
+
+# ---------------------------------------------------------------------------
+# 6. Android Studio, Gradle y Kotlin (App Lectores)
+# ---------------------------------------------------------------------------
+.gradle/
+**/.gradle/
+build/
+**/build/
+local.properties
+**/local.properties
+.cxx/
+**/.cxx/
+.externalNativeBuild/
+**/.externalNativeBuild/
+captures/
+**/captures/
+.kotlin/
+**/.kotlin/
+*.iml
+
+# ---------------------------------------------------------------------------
+# 7. IDEs y Editores de Código
+# ---------------------------------------------------------------------------
+.idea/
+**/.idea/
+.vscode/
+**/.vscode/
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# 8. Archivos del Sistema Operativo
+# ---------------------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+.DS_Store

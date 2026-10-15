@@ -1,0 +1,21 @@
+# ===========================================================================
+# requirements.txt — CAAPD Facturación (Servidor Flask / Raíz del Proyecto)
+# ===========================================================================
+
+# Servidor Web local Flask
+flask>=3.0.0
+
+# Base de datos y servicios Cloud
+firebase-admin>=6.5.0
+
+# Gestión de hojas de cálculo Excel y respaldos
+openpyxl>=3.1.2
+
+# Generación de recibos PDF, gráficos vectoriales y códigos QR
+reportlab>=4.1.0
+matplotlib>=3.8.0
+qrcode[pil]>=7.4.2
+Pillow>=10.2.0
+
+# Pruebas automatizadas
+pytest>=8.0.0

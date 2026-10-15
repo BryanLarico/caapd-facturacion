@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+{% block titulo %}Usuarios — Padrón{% endblock %}
+
+{% block contenido %}
+<div class="encabezado-seccion">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--espacio-md);">
+        <div>
+            <h1>Padrón de Usuarios</h1>
+            <p>Gestión completa del padrón, medidores y corrección de documentos de identidad</p>
+        </div>
+        <div class="grupo-botones">
+            <button type="button" class="boton boton-primario" id="btn-nuevo-usuario" onclick="abrirModalNuevo()">
+                ➕ Nuevo Usuario
+            </button>
+            <form action="{{ url_for('api_actualizar') }}" method="POST" style="margin: 0;">
+                <button type="submit" class="boton boton-secundario" title="Recargar padrón desde Firestore">
+                    🔄 Actualizar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Buscador y filtros -->
+<div class="tarjeta mb-xl" style="padding: var(--espacio-md) var(--espacio-lg);">
+    <!-- Buscador inteligente -->
+    <form method="GET" action="{{ url_for('usuarios') }}" class="buscador" style="margin-bottom: var(--espacio-md);">
+        <input type="hidden" name="filtro" value="{{ filtro }}">
+        <input type="text"
+               name="q"
+               id="campo-busqueda"
+               class="campo"
+               placeholder="Buscar por medidor (ej. 3386), conexión (796), DNI o apellidos y nombres..."
+               value="{{ q }}"
+               autofocus>
+        <button type="submit" class="boton boton-primario" id="btn-buscar">
+            🔍 Buscar
+        </button>
+        {% if q %}
+            <a href="{{ url_for('usuarios', filtro=filtro) }}" class="boton boton-secundario" title="Limpiar búsqueda">
+                ✖ Limpiar
+            </a>
+        {% endif %}
+    </form>
+
+    <!-- Barra de filtros -->
+    <div class="barra-herramientas-usuarios" style="margin-bottom: 0;">
+        <div class="filtros-usuarios">
+            <a href="{{ url_for('usuarios', filtro='todos', q=q) }}"
+               class="filtro-btn {% if filtro == 'todos' %}activo{% endif %}"
+               id="filtro-todos">
+                <span>Todos</span>
+                <span class="filtro-contador">{{ total_todos }}</span>
+            </a>
+            <a href="{{ url_for('usuarios', filtro='activos', q=q) }}"
+               class="filtro-btn {% if filtro == 'activos' %}activo{% endif %}"
+               id="filtro-activos">
+                <span>Activos</span>
+                <span class="filtro-contador">{{ total_activos }}</span>
+            </a>
+            <a href="{{ url_for('usuarios', filtro='inactivos', q=q) }}"
+               class="filtro-btn {% if filtro == 'inactivos' %}activo{% endif %}"
+               id="filtro-inactivos">
+                <span>Inactivos</span>
+                <span class="filtro-contador">{{ total_inactivos }}</span>
+            </a>
+            <a href="{{ url_for('usuarios', filtro='pendientes', q=q) }}"
+               class="filtro-btn {% if filtro == 'pendientes' %}activo{% endif %}"
+               id="filtro-pendientes"
+               style="{% if filtro != 'pendientes' and total_pendientes > 0 %}border-color: #f59e0b; color: #b45309;{% endif %}">
+                <span>⚠️ Pendientes de DNI</span>
+                <span class="filtro-contador">{{ total_pendientes }}</span>
+            </a>
+        </div>
+        <div class="texto-sm texto-muted">
+            Mostrando <strong>{{ usuarios|length }}</strong> de <strong>{{ total_filtrados }}</strong> registros
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de usuarios -->
+<div class="tarjeta" style="padding: 0; overflow: hidden;">
+    {% if usuarios %}
+    <div class="contenedor-tabla">
+        <table class="tabla" id="tabla-usuarios">
+            <thead>
+                <tr>
+                    <th style="width: 100px;">Conexión</th>
+                    <th style="width: 130px;">DNI / ID</th>
+                    <th>Apellidos y Nombres</th>
+                    <th>Sector</th>
+                    <th>Dirección</th>
+                    <th>Medidores</th>
+                    <th style="width: 80px;">Cat.</th>
+                    <th style="width: 90px; text-align: center;">Estado</th>
+                    <th style="width: 160px; text-align: center;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr>
+                    <td class="texto-mono texto-negrita texto-primario">
+                        {{ u.nro_conexion or '—' }}
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                            <span class="texto-mono texto-negrita">{{ u.id_usuario }}</span>
+                            {% if u.es_pendiente %}
+                                <button type="button"
+                                        class="insignia-pendiente"
+                                        title="Haga clic para ingresar el DNI real"
+                                        onclick="abrirModalCorregirDni('{{ u.id_usuario }}', '{{ u.nombre|escape }}')"
+                                        style="cursor: pointer; border: none;">
+                                    ⚠️ Pedir DNI
+                                </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <strong class="texto-lg">{{ u.nombre }}</strong>
+                    </td>
+                    <td class="texto-sm">
+                        {{ u.sector }}
+                    </td>
+                    <td class="texto-sm texto-muted">
+                        {{ u.direccion or 'S/N' }}
+                    </td>
+                    <td>
+                        {% if u.medidores %}
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                {% for m in u.medidores %}
+                                    <span class="chip-medidor">💧 {{ m }}</span>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <span class="texto-muted texto-sm"><em>(Sin medidor)</em></span>
+                        {% endif %}
+                    </td>
+                    <td class="texto-centro">
+                        <span class="badge badge-gris">{{ u.codigo_categoria or 'A' }}</span>
+                    </td>
+                    <td class="texto-centro">
+                        {% if u.activo %}
+                            <span class="badge badge-verde">Activo</span>
+                        {% else %}
+                            <span class="badge badge-gris">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="texto-centro">
+                        <div class="grupo-botones" style="justify-content: center; gap: 4px;">
+                            <button type="button"
+                                    class="boton boton-pequeno boton-secundario"
+                                    title="Editar usuario"
+                                    onclick="cargarYEditarUsuario('{{ u.id_usuario }}')">
+                                ✏️
+                            </button>
+                            {% if u.es_pendiente %}
+                            <button type="button"
+                                    class="boton boton-pequeno boton-aviso"
+                                    title="Corregir DNI"
+                                    onclick="abrirModalCorregirDni('{{ u.id_usuario }}', '{{ u.nombre|escape }}')">
+                                🆔
+                            </button>
+                            {% endif %}
+                            <form action="{{ url_for('usuarios_cambiar_estado') }}" method="POST" style="margin: 0; display: inline;">
+                                <input type="hidden" name="id_usuario" value="{{ u.id_usuario }}">
+                                <input type="hidden" name="activo" value="{{ '0' if u.activo else '1' }}">
+                                <button type="submit"
+                                        class="boton boton-pequeno {% if u.activo %}boton-secundario{% else %}boton-exito{% endif %}"
+                                        title="{{ 'Desactivar usuario' if u.activo else 'Activar usuario' }}">
+                                    {{ '⏸️' if u.activo else '▶️' }}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if total_paginas > 1 %}
+    <div class="paginacion" style="margin: var(--espacio-lg) 0;">
+        {% if pagina > 1 %}
+            <a href="{{ url_for('usuarios', filtro=filtro, q=q, pagina=pagina-1) }}">⬅ Anterior</a>
+        {% endif %}
+
+        {% for p in range(1, total_paginas + 1) %}
+            {% if p == pagina %}
+                <span class="actual">{{ p }}</span>
+            {% elif p <= 3 or p >= total_paginas - 2 or (p >= pagina - 1 and p <= pagina + 1) %}
+                <a href="{{ url_for('usuarios', filtro=filtro, q=q, pagina=p) }}">{{ p }}</a>
+            {% elif p == 4 or p == total_paginas - 3 %}
+                <span style="border: none; background: none;">...</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagina < total_paginas %}
+            <a href="{{ url_for('usuarios', filtro=filtro, q=q, pagina=pagina+1) }}">Siguiente ➡</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="estado-vacio">
+        <p>No se encontraron usuarios</p>
+        <span class="texto-muted">
+            {% if q %}
+                No hay resultados para la búsqueda "<strong>{{ q }}</strong>" en esta categoría.
+            {% else %}
+                No hay usuarios en este filtro.
+            {% endif %}
+        </span>
+        <div class="mt-lg">
+            <button type="button" class="boton boton-primario" onclick="abrirModalNuevo()">
+                ➕ Registrar primer usuario
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+
+<!-- ===================================================================
+     MODAL: Agregar / Editar Usuario
+     =================================================================== -->
+<div class="modal-backdrop" id="modal-usuario-backdrop" onclick="cerrarModalFuera(event, 'modal-usuario-backdrop')">
+    <div class="modal-contenido">
+        <div class="modal-encabezado">
+            <h3 id="modal-usuario-titulo">Nuevo Usuario</h3>
+            <button type="button" class="modal-cerrar" onclick="cerrarModal('modal-usuario-backdrop')">✕</button>
+        </div>
+
+        <form action="{{ url_for('usuarios_guardar') }}" method="POST" id="form-usuario">
+            <input type="hidden" name="es_edicion" id="form-es-edicion" value="0">
+            <input type="hidden" name="medidores" id="form-medidores-hidden" value="">
+
+            <div class="formulario-fila">
+                <!-- ID / DNI -->
+                <div class="formulario-grupo">
+                    <label for="form-id-usuario">DNI / Documento de Identidad:</label>
+                    <input type="text"
+                           name="id_usuario"
+                           id="form-id-usuario"
+                           class="campo"
+                           placeholder="8 dígitos (ej. 30771072)"
+                           maxlength="12">
+                    <div id="check-sin-dni-contenedor" style="margin-top: 6px;">
+                        <label style="font-size: var(--tamano-sm); font-weight: var(--peso-normal); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            <input type="checkbox" name="sin_dni" id="form-sin-dni" value="1" onchange="toggleSinDni(this)">
+                            <span>Persona sin DNI (asignar ID provisional {{ sug_id_sd }})</span>
+                        </label>
+                    </div>
+                    <span class="campo-ayuda" id="form-id-ayuda">Si ingresas 7 dígitos, se completará con cero.</span>
+                </div>
+
+                <!-- Conexión -->
+                <div class="formulario-grupo">
+                    <label for="form-nro-conexion">N° de Conexión:</label>
+                    <input type="text"
+                           name="nro_conexion"
+                           id="form-nro-conexion"
+                           class="campo"
+                           placeholder="6 dígitos (ej. 000796)"
+                           value="{{ sug_conexion }}"
+                           required>
+                    <span class="campo-ayuda">Sugerido el siguiente número correlativo disponible.</span>
+                </div>
+            </div>
+
+            <!-- Nombre -->
+            <div class="formulario-grupo">
+                <label for="form-nombre">Apellidos y Nombres Completos:</label>
+                <input type="text"
+                       name="nombre"
+                       id="form-nombre"
+                       class="campo"
+                       placeholder="Ej. CONDORI MAMANI, CARLOS ALBERTO"
+                       required>
+            </div>
+
+            <div class="formulario-fila">
+                <!-- Sector -->
+                <div class="formulario-grupo">
+                    <label for="form-sector">Sector / Barrio:</label>
+                    <select name="sector" id="form-sector" class="campo" required>
+                        {% for s in sectores %}
+                            <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Categoría -->
+                <div class="formulario-grupo">
+                    <label for="form-categoria">Categoría de Facturación:</label>
+                    <select name="codigo_categoria" id="form-categoria" class="campo" required>
+                        {% for cod, cat in categorias.items() %}
+                            <option value="{{ cod }}">{{ cod }} — {{ cat.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dirección -->
+            <div class="formulario-grupo">
+                <label for="form-direccion">Dirección / Referencia:</label>
+                <input type="text"
+                       name="direccion"
+                       id="form-direccion"
+                       class="campo"
+                       placeholder="Ej. CALLE 05 DE AGOSTO S/N">
+            </div>
+
+            <!-- Medidores -->
+            <div class="formulario-grupo">
+                <label>Medidores de Agua Asignados:</label>
+                <div style="display: flex; gap: var(--espacio-sm);">
+                    <input type="text"
+                           id="input-nuevo-medidor"
+                           class="campo"
+                           placeholder="N° de medidor (ej. 22392996)"
+                           style="flex: 1;">
+                    <button type="button" class="boton boton-secundario" onclick="agregarMedidorModal()">
+                        ➕ Añadir
+                    </button>
+                </div>
+                <div class="contenedor-medidores" id="lista-chips-medidores">
+                    <!-- Chips renderizados dinámicamente -->
+                </div>
+                <span class="campo-ayuda">
+                    Se normalizan a mínimo 6 dígitos al guardar. Un medidor no puede pertenecer a más de una persona.
+                </span>
+            </div>
+
+            <!-- Activo y Opciones adicionales -->
+            <div style="margin-top: var(--espacio-md); padding: var(--espacio-md); background: var(--color-fondo); border-radius: var(--radio-md);">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: var(--peso-medio);">
+                    <input type="checkbox" name="activo" id="form-activo" value="1" checked>
+                    <span>Usuario ACTIVO en el servicio de agua</span>
+                </label>
+
+                {% if mes_abierto %}
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-borde-suave);" id="opcion-agregar-mes">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--color-primario); font-weight: var(--peso-medio);">
+                        <input type="checkbox" name="agregar_al_mes" value="1" checked>
+                        <span>Agregar automáticamente a la lista del mes abierto actual ({{ mes_actual.periodo }})</span>
+                    </label>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="modal-pie">
+                <button type="button" class="boton boton-secundario" onclick="cerrarModal('modal-usuario-backdrop')">
+                    Cancelar
+                </button>
+                <button type="submit" class="boton boton-primario" id="btn-guardar-usuario">
+                    💾 Guardar Usuario
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ===================================================================
+     MODAL: Corregir DNI
+     =================================================================== -->
+<div class="modal-backdrop" id="modal-corregir-dni-backdrop" onclick="cerrarModalFuera(event, 'modal-corregir-dni-backdrop')">
+    <div class="modal-contenido" style="max-width: 500px;">
+        <div class="modal-encabezado">
+            <h3>Corregir Documento de Identidad</h3>
+            <button type="button" class="modal-cerrar" onclick="cerrarModal('modal-corregir-dni-backdrop')">✕</button>
+        </div>
+
+        <form action="{{ url_for('usuarios_corregir_dni') }}" method="POST" id="form-corregir-dni">
+            <input type="hidden" name="id_viejo" id="corregir-id-viejo" value="">
+
+            <div class="alerta alerta-aviso">
+                <span class="alerta-icono">⚠️</span>
+                <div>
+                    <div>Usuario actual: <strong id="corregir-nombre-usuario">...</strong></div>
+                    <div style="margin-top: 2px;">ID Provisional actual: <span class="texto-mono texto-negrita" id="corregir-id-actual-texto">...</span></div>
+                </div>
+            </div>
+
+            <div class="formulario-grupo">
+                <label for="corregir-id-nuevo">Nuevo DNI Real (8 dígitos):</label>
+                <input type="text"
+                       name="id_nuevo"
+                       id="corregir-id-nuevo"
+                       class="campo"
+                       placeholder="Ej. 30771072"
+                       maxlength="8"
+                       required
+                       pattern="[0-9]{7,8}">
+                <span class="campo-ayuda">
+                    Debe contener 8 dígitos numéricos y no existir previamente en el padrón.
+                </span>
+            </div>
+
+            <div class="alerta alerta-info" style="font-size: var(--tamano-sm);">
+                <span>ℹ️</span>
+                <span>
+                    Esta acción creará el documento con el DNI definitivo, transferirá sus medidores e historial, actualizará todas las colecciones de meses existentes y eliminará el código provisional anterior.
+                </span>
+            </div>
+
+            <div class="modal-pie">
+                <button type="button" class="boton boton-secundario" onclick="cerrarModal('modal-corregir-dni-backdrop')">
+                    Cancelar
+                </button>
+                <button type="submit" class="boton boton-aviso">
+                    ✅ Confirmar y Renombrar DNI
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Gestión dinámica de medidores en el modal
+    let medidoresLista = [];
+
+    function renderizarMedidores() {
+        const contenedor = document.getElementById('lista-chips-medidores');
+        contenedor.innerHTML = '';
+        if (medidoresLista.length === 0) {
+            contenedor.innerHTML = '<span class="texto-muted texto-sm" style="padding: 4px;">Sin medidores asignados</span>';
+        } else {
+            medidoresLista.forEach((m, idx) => {
+                const chip = document.createElement('span');
+                chip.className = 'chip-medidor';
+                chip.innerHTML = `💧 ${m} <button type="button" class="chip-medidor-quitar" onclick="quitarMedidorModal(${idx})" title="Quitar medidor">✕</button>`;
+                contenedor.appendChild(chip);
+            });
+        }
+        document.getElementById('form-medidores-hidden').value = medidoresLista.join(',');
+    }
+
+    function agregarMedidorModal() {
+        const input = document.getElementById('input-nuevo-medidor');
+        let valor = input.value.trim();
+        if (!valor) return;
+
+        // Normalizar mínimo 6 dígitos si son números
+        if (/^\d+$/.test(valor)) {
+            while (valor.length < 6) {
+                valor = '0' + valor;
+            }
+        }
+
+        if (!medidoresLista.includes(valor)) {
+            medidoresLista.push(valor);
+            renderizarMedidores();
+        }
+        input.value = '';
+        input.focus();
+    }
+
+    function quitarMedidorModal(idx) {
+        medidoresLista.splice(idx, 1);
+        renderizarMedidores();
+    }
+
+    // Permitir presionar Enter en el input de medidor sin enviar el formulario
+    document.getElementById('input-nuevo-medidor').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            agregarMedidorModal();
+        }
+    });
+
+    // Abrir modal Nuevo Usuario
+    function abrirModalNuevo() {
+        document.getElementById('modal-usuario-titulo').textContent = '➕ Nuevo Usuario';
+        document.getElementById('form-es-edicion').value = '0';
+        document.getElementById('form-id-usuario').value = '';
+        document.getElementById('form-id-usuario').readOnly = false;
+        document.getElementById('check-sin-dni-contenedor').style.display = 'block';
+        document.getElementById('form-sin-dni').checked = false;
+        document.getElementById('form-nro-conexion').value = '{{ sug_conexion }}';
+        document.getElementById('form-nombre').value = '';
+        document.getElementById('form-direccion').value = '';
+        document.getElementById('form-activo').checked = true;
+        medidoresLista = [];
+        renderizarMedidores();
+
+        const optMes = document.getElementById('opcion-agregar-mes');
+        if (optMes) optMes.style.display = 'block';
+
+        abrirModal('modal-usuario-backdrop');
+    }
+
+    // Toggle Sin DNI
+    function toggleSinDni(chk) {
+        const idInput = document.getElementById('form-id-usuario');
+        const ayuda = document.getElementById('form-id-ayuda');
+        if (chk.checked) {
+            idInput.value = '{{ sug_id_sd }}';
+            idInput.readOnly = true;
+            ayuda.textContent = 'Se asignará el identificador provisional correlativo {{ sug_id_sd }}.';
+        } else {
+            idInput.value = '';
+            idInput.readOnly = false;
+            ayuda.textContent = 'Si ingresas 7 dígitos, se completará con cero al frente.';
+        }
+    }
+
+    // Cargar y Editar Usuario
+    function cargarYEditarUsuario(idUsuario) {
+        fetch(`/api/usuarios/${encodeURIComponent(idUsuario)}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Usuario no encontrado');
+                return res.json();
+            })
+            .then(u => {
+                document.getElementById('modal-usuario-titulo').textContent = `✏️ Editar Usuario: ${u.nombre}`;
+                document.getElementById('form-es-edicion').value = '1';
+                document.getElementById('form-id-usuario').value = u.id_usuario;
+                document.getElementById('form-id-usuario').readOnly = true;
+                document.getElementById('check-sin-dni-contenedor').style.display = 'none';
+
+                document.getElementById('form-nro-conexion').value = u.nro_conexion || '';
+                document.getElementById('form-nombre').value = u.nombre || '';
+                document.getElementById('form-sector').value = u.sector || '';
+                document.getElementById('form-categoria').value = u.codigo_categoria || 'A';
+                document.getElementById('form-direccion').value = u.direccion || '';
+                document.getElementById('form-activo').checked = (u.activo !== false);
+
+                const optMes = document.getElementById('opcion-agregar-mes');
+                if (optMes) optMes.style.display = 'none';
+
+                medidoresLista = (u.medidores || []).map(m => typeof m === 'string' ? m : (m.nro_medidor || ''));
+                renderizarMedidores();
+
+                abrirModal('modal-usuario-backdrop');
+            })
+            .catch(err => {
+                alert('No se pudo cargar la información del usuario: ' + err.message);
+            });
+    }
+
+    // Modal Corregir DNI
+    function abrirModalCorregirDni(idViejo, nombre) {
+        document.getElementById('corregir-id-viejo').value = idViejo;
+        document.getElementById('corregir-id-actual-texto').textContent = idViejo;
+        document.getElementById('corregir-nombre-usuario').textContent = nombre;
+        document.getElementById('corregir-id-nuevo').value = '';
+        abrirModal('modal-corregir-dni-backdrop');
+        setTimeout(() => document.getElementById('corregir-id-nuevo').focus(), 100);
+    }
+
+    // Utilidades genéricas de Modal
+    function abrirModal(id) {
+        document.getElementById(id).classList.add('activo');
+    }
+
+    function cerrarModal(id) {
+        document.getElementById(id).classList.remove('activo');
+    }
+
+    function cerrarModalFuera(event, id) {
+        if (event.target.id === id) {
+            cerrarModal(id);
+        }
+    }
+
+    // Cerrar modales con ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-backdrop.activo').forEach(m => m.classList.remove('activo'));
+        }
+    });
+</script>
+{% endblock %}

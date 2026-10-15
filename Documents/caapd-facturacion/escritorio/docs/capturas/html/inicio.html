@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titulo %}Inicio{% endblock %}
+
+{% block contenido %}
+<div class="encabezado-seccion">
+    <h1>Panel de control</h1>
+    <p>Facturación mensual de agua potable</p>
+</div>
+
+<!-- Banner del mes actual -->
+{% if periodo %}
+<div class="banner-mes">
+    <div class="banner-mes-info">
+        <h2>{{ periodo | replace('-', '/') }}</h2>
+        <p>
+            Emisión: {{ config.mes_actual.fecha_emision or '—' }}
+            &nbsp;·&nbsp;
+            Vencimiento: {{ config.mes_actual.fecha_vencimiento or '—' }}
+            &nbsp;·&nbsp;
+            Estado: <strong>{{ config.mes_actual.estado or '—' }}</strong>
+        </p>
+    </div>
+    <div class="grupo-botones">
+        {% if config.mes_actual.estado == 'CERRADO' or not config.mes_actual.periodo %}
+            <a href="{{ url_for('recibos') }}#abrir-mes" class="boton boton-exito boton-grande" id="btn-abrir-mes">
+                📅 Abrir mes nuevo
+            </a>
+        {% endif %}
+        {% if config.mes_actual.estado == 'ABIERTO' %}
+            <a href="{{ url_for('recibos') }}#generar" class="boton boton-primario boton-grande" id="btn-generar-recibos">
+                🧾 Generar recibos
+            </a>
+        {% endif %}
+        <a href="{{ url_for('recibos') }}#respaldo" class="boton boton-secundario" id="btn-respaldo">
+            📥 Descargar respaldo Excel
+        </a>
+    </div>
+</div>
+{% else %}
+<div class="alerta alerta-aviso">
+    <span class="alerta-icono">⚠️</span>
+    <span>No hay un mes activo. Ve a <a href="{{ url_for('recibos') }}">Recibos</a> para abrir el primer mes.</span>
+</div>
+{% endif %}
+
+<!-- Tarjetas de estadísticas de recibos -->
+<div class="tarjeta-grid">
+    <div class="tarjeta-stat">
+        <span class="stat-numero">{{ stats_recibos.generados }}</span>
+        <span class="stat-label">Recibos generados</span>
+    </div>
+    <div class="tarjeta-stat exito">
+        <span class="stat-numero">{{ stats_recibos.pagados }}</span>
+        <span class="stat-label">Pagados</span>
+    </div>
+    <div class="tarjeta-stat aviso">
+        <span class="stat-numero">{{ stats_recibos.pendientes }}</span>
+        <span class="stat-label">Pendientes de pago</span>
+    </div>
+</div>
+
+<!-- Avance de lecturas por sector -->
+{% if stats_sectores %}
+<div class="tarjeta">
+    <div class="tarjeta-titulo">📊 Avance de lecturas por sector</div>
+    {% for s in stats_sectores %}
+        {% set pct = ((s.leidos / s.total * 100) | int) if s.total > 0 else 0 %}
+        <div class="sector-item">
+            <span class="sector-nombre">{{ s.sector }}</span>
+            <div class="sector-progreso">
+                <span class="sector-progreso-texto">
+                    {{ s.leidos }} de {{ s.total }}
+                    {% if s.leidos == s.total and s.total > 0 %}✅{% endif %}
+                </span>
+                <div class="barra-progreso-contenedor">
+                    <div class="barra-progreso {% if pct == 100 %}completo{% endif %}"
+                         style="width: {{ pct }}%"
+                         role="progressbar"
+                         aria-valuenow="{{ pct }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="tarjeta">
+    <div class="tarjeta-titulo">📊 Avance de lecturas por sector</div>
+    <div class="estado-vacio">
+        <p>Sin datos</p>
+        <span class="texto-muted texto-sm">Abre un mes para ver el avance de lecturas.</span>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

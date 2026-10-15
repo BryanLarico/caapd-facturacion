@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "555407687564",
+    "project_id": "caapd-ispacas-optimizado",
+    "storage_bucket": "caapd-ispacas-optimizado.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:555407687564:android:cc8ee71d9039cb7f1be0a9",
+        "android_client_info": {
+          "package_name": "com.caapd.lecturas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCy1-gUBofT5yqv4cu_zlNmwyxGJJ1GxoU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

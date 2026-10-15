@@ -1,0 +1,114 @@
+[
+  {
+    "id_evento": "evt_20261014_092652_358164",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "30771152",
+      "nro_medidor": "2001887",
+      "lectura_actual": 118,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:26:52.358164",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 30771152 no encontrado en el mes 2026-10."
+  },
+  {
+    "id_evento": "evt_20261014_092655_264725",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "30770229",
+      "nro_medidor": "6593681",
+      "lectura_actual": 961,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:26:55.264725",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 30770229 no encontrado en el mes 2026-10."
+  },
+  {
+    "id_evento": "evt_20261014_092658_353128",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "30770890",
+      "nro_medidor": "220014925",
+      "lectura_actual": 258,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:26:58.353128",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 30770890 no encontrado en el mes 2026-10."
+  },
+  {
+    "id_evento": "evt_20261014_092701_243137",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "30770036",
+      "nro_medidor": "6563926",
+      "lectura_actual": 254,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:27:01.243137",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 30770036 no encontrado en el mes 2026-10."
+  },
+  {
+    "id_evento": "evt_20261014_092707_559657",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "30778043",
+      "nro_medidor": "6563939",
+      "lectura_actual": 488,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:27:07.559657",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 30778043 no encontrado en el mes 2026-10."
+  },
+  {
+    "id_evento": "evt_20261014_092715_666567",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "30769528",
+      "nro_medidor": "60062505",
+      "lectura_actual": 249,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:27:15.666567",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 30769528 no encontrado en el mes 2026-10."
+  },
+  {
+    "id_evento": "evt_20261014_092724_028108",
+    "tipo": "lectura",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "45209656",
+      "nro_medidor": "60062454",
+      "lectura_actual": 137,
+      "novedad": "ESTIMADO",
+      "nota": "Estimado automáticamente",
+      "registrado_por": "ADMIN"
+    },
+    "fecha_creacion": "2026-10-14T09:27:24.028108",
+    "reintentos": 3,
+    "ultimo_error": "Usuario 45209656 no encontrado en el mes 2026-10."
+  }
+]
