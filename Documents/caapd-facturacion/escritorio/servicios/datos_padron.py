@@ -557,6 +557,52 @@ class ServicioDatosPadron(ServicioDatos):
             self._archivos_mtime[str(destino)] = destino.stat().st_mtime
         return resultado
 
+    def actualizar_deuda(
+        self, periodo: str, id_usuario: str, campo: str, valor: float
+    ) -> Dict[str, Any]:
+        """Actualiza una deuda y persiste el padrón del periodo antes de confirmar."""
+        import math
+
+        if campo not in ("deuda_anterior", "deuda_actual"):
+            raise ValueError(f"Campo de deuda inválido: {campo}")
+        importe = round(float(valor), 2)
+        if not math.isfinite(importe) or importe < 0:
+            raise ValueError("La deuda debe ser un importe finito no negativo.")
+        if self.periodo and periodo != self.periodo:
+            raise ValueError(f"El periodo activo es {self.periodo}, no {periodo}.")
+
+        doc = self.mes.get(id_usuario)
+        if not doc:
+            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+
+        valores_anteriores = {
+            clave: doc.get(clave)
+            for clave in ("deuda_anterior", "deuda_actual", "total_a_pagar")
+        }
+        deuda_anterior = importe if campo == "deuda_anterior" else float(doc.get("deuda_anterior") or 0.0)
+        deuda_actual = importe if campo == "deuda_actual" else doc.get("deuda_actual")
+        if deuda_actual is None:
+            deuda_actual = max(
+                0.0,
+                round(float(doc.get("total_a_pagar") or 0.0) - deuda_anterior, 2),
+            )
+
+        doc["deuda_anterior"] = deuda_anterior
+        doc["deuda_actual"] = float(deuda_actual or 0.0)
+        doc["total_a_pagar"] = round(
+            deuda_anterior + float(deuda_actual or 0.0), 2
+        )
+        try:
+            self.guardar_en_respaldo_local(periodo)
+        except Exception:
+            for clave, valor_anterior in valores_anteriores.items():
+                if valor_anterior is None:
+                    doc.pop(clave, None)
+                else:
+                    doc[clave] = valor_anterior
+            raise
+        return doc
+
     def _extraer_datos_archivo_excel(self, ruta: Path) -> Dict[str, Any]:
         """Extrae usuarios y documentos del mes desde cualquier archivo de respaldo o padrón Excel."""
         import openpyxl
@@ -1256,124 +1302,53 @@ class ServicioDatosPadron(ServicioDatos):
     ) -> Dict[str, Any]:
         """
         Acción B: Traer lecturas de los lectores (Nube -> Excel).
-        Descarga exclusivamente las lecturas y medidores desde mes_aaaa-mm.
-        - Protege las lecturas registradas por ADMIN (nunca las sobreescribe sin aviso).
-        - Recalcula los consumos por medidor y consumo_total_m3 según reglas comunales.
-        - Guarda inmediatamente en el archivo Excel local.
+        Descarga por la API REST de Firestore (servicios/firestore_rest.py), NO por gRPC.
+        La versión anterior usaba `col.select([...]).stream()`, que en Windows podía
+        colgarse dentro de gRPC y cerrar el proceso con un «access violation».
+        La fusión con el Excel local la hace `fusionar_lecturas_nube`.
         """
         import time
-        import firebase_client as fb
+        from servicios import firestore_rest
 
         t_inicio = time.perf_counter()
         p = periodo or self.periodo
 
-        actualizados = 0
-        conflictos_admin = []
-        db = fb.db()
-        col = db.collection(f"mes_{p}")
+        if callback_progreso:
+            callback_progreso(10, "Autenticando con Firebase (API REST, sin gRPC)...")
+
+        total_docs_locales = max(1, len(self.mes))
+
+        def _progreso_descarga(n_recibidos: int, texto: str) -> None:
+            if not callback_progreso:
+                return
+            pct = 20 + int(min(n_recibidos, total_docs_locales) / total_docs_locales * 50)
+            callback_progreso(min(pct, 70), texto)
 
         if callback_progreso:
             callback_progreso(
-                30,
-                "Conectando con Firestore; la descarga tiene un límite de 60 segundos...",
+                20,
+                "Conectando con Firebase; cada petición tiene un límite de "
+                f"{int(firestore_rest.TIMEOUT_LECTURA_S)} segundos...",
             )
 
-        total_docs_locales = len(self.mes)
-        docs_recibidos = 0
-        consulta = col.select(["medidores", "nombre"])
-        for idx, doc in enumerate(consulta.stream(timeout=60), 1):
-            docs_recibidos = idx
-            self.ops["lecturas"] += 1
-            uid = doc.id
-            if callback_progreso and (idx == 1 or idx % 5 == 0):
-                pct = 30 + int(
-                    min(idx, total_docs_locales) / max(1, total_docs_locales) * 45
-                )
-                callback_progreso(
-                    pct,
-                    f"Descargando y consolidando lecturas ({idx} documentos recibidos)...",
-                )
-            if uid not in self.mes:
-                continue
+        # 1. Descarga completa (paginada) por REST. Lanza excepción clara si falla.
+        docs_nube = firestore_rest.descargar_documentos_mes(
+            p,
+            campos=("medidores", "nombre"),
+            callback_progreso=_progreso_descarga,
+        )
+        docs_recibidos = len(docs_nube)
+        self.ops["lecturas"] += docs_recibidos
 
-            datos_cloud = doc.to_dict() or {}
-            doc_local = self.mes[uid]
-            meds_cloud = datos_cloud.get("medidores") or []
-            meds_local = doc_local.get("medidores") or []
+        # 2. Fusión en memoria con protección ADMIN y recálculo de consumos.
+        if callback_progreso:
+            callback_progreso(75, f"Consolidando {docs_recibidos} documento(s) con el padrón local...")
+        actualizados, conflictos_admin = fusionar_lecturas_nube(docs_nube, self.mes)
 
-            modificado_usuario = False
-
-            for mc in meds_cloud:
-                nro = str(mc.get("nro_medidor") or "")
-                ml = next((m for m in meds_local if str(m.get("nro_medidor") or "") == nro), None)
-                if not ml and len(meds_local) == 1:
-                    ml = meds_local[0]
-
-                if not ml:
-                    continue
-
-                lec_cloud = mc.get("lectura_actual")
-                if lec_cloud is None:
-                    continue
-
-                # Protección ADMIN: Si ya tiene lectura de ADMIN, verificar conflicto
-                reg_por = str(ml.get("registrado_por") or "").upper()
-                lec_local = ml.get("lectura_actual")
-                if reg_por == "ADMIN" and lec_local is not None:
-                    try:
-                        if int(lec_local) != int(lec_cloud):
-                            conflictos_admin.append({
-                                "id_usuario": uid,
-                                "nombre": doc_local.get("nombre", ""),
-                                "nro_medidor": nro,
-                                "lectura_admin": lec_local,
-                                "lectura_cloud": lec_cloud,
-                                "registrado_por_cloud": mc.get("registrado_por") or "Lector",
-                            })
-                            continue
-                    except Exception:
-                        pass
-
-                # Asignar lectura del lector
-                try:
-                    ml["lectura_actual"] = int(lec_cloud)
-                except Exception:
-                    ml["lectura_actual"] = lec_cloud
-                ml["estado_lectura"] = mc.get("estado_lectura", "LEIDO")
-                ml["novedad"] = mc.get("novedad", "NORMAL")
-                ml["nota"] = mc.get("nota", "")
-                ml["fecha_lectura"] = mc.get("fecha_lectura") or datetime.date.today().isoformat()
-                ml["registrado_por"] = mc.get("registrado_por") or "LECTOR"
-                actualizados += 1
-                modificado_usuario = True
-
-            # Recalcular consumo del usuario
-            if modificado_usuario or any(m.get("lectura_actual") is not None for m in meds_local):
-                consumo_total = 0
-                for m in meds_local:
-                    ant = m.get("lectura_anterior")
-                    act = m.get("lectura_actual")
-                    nov = str(m.get("novedad") or "").upper()
-                    if act is not None and ant is not None:
-                        try:
-                            act_i = int(act)
-                            ant_i = int(ant)
-                            if nov == "CAMBIO_MEDIDOR":
-                                c = act_i
-                            elif act_i >= ant_i:
-                                c = act_i - ant_i
-                            else:
-                                c = 0
-                        except Exception:
-                            c = 0
-                        m["consumo_m3"] = c
-                        consumo_total += c
-                doc_local["consumo_total_m3"] = consumo_total
-
-        # 4. Guardar en Excel local
+        # 3. Guardar en Excel local
         if callback_progreso:
             callback_progreso(
-                80,
+                85,
                 f"Descarga completa ({docs_recibidos} documentos). Guardando el Excel local...",
             )
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1390,6 +1365,7 @@ class ServicioDatosPadron(ServicioDatos):
             "actualizados": actualizados,
             "conflictos_admin": conflictos_admin,
             "tiempo_segundos": round(duracion, 2),
+            "metodo": "REST",
             "exito": True,
         }
 

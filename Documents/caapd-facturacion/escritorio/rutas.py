@@ -7,8 +7,14 @@ y configura sys.path para la importación limpia de módulos.
 from pathlib import Path
 import sys
 
-# Directorio raíz del programa de escritorio
-DIR_BASE = Path(__file__).resolve().parent
+# Directorio donde se guardan los datos editables. En una distribución congelada
+# queda junto al ejecutable, no dentro de los recursos temporales de PyInstaller.
+DIR_BASE = (
+    Path(sys.executable).resolve().parent
+    if getattr(sys, "frozen", False)
+    else Path(__file__).resolve().parent
+)
+DIR_RECURSOS = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 
 # Asegurar que el directorio base esté en sys.path
 if str(DIR_BASE) not in sys.path:
@@ -16,8 +22,19 @@ if str(DIR_BASE) not in sys.path:
 
 
 def ruta_recurso(*partes: str) -> Path:
-    """Devuelve la ruta absoluta a un recurso dentro de escritorio."""
+    """Devuelve la ruta absoluta a un recurso incluido con la aplicación."""
+    return DIR_RECURSOS.joinpath(*partes)
+
+
+def ruta_aplicacion(*partes: str) -> Path:
+    """Devuelve una ruta editable junto al ejecutable o al código fuente."""
     return DIR_BASE.joinpath(*partes)
+
+
+def preparar_directorios() -> None:
+    """Crea las carpetas de trabajo necesarias sin alterar su contenido."""
+    for nombre in ("Base de datos", "datos", "logs", "plantillas", "salida", "respaldos"):
+        DIR_BASE.joinpath(nombre).mkdir(parents=True, exist_ok=True)
 
 
 def ruta_fuentes(*partes: str) -> Path:
@@ -98,9 +115,10 @@ def ruta_recibos(*partes: str) -> Path:
 
 def ruta_respaldos(*partes: str) -> Path:
     """Devuelve la ruta dentro de respaldos/ (creándola si no existe)."""
-    # Priorizar respaldos en la raíz si existe, sino en escritorio
-    dir_resp = DIR_BASE.parent.joinpath("respaldos") if DIR_BASE.parent.joinpath(
-        "respaldos").exists() else DIR_BASE.joinpath("respaldos")
+    # La distribución portable mantiene sus respaldos junto al ejecutable.
+    dir_resp = DIR_BASE.joinpath("respaldos")
+    if not getattr(sys, "frozen", False) and DIR_BASE.parent.joinpath("respaldos").exists():
+        dir_resp = DIR_BASE.parent.joinpath("respaldos")
     p = dir_resp.joinpath(*partes)
     p.parent.mkdir(parents=True, exist_ok=True)
     return p

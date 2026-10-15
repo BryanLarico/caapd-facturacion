@@ -55,7 +55,9 @@ def _buscar_archivo_credenciales(ruta_personalizada: Optional[Path | str] = None
 
     # Buscar en escritorio y raíz
     candidatos = [
+        rutas.ruta_aplicacion("serviceAccountKey.json"),
         rutas.ruta_recurso("caapd-ispacas-optimizado-firebase-adminsdk-fbsvc-e6c4b2f0b0.json"),
+        rutas.ruta_aplicacion("caapd-ispacas-optimizado-firebase-adminsdk-fbsvc-e6c4b2f0b0.json"),
         rutas.DIR_BASE.parent / "caapd-ispacas-optimizado-firebase-adminsdk-fbsvc-e6c4b2f0b0.json",
     ]
     for c in candidatos:

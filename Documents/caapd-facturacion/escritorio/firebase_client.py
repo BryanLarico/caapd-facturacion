@@ -10,22 +10,35 @@ REGLAS:
 
 from __future__ import annotations
 import os
+import sys
 import threading
 import firebase_admin
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import WriteBatch
 
-PROYECTO_REAL_ID = "caapd-ispacas-optimizado"
-try:
-    from config_local import PROYECTO_REAL_ID
-except ImportError:
-    pass
+import rutas
 
-try:
-    from config_local import FIREBASE_KEY_PATH
-except ImportError:
-    FIREBASE_KEY_PATH = os.environ.get(
-        "FIREBASE_KEY_PATH", "serviceAccountKey.json")
+PROYECTO_REAL_ID = "caapd-ispacas-optimizado"
+if not getattr(sys, "frozen", False):
+    try:
+        from config_local import PROYECTO_REAL_ID
+    except ImportError:
+        pass
+
+if os.environ.get("FIREBASE_KEY_PATH"):
+    FIREBASE_KEY_PATH = os.environ["FIREBASE_KEY_PATH"]
+elif getattr(sys, "frozen", False):
+    FIREBASE_KEY_PATH = str(rutas.ruta_aplicacion("serviceAccountKey.json"))
+    ruta_clave_existente = rutas.ruta_aplicacion(
+        "caapd-ispacas-optimizado-firebase-adminsdk-fbsvc-e6c4b2f0b0.json"
+    )
+    if not os.path.exists(FIREBASE_KEY_PATH) and ruta_clave_existente.exists():
+        FIREBASE_KEY_PATH = str(ruta_clave_existente)
+else:
+    try:
+        from config_local import FIREBASE_KEY_PATH
+    except ImportError:
+        FIREBASE_KEY_PATH = str(rutas.ruta_aplicacion("serviceAccountKey.json"))
 
 
 def obtener_proyecto_id() -> str:

@@ -31,12 +31,12 @@ import rutas
 from calculos import calcular_nivel_mora, numero_a_letras, periodo_a_temporada
 
 ANCHO_RECIBO = 13.97 * cm
-ALTO_RECIBO = 21.59 * cm
+ALTO_RECIBO = 20.59 * cm
 
 DESPLAZAMIENTO_X_CM = 0.0
-DESPLAZAMIENTO_Y_CM = 0.6
+DESPLAZAMIENTO_Y_CM = 0.0
 
-AJUSTE_TALON_Y_CM = -0.1
+AJUSTE_TALON_Y_CM = 0.5
 
 X_DERECHA = 13.3 * cm
 

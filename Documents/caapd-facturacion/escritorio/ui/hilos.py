@@ -35,7 +35,7 @@ import rutas
 _log = logging.getLogger("caapd.hilos")
 if not _log.handlers:
     try:
-        _ruta_log = rutas.ruta_recurso("logs", "hilos.log")
+        _ruta_log = rutas.ruta_aplicacion("logs", "hilos.log")
         _ruta_log.parent.mkdir(parents=True, exist_ok=True)
         _handler = logging.FileHandler(str(_ruta_log), encoding="utf-8")
         _handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))

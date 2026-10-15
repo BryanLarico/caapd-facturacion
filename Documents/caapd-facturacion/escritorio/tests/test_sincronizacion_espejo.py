@@ -165,6 +165,39 @@ def servicio_prueba(tmp_path):
     return s
 
 
+def test_actualizar_deuda_guarda_los_importes_en_el_padron(
+    servicio_prueba, tmp_path, monkeypatch
+):
+    import openpyxl
+
+    ruta_padron = tmp_path / "Base de datos" / "PADRON_MES_2026-09.xlsx"
+    monkeypatch.setattr(
+        "servicios.datos_padron.rutas.ruta_base_de_datos",
+        lambda nombre: ruta_padron,
+    )
+
+    doc = servicio_prueba.actualizar_deuda(
+        "2026-09", "30770229", "deuda_actual", 9.5
+    )
+    assert doc["deuda_anterior"] == 26.0
+    assert doc["deuda_actual"] == 9.5
+    assert doc["total_a_pagar"] == 35.5
+    assert ruta_padron.exists()
+
+    wb = openpyxl.load_workbook(ruta_padron, read_only=True, data_only=True)
+    try:
+        ws = wb["AYACUCHO"]
+        fila = next(
+            row
+            for row in ws.iter_rows(min_row=4, values_only=True)
+            if str(row[1]).zfill(6) == "000528"
+        )
+        assert fila[11] == 26.0
+        assert fila[12] == 9.5
+    finally:
+        wb.close()
+
+
 def test_guardar_en_respaldo_local_solo_genera_padron_en_base_de_datos(
     tmp_path, monkeypatch
 ):

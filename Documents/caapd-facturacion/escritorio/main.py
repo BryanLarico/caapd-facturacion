@@ -48,9 +48,11 @@ def cargar_estilos(app: QApplication) -> None:
 
 
 def main() -> None:
+    rutas.preparar_directorios()
+
     # Registro de fallos nativos (cierres sin traceback): escritorio/logs/crash.log
     try:
-        ruta_crash = rutas.ruta_recurso("logs", "crash.log")
+        ruta_crash = rutas.ruta_aplicacion("logs", "crash.log")
         ruta_crash.parent.mkdir(parents=True, exist_ok=True)
         _archivo_crash = open(ruta_crash, "a", encoding="utf-8")
         faulthandler.enable(file=_archivo_crash, all_threads=True)

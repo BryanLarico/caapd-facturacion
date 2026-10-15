@@ -1,7 +1,7 @@
 """
 tests/test_ui_cobros.py — Pruebas unitarias de la pantalla unificada de Cobros y Facturación.
 
-Prueba el modelo de 7 columnas, los filtros por chips, la ficha del usuario,
+Prueba el modelo de 9 columnas, la edición de deudas, los filtros por chips, la ficha del usuario,
 el cobro todo o nada, el asistente de emisión de recibos y la exportación de morosos.
 """
 import os
@@ -209,20 +209,23 @@ def test_modelo_y_proxy_7_columnas():
 
     modelo = ModeloCobros(datos)
     assert modelo.rowCount() == 4
-    assert modelo.columnCount() == 7
+    assert modelo.columnCount() == 9
 
-    # Columnas: 0:Conexión, 1:N° Recibo, 2:Titular, 3:Sector, 4:Consumo, 5:Total, 6:Estado
+    # Columnas: 0:Conexión, 1:N° Recibo, 2:Titular, 3:Sector, 4:Consumo,
+    # 5:Deuda anterior, 6:Deuda actual, 7:Total, 8:Estado
     assert modelo.data(modelo.index(0, 0)) == "000796"
     assert modelo.data(modelo.index(0, 1)) == "000000101"
     assert modelo.data(modelo.index(0, 2)) == "QUISPE CARLOS"
     assert modelo.data(modelo.index(0, 3)) == "Chaupi"
     assert modelo.data(modelo.index(0, 4)) == "16"
-    assert modelo.data(modelo.index(0, 5)) == "S/. 17.50"
-    assert modelo.data(modelo.index(0, 6)) == "Pendiente"
+    assert modelo.data(modelo.index(0, 5)) == "S/. 0.00"
+    assert modelo.data(modelo.index(0, 6)) == "S/. 17.50"
+    assert modelo.data(modelo.index(0, 7)) == "S/. 17.50"
+    assert modelo.data(modelo.index(0, 8)) == "Pendiente"
 
-    assert modelo.data(modelo.index(1, 6)) == "2 Meses"
-    assert "Corte" in modelo.data(modelo.index(2, 6))
-    assert modelo.data(modelo.index(3, 6)) == "Pagado"
+    assert modelo.data(modelo.index(1, 8)) == "2 Meses"
+    assert "Corte" in modelo.data(modelo.index(2, 8))
+    assert modelo.data(modelo.index(3, 8)) == "Pagado"
 
     # Probar Proxy y Filtros
     proxy = ProxyCobros()
@@ -258,6 +261,38 @@ def test_modelo_y_proxy_7_columnas():
     proxy.set_texto_filtro("800")
     assert proxy.rowCount() == 1
     assert proxy.data(proxy.index(0, 2)) == "FLORES MARIA"
+
+def test_modelo_solicita_edicion_solo_de_deudas():
+    modelo = ModeloCobros([{
+        "id_usuario": "07654321",
+        "deuda_anterior": 5.0,
+        "deuda_actual": 12.5,
+        "total_a_pagar": 17.5,
+    }])
+    cambios = []
+    modelo.cambio_deuda_solicitado.connect(
+        lambda uid, campo, valor: cambios.append((uid, campo, valor))
+    )
+
+    assert modelo.flags(modelo.index(0, 5)) & Qt.ItemFlag.ItemIsEditable
+    assert modelo.flags(modelo.index(0, 6)) & Qt.ItemFlag.ItemIsEditable
+    assert not (modelo.flags(modelo.index(0, 7)) & Qt.ItemFlag.ItemIsEditable)
+    assert modelo.setData(modelo.index(0, 5), "8,25")
+    assert cambios == [("07654321", "deuda_anterior", 8.25)]
+    assert not modelo.setData(modelo.index(0, 6), "-1")
+    assert not modelo.setData(modelo.index(0, 7), "3")
+    assert modelo.data(modelo.index(0, 7)) == "S/. 17.50"
+
+
+def test_servicio_memoria_recalcula_total_al_editar_deuda(servicio_memoria_cobros):
+    servicio = servicio_memoria_cobros
+    doc = servicio.actualizar_deuda(
+        "2026-10", "07654321", "deuda_anterior", 10.25
+    )
+    assert doc["deuda_anterior"] == 10.25
+    assert doc["total_a_pagar"] == round(
+        10.25 + doc["deuda_actual"], 2
+    )
 
 
 def test_servicio_registro_y_anulacion_pago(servicio_memoria_cobros):

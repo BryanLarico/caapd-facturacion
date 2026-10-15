@@ -1,0 +1,2 @@
+# Dependencias de empaquetado; instalarlas junto con requirements.txt.
+pyinstaller>=6.10,<7

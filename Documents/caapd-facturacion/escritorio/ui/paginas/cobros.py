@@ -5,7 +5,7 @@ Versión simplificada:
 - 3 Tarjetas KPI compactas (Total facturado, Recaudado, En lista de corte)
 - Chips de filtro por estado de mora y alertas
 - Barra única: Sector + Buscador + "Imprimir / Descargar recibo PDF" + "Carpeta de recibos"
-- Tabla de 7 columnas con filas coloreadas por morosidad (naranja 2 meses, rojo 3+ meses)
+- Tabla con deudas editables, total calculado y filas coloreadas por morosidad
 - Ficha lateral con detalle y cobro todo o nada
 - Avisos en forma de pop-up (toast) de 5 segundos en la esquina superior derecha
 - Diseño responsive: en ventanas angostas la ficha pasa debajo de la tabla
@@ -209,6 +209,7 @@ class PaginaCobros(QWidget):
 
         # Tabla
         self.modelo = ModeloCobros([], self)
+        self.modelo.cambio_deuda_solicitado.connect(self._al_cambiar_deuda)
         self.proxy = ProxyCobros(self)
         self.proxy.setSourceModel(self.modelo)
 
@@ -232,23 +233,27 @@ class PaginaCobros(QWidget):
         self.tabla.customContextMenuRequested.connect(
             self._menu_contextual_tabla)
 
-        # Anchos de 7 columnas
+        # Anchos de 9 columnas
         header = self.tabla.horizontalHeader()
         header.setMinimumSectionSize(60)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         header.resizeSection(0, 95)   # Conexión
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         header.resizeSection(1, 100)  # N° Recibo
-        header.setSectionResizeMode(
-            2, QHeaderView.ResizeMode.Stretch)      # Titular
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(2, 180)  # Titular
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
         header.resizeSection(3, 105)  # Sector
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
         header.resizeSection(4, 70)   # m³
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(5, 105)  # Total S/.
+        header.resizeSection(5, 120)  # Deuda anterior
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(6, 115)  # Estado
+        header.resizeSection(6, 120)  # Deuda actual
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(7, 105)  # Total S/.
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(8, 115)  # Estado
 
         col_izquierda.addWidget(self.tabla, stretch=1)
         self.splitter.addWidget(self.panel_izquierdo)
@@ -620,6 +625,31 @@ class PaginaCobros(QWidget):
     def _al_fallar_carga(self, err_msg: str) -> None:
         self._set_cargando(False)
         mostrar_dialogo_error(self, "Error al cargar datos de cobros", err_msg)
+
+    def _al_cambiar_deuda(self, id_usuario: str, campo: str, valor: float) -> None:
+        """Persiste la deuda editada en el padrón antes de refrescar la tabla."""
+        try:
+            doc_actualizado = self.servicio.actualizar_deuda(
+                self.periodo_actual, id_usuario, campo, valor
+            )
+            for doc in self.lista_items_completa:
+                if str(doc.get("id_usuario") or doc.get("_id") or "") == id_usuario:
+                    doc.update(doc_actualizado)
+                    break
+            self.modelo.notificar_cambio_deuda(id_usuario)
+            if (
+                self.item_seleccionado
+                and str(self.item_seleccionado.get("id_usuario") or self.item_seleccionado.get("_id") or "") == id_usuario
+            ):
+                self._actualizar_ficha(self.item_seleccionado)
+            self._actualizar_kpis_y_chips()
+            self.toast.mostrar("Deuda actualizada y guardada en el padrón.", "exito")
+        except Exception as exc:
+            mostrar_dialogo_error(
+                self,
+                "No se pudo guardar la deuda",
+                f"No se aplicó el cambio al padrón.\n\n{exc}",
+            )
 
     def _actualizar_kpis_y_chips(self) -> None:
         tot_usuarios = len(self.lista_items_completa)

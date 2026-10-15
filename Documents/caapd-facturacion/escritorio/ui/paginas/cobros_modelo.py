@@ -1,22 +1,25 @@
 """
 ui/paginas/cobros_modelo.py — Modelo y Proxy para la tabla unificada de Cobros y Morosos.
 
-Tabla optimizada de 7 columnas:
+Tabla optimizada de 9 columnas:
 0. Conexión
 1. N° Recibo
 2. Titular
 3. Sector
 4. m³ (consumo del mes)
-5. Total (S/.)
-6. Estado
+5. Deuda anterior (S/.)
+6. Deuda actual (S/.)
+7. Total (S/.)
+8. Estado
 
 Color de fila según morosidad:
 - 2 meses adeudados  -> fila naranja
 - 3 o más meses      -> fila roja
 """
 from __future__ import annotations
+import math
 from typing import Any, Dict, List, Optional
-from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QSortFilterProxyModel, Qt
+from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
@@ -29,12 +32,17 @@ COLUMNAS_COBROS = [
     "TITULAR",
     "SECTOR",
     "m³",
+    "DEUDA ANT. (S/.)",
+    "DEUDA ACT. (S/.)",
     "TOTAL (S/.)",
     "ESTADO",
 ]
 
 TOOLTIP_COLUMNAS = {
     4: "Consumo del mes en metros cúbicos (m³)",
+    5: "Deuda acumulada de periodos anteriores",
+    6: "Deuda correspondiente al periodo actual",
+    7: "Suma de deuda anterior y deuda actual. No editable",
 }
 
 # Colores de fila por morosidad: (fondo, texto)
@@ -139,6 +147,8 @@ class DelegadoFilasCobros(QStyledItemDelegate):
 class ModeloCobros(QAbstractTableModel):
     """Modelo de datos tabular para la pantalla unificada de cobros y facturación."""
 
+    cambio_deuda_solicitado = Signal(str, str, float)
+
     def __init__(self, datos: Optional[List[Dict[str, Any]]] = None, parent=None):
         super().__init__(parent)
         self._datos: List[Dict[str, Any]] = datos or []
@@ -158,9 +168,9 @@ class ModeloCobros(QAbstractTableModel):
             if role == Qt.ItemDataRole.ToolTipRole:
                 return TOOLTIP_COLUMNAS.get(section)
             if role == Qt.ItemDataRole.TextAlignmentRole:
-                if section in (0, 1, 6):
+                if section in (0, 1, 8):
                     return int(Qt.AlignmentFlag.AlignCenter)
-                elif section in (4, 5):
+                elif section in (4, 5, 6, 7):
                     return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
@@ -177,6 +187,12 @@ class ModeloCobros(QAbstractTableModel):
         saldo = max(0.0, round(tot_pagar - m_pagado, 2))
         m_adeudados = int(doc.get("meses_adeudados") or 1)
         consumo_m3 = doc.get("consumo_total_m3")
+        deuda_anterior = float(doc.get("deuda_anterior") or 0.0)
+        deuda_actual = doc.get("deuda_actual")
+        if deuda_actual is None:
+            deuda_actual = max(0.0, round(tot_pagar - deuda_anterior, 2))
+        else:
+            deuda_actual = float(deuda_actual or 0.0)
 
         # Alertas de medidor
         meds = doc.get("medidores") or []
@@ -218,27 +234,37 @@ class ModeloCobros(QAbstractTableModel):
             elif col == 4:
                 return f"{int(consumo_m3)}" if consumo_m3 is not None else "—"
             elif col == 5:
-                return f"S/. {tot_pagar:.2f}"
+                return f"S/. {deuda_anterior:.2f}"
             elif col == 6:
+                return f"S/. {deuda_actual:.2f}"
+            elif col == 7:
+                return f"S/. {tot_pagar:.2f}"
+            elif col == 8:
                 return estado_txt
+
+        elif role == Qt.ItemDataRole.EditRole and col in (5, 6):
+            return deuda_anterior if col == 5 else deuda_actual
+
+        elif role == Qt.ItemDataRole.UserRole and col in (5, 6, 7):
+            return deuda_anterior if col == 5 else deuda_actual if col == 6 else tot_pagar
 
         elif role == Qt.ItemDataRole.ToolTipRole:
             if col == 3:
                 return doc.get("sector") or ""
             elif col == 4:
                 return f"{int(consumo_m3)} m³ consumidos este mes" if consumo_m3 is not None else ""
-            elif col == 6 and tiene_alertas:
+            elif col == 8 and tiene_alertas:
                 return f"Alerta de medidor: {', '.join(novedades_alertables)}"
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if col in (0, 1, 6):
+            if col in (0, 1, 8):
                 return int(Qt.AlignmentFlag.AlignCenter)
-            elif col in (4, 5):
+            elif col in (4, 5, 6, 7):
                 return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         elif role == Qt.ItemDataRole.FontRole:
-            if col in (0, 5) or (color_fila is not None and col == 6):
+            if col in (0, 7) or (color_fila is not None and col == 8):
                 f = QFont()
                 f.setBold(True)
                 return f
@@ -257,11 +283,11 @@ class ModeloCobros(QAbstractTableModel):
                 return QBrush(QColor("#0369a1"))
             elif col == 1:
                 return QBrush(QColor("#475569"))
-            elif col == 5:
+            elif col == 7:
                 if saldo <= 0.0 and tot_pagar > 0.0:
                     return QBrush(QColor("#16a34a"))  # Verde si está pagado
                 return QBrush(QColor("#0f172a"))
-            elif col == 6:  # Estado
+            elif col == 8:  # Estado
                 if not doc.get("nro_recibo") or (tot_pagar == 0.0 and consumo_m3 is None):
                     return QBrush(QColor("#64748b"))  # Gris sin facturar
                 if saldo <= 0.0 and tot_pagar > 0.0:
@@ -274,6 +300,50 @@ class ModeloCobros(QAbstractTableModel):
                 return QBrush(QColor("#d97706"))
 
         return None
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
+        flags = super().flags(index)
+        if index.isValid() and index.column() in (5, 6):
+            return flags | Qt.ItemFlag.ItemIsEditable
+        return flags
+
+    def setData(
+        self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole
+    ) -> bool:
+        if (
+            role != Qt.ItemDataRole.EditRole
+            or not index.isValid()
+            or index.column() not in (5, 6)
+            or not 0 <= index.row() < len(self._datos)
+        ):
+            return False
+
+        try:
+            texto = str(value).strip().replace(",", ".")
+            importe = float(texto)
+            if not texto or not math.isfinite(importe) or importe < 0:
+                return False
+            importe = round(importe, 2)
+        except (TypeError, ValueError):
+            return False
+
+        doc = self._datos[index.row()]
+        id_usuario = str(doc.get("id_usuario") or doc.get("_id") or "")
+        if not id_usuario:
+            return False
+        campo = "deuda_anterior" if index.column() == 5 else "deuda_actual"
+        self.cambio_deuda_solicitado.emit(id_usuario, campo, importe)
+        return True
+
+    def notificar_cambio_deuda(self, id_usuario: str) -> None:
+        for fila, doc in enumerate(self._datos):
+            if str(doc.get("id_usuario") or doc.get("_id") or "") == id_usuario:
+                self.dataChanged.emit(
+                    self.index(fila, 5),
+                    self.index(fila, 8),
+                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, Qt.ItemDataRole.UserRole],
+                )
+                return
 
     def actualizar_datos(self, nuevos_datos: List[Dict[str, Any]]) -> None:
         """Reemplaza la lista completa de recibos y notifica a las vistas."""
@@ -434,9 +504,19 @@ class ProxyCobros(QSortFilterProxyModel):
             c_l = float(d_left.get("consumo_total_m3") or 0.0)
             c_r = float(d_right.get("consumo_total_m3") or 0.0)
             return c_l < c_r
-        elif col == 5:  # Total S/.
+        elif col == 5:  # Deuda anterior
+            return float(d_left.get("deuda_anterior") or 0.0) < float(d_right.get("deuda_anterior") or 0.0)
+        elif col == 6:  # Deuda actual
+            deuda_actual_left = d_left.get("deuda_actual")
+            deuda_actual_right = d_right.get("deuda_actual")
+            if deuda_actual_left is None:
+                deuda_actual_left = max(0.0, float(d_left.get("total_a_pagar") or 0.0) - float(d_left.get("deuda_anterior") or 0.0))
+            if deuda_actual_right is None:
+                deuda_actual_right = max(0.0, float(d_right.get("total_a_pagar") or 0.0) - float(d_right.get("deuda_anterior") or 0.0))
+            return float(deuda_actual_left) < float(deuda_actual_right)
+        elif col == 7:  # Total S/.
             return float(d_left.get("total_a_pagar") or 0.0) < float(d_right.get("total_a_pagar") or 0.0)
-        elif col == 6:  # Estado
+        elif col == 8:  # Estado
             return int(d_left.get("meses_adeudados") or 1) < int(d_right.get("meses_adeudados") or 1)
 
         return super().lessThan(left, right)

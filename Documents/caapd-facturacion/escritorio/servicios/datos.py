@@ -252,6 +252,11 @@ class ServicioDatos:
     ) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def actualizar_deuda(
+        self, periodo: str, id_usuario: str, campo: str, valor: float
+    ) -> Dict[str, Any]:
+        raise NotImplementedError
+
     def get_ops(self) -> Dict[str, int]:
         return {"lecturas": 0, "escrituras": 0}
 
@@ -890,6 +895,26 @@ class ServicioDatosMemoria(ServicioDatos):
             doc["consumo_total_m3"] = None
 
         return {"id_usuario": id_usuario, "nro_medidor": nro_medidor, "consumo_total_m3": doc.get("consumo_total_m3")}
+
+    def actualizar_deuda(
+        self, periodo: str, id_usuario: str, campo: str, valor: float
+    ) -> Dict[str, Any]:
+        if campo not in ("deuda_anterior", "deuda_actual"):
+            raise ValueError(f"Campo de deuda inválido: {campo}")
+        importe = round(float(valor), 2)
+        if importe < 0:
+            raise ValueError("La deuda no puede ser negativa.")
+        doc = self.mes.get(id_usuario)
+        if not doc:
+            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+        deuda_anterior = importe if campo == "deuda_anterior" else float(doc.get("deuda_anterior") or 0.0)
+        deuda_actual = importe if campo == "deuda_actual" else doc.get("deuda_actual")
+        if deuda_actual is None:
+            deuda_actual = max(0.0, round(float(doc.get("total_a_pagar") or 0.0) - deuda_anterior, 2))
+        doc["deuda_anterior"] = deuda_anterior
+        doc["deuda_actual"] = deuda_actual
+        doc["total_a_pagar"] = round(deuda_anterior + float(deuda_actual or 0.0), 2)
+        return doc
 
     def get_ops(self) -> Dict[str, int]:
         return self.ops

@@ -30,6 +30,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
+build/
+dist/
 
 # Archivos de trabajo temporales y notas grandes
 scratch_*.txt
