@@ -261,7 +261,7 @@ QPushButton.boton_grande {
 /* --- Alertas --- */
 QFrame.alerta {
     border-radius: 8px;
-    padding: 12px 18px;
+    padding: 0px;              /* los márgenes los pone el layout interno (14,10,14,10) */
     border-left: 5px solid;
 }
 
@@ -368,6 +368,17 @@ QTableView::item:hover {
     background-color: #f0f9ff;
 }
 
+QTableView QLineEdit,
+QTableWidget QLineEdit {
+    border: none;
+    border-radius: 0;
+    padding: 0 8px;
+    margin: 0;
+    min-height: 0;
+    background-color: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+}
 QHeaderView::section {
     background-color: #0369a1;
     color: #ffffff;
@@ -393,6 +404,65 @@ QLineEdit, QTextEdit {
 QLineEdit:focus, QTextEdit:focus {
     border-color: #0369a1;
     background-color: #f8fafc;
+}
+
+/* ===================================================================
+   Checkbox y casillas de verificación en tablas/listas
+   (Regla: fondo BLANCO, borde celeste, check azul — nunca fondo morado)
+   =================================================================== */
+QCheckBox {
+    spacing: 8px;
+    color: #0f172a;
+    background: transparent;
+}
+
+QCheckBox::indicator,
+QTableView::indicator,
+QListView::indicator,
+QTreeView::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #bae6fd;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:hover,
+QTableView::indicator:hover,
+QListView::indicator:hover,
+QTreeView::indicator:hover {
+    border-color: #0369a1;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:checked,
+QTableView::indicator:checked,
+QListView::indicator:checked,
+QTreeView::indicator:checked {
+    background-color: #ffffff;
+    border-color: #0369a1;
+    image: url("recursos/check.svg");
+}
+
+QCheckBox::indicator:disabled,
+QTableView::indicator:disabled,
+QListView::indicator:disabled,
+QTreeView::indicator:disabled {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+/* Botones de opción (por si se usan en otras pantallas): también fondo blanco */
+QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #bae6fd;
+    border-radius: 9px;
+    background-color: #ffffff;
+}
+QRadioButton::indicator:checked {
+    border: 5px solid #0369a1;
+    background-color: #ffffff;
 }
 
 /* ===================================================================

@@ -7,7 +7,7 @@
       "id_usuario": "75849301"
     },
     "fecha_creacion": "2026-10-15T01:43:43.280528",
-    "reintentos": 26,
+    "reintentos": 33,
     "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
   },
   {
@@ -20,7 +20,7 @@
       "fecha_pago": "2026-10-15"
     },
     "fecha_creacion": "2026-10-15T02:15:48.376316",
-    "reintentos": 4,
+    "reintentos": 11,
     "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
   },
   {
@@ -31,7 +31,7 @@
       "id_usuario": "30778043"
     },
     "fecha_creacion": "2026-10-15T02:15:58.794417",
-    "reintentos": 4,
+    "reintentos": 11,
     "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
   },
   {
@@ -42,7 +42,7 @@
       "id_usuario": "75849301"
     },
     "fecha_creacion": "2026-10-15T02:20:00.336160",
-    "reintentos": 1,
+    "reintentos": 8,
     "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
   },
   {
@@ -53,7 +53,7 @@
       "id_usuario": "75849301"
     },
     "fecha_creacion": "2026-10-15T02:33:48.561498",
-    "reintentos": 1,
+    "reintentos": 8,
     "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
   }
 ]
