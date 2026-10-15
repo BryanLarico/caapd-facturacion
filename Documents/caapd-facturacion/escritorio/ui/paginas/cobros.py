@@ -137,7 +137,7 @@ class PaginaCobros(QWidget):
 
         layout_principal.addLayout(fila_kpi)
 
-        # 3. Barra de Acciones Principales (Asistente, Menú Recibos, Morosos)
+        # 3. Barra de Acciones Principales (Asistente, Imprimir/Descargar, Menú Recibos, Morosos)
         fila_acciones = QHBoxLayout()
         fila_acciones.setSpacing(10)
 
@@ -147,15 +147,31 @@ class PaginaCobros(QWidget):
         self.btn_asistente_recibos.clicked.connect(self.abrir_asistente_recibos)
         fila_acciones.addWidget(self.btn_asistente_recibos)
 
+        # Botón directo: Imprimir / Descargar recibo PDF
+        self.btn_imprimir_pdf_top = QPushButton("🖨️ Imprimir / Descargar recibo PDF")
+        self.btn_imprimir_pdf_top.setProperty("class", "boton boton_secundario boton_grande")
+        self.btn_imprimir_pdf_top.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_imprimir_pdf_top.setToolTip("Abre o descarga el recibo PDF del usuario seleccionado para imprimirlo")
+        self.btn_imprimir_pdf_top.clicked.connect(self._accion_ver_recibo)
+        fila_acciones.addWidget(self.btn_imprimir_pdf_top)
+
         # Menú desplegable "Recibos ▾"
         self.btn_menu_recibos = QPushButton("Recibos ▾")
         self.btn_menu_recibos.setProperty("class", "boton boton_secundario")
         self.btn_menu_recibos.setCursor(Qt.CursorShape.PointingHandCursor)
         menu_recibos = QMenu(self)
+        act_ver_menu = menu_recibos.addAction("🖨️ Imprimir recibo PDF (seleccionado)")
+        act_ver_menu.triggered.connect(self._accion_ver_recibo)
+        act_guardar_menu = menu_recibos.addAction("💾 Guardar recibo PDF como... (descargar)")
+        act_guardar_menu.triggered.connect(self._accion_guardar_recibo_como)
+        menu_recibos.addSeparator()
         act_zip = menu_recibos.addAction("📦 Descargar ZIP de recibos (todos)")
         act_zip.triggered.connect(self._descargar_zip_recibos)
         act_carpeta = menu_recibos.addAction("📂 Abrir carpeta de recibos")
         act_carpeta.triggered.connect(self._abrir_carpeta_recibos)
+        menu_recibos.addSeparator()
+        act_emitir_indiv = menu_recibos.addAction("🧾 Emitir un recibo individual...")
+        act_emitir_indiv.triggered.connect(self._accion_emitir_individual_top)
         self.btn_menu_recibos.setMenu(menu_recibos)
         fila_acciones.addWidget(self.btn_menu_recibos)
 
@@ -424,10 +440,24 @@ class PaginaCobros(QWidget):
         lay.addWidget(sep2)
 
         # Botones de Acción
-        self.btn_generar_individual = QPushButton("🧾 Emitir recibo a este usuario")
-        self.btn_generar_individual.setProperty("class", "boton boton_primario boton_grande")
-        self.btn_generar_individual.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_generar_individual.setStyleSheet("""
+        self.btn_marcar_pagado = QPushButton("💳 Marcar como pagado")
+        self.btn_marcar_pagado.setProperty("class", "boton boton_exito boton_grande")
+        self.btn_marcar_pagado.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_marcar_pagado.setStyleSheet("""
+            QPushButton {
+                background-color: #16a34a; color: #ffffff;
+                font-weight: bold; font-size: 13px; padding: 10px; border-radius: 6px;
+            }
+            QPushButton:hover { background-color: #15803d; }
+            QPushButton:disabled { background-color: #94a3b8; color: #f1f5f9; }
+        """)
+        self.btn_marcar_pagado.clicked.connect(self._accion_marcar_pagado)
+        lay.addWidget(self.btn_marcar_pagado)
+
+        self.btn_ver_recibo = QPushButton("🖨️ Imprimir / Descargar recibo PDF")
+        self.btn_ver_recibo.setProperty("class", "boton boton_primario boton_grande")
+        self.btn_ver_recibo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ver_recibo.setStyleSheet("""
             QPushButton {
                 background-color: #0284c7; color: #ffffff;
                 font-weight: bold; font-size: 13px; padding: 10px; border-radius: 6px;
@@ -435,26 +465,20 @@ class PaginaCobros(QWidget):
             QPushButton:hover { background-color: #0369a1; }
             QPushButton:disabled { background-color: #94a3b8; color: #f1f5f9; }
         """)
+        self.btn_ver_recibo.clicked.connect(self._accion_ver_recibo)
+        lay.addWidget(self.btn_ver_recibo)
+
+        self.btn_generar_individual = QPushButton("🧾 Emitir recibo a este usuario")
+        self.btn_generar_individual.setProperty("class", "boton boton_secundario")
+        self.btn_generar_individual.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_generar_individual.clicked.connect(self._accion_generar_individual)
         lay.addWidget(self.btn_generar_individual)
-
-        self.btn_marcar_pagado = QPushButton("💳 Marcar como pagado")
-        self.btn_marcar_pagado.setProperty("class", "boton boton_exito boton_grande")
-        self.btn_marcar_pagado.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_marcar_pagado.clicked.connect(self._accion_marcar_pagado)
-        lay.addWidget(self.btn_marcar_pagado)
 
         self.btn_anular_cobro = QPushButton("↩️ Anular cobro")
         self.btn_anular_cobro.setProperty("class", "boton boton_peligro")
         self.btn_anular_cobro.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_anular_cobro.clicked.connect(self._accion_anular_cobro)
         lay.addWidget(self.btn_anular_cobro)
-
-        self.btn_ver_recibo = QPushButton("🖨️ Ver / Imprimir recibo")
-        self.btn_ver_recibo.setProperty("class", "boton boton_secundario")
-        self.btn_ver_recibo.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_ver_recibo.clicked.connect(self._accion_ver_recibo)
-        lay.addWidget(self.btn_ver_recibo)
 
         lay.addStretch(1)
 
@@ -805,9 +829,13 @@ class PaginaCobros(QWidget):
         self.btn_anular_cobro.setEnabled(esta_pagado)
         self.btn_anular_cobro.setVisible(esta_pagado)
 
-        # Ver / imprimir recibo: habilitado si tiene recibo emitido
-        self.btn_ver_recibo.setEnabled(tiene_recibo)
-        self.btn_ver_recibo.setVisible(tiene_recibo)
+        # Imprimir / descargar recibo PDF: habilitado para el usuario seleccionado
+        self.btn_ver_recibo.setEnabled(True)
+        self.btn_ver_recibo.setVisible(True)
+        if tiene_recibo:
+            self.btn_ver_recibo.setText("🖨️ Imprimir / Descargar recibo PDF")
+        else:
+            self.btn_ver_recibo.setText("🖨️ Emitir e imprimir PDF")
 
     def _limpiar_ficha(self) -> None:
         self.item_seleccionado = None
@@ -826,6 +854,7 @@ class PaginaCobros(QWidget):
         self.btn_marcar_pagado.setEnabled(False)
         self.btn_anular_cobro.setEnabled(False)
         self.btn_ver_recibo.setEnabled(False)
+        self.btn_ver_recibo.setText("🖨️ Imprimir / Descargar recibo PDF")
         self.btn_generar_individual.setEnabled(False)
 
     # -----------------------------------------------------------------------
@@ -908,18 +937,111 @@ class PaginaCobros(QWidget):
             mostrar_dialogo_error(self, "Error al anular cobro", str(e))
 
     def _accion_ver_recibo(self) -> None:
+        """Abre el visor de PDF listo para imprimir o descargar el recibo del usuario seleccionado."""
         if not self.item_seleccionado:
+            QMessageBox.information(
+                self,
+                "Seleccionar Usuario",
+                "Por favor, selecciona una fila de la tabla para imprimir o descargar su recibo PDF.",
+            )
             return
 
         uid = self.item_seleccionado.get("id_usuario") or self.item_seleccionado.get("_id")
+        nom = self.item_seleccionado.get("nombre") or "Usuario"
+        tiene_rec = bool(self.item_seleccionado.get("nro_recibo"))
+
+        # Si aún no tiene recibo emitido, ofrecer emitirlo inmediatamente
+        if not tiene_rec:
+            resp = QMessageBox.question(
+                self,
+                "Emitir Recibo",
+                f"El usuario {nom} aún no tiene un recibo emitido en este periodo.\n\n"
+                f"¿Deseas emitir su recibo ahora para poder imprimirlo / descargarlo?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if resp != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                doc = self.servicio.generar_recibo_usuario(self.periodo_actual, uid)
+                self.item_seleccionado.update(doc)
+                self._actualizar_ficha(self.item_seleccionado)
+                self.modelo.layoutChanged.emit()
+                self._actualizar_kpis_y_chips()
+            except Exception as e:
+                mostrar_dialogo_error(self, "Error al generar recibo individual", str(e))
+                return
+
         try:
             ruta_pdf = self.servicio.generar_pdf_recibo(self.periodo_actual, uid)
             if ruta_pdf and Path(ruta_pdf).exists():
                 os.startfile(ruta_pdf)
+                self.alerta_flash.mostrar(f"Recibo PDF abierto listo para imprimir/descargar: {nom}", "exito")
             else:
                 QMessageBox.warning(self, "Aviso", "No se pudo encontrar el archivo PDF generado.")
         except Exception as e:
             mostrar_dialogo_error(self, "Error al abrir recibo PDF", str(e))
+
+    def _accion_guardar_recibo_como(self) -> None:
+        """Permite guardar una copia del recibo PDF en la carpeta que el usuario elija (Descargar)."""
+        if not self.item_seleccionado:
+            QMessageBox.information(
+                self,
+                "Seleccionar Usuario",
+                "Por favor, selecciona una fila de la tabla para descargar su recibo PDF.",
+            )
+            return
+
+        uid = self.item_seleccionado.get("id_usuario") or self.item_seleccionado.get("_id")
+        nom = self.item_seleccionado.get("nombre") or "Usuario"
+        tiene_rec = bool(self.item_seleccionado.get("nro_recibo"))
+
+        if not tiene_rec:
+            resp = QMessageBox.question(
+                self,
+                "Emitir Recibo",
+                f"El usuario {nom} aún no tiene un recibo emitido.\n\n"
+                f"¿Deseas emitir su recibo ahora para poder descargarlo?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if resp != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                doc = self.servicio.generar_recibo_usuario(self.periodo_actual, uid)
+                self.item_seleccionado.update(doc)
+                self._actualizar_ficha(self.item_seleccionado)
+                self.modelo.layoutChanged.emit()
+                self._actualizar_kpis_y_chips()
+            except Exception as e:
+                mostrar_dialogo_error(self, "Error al generar recibo", str(e))
+                return
+
+        try:
+            ruta_pdf = self.servicio.generar_pdf_recibo(self.periodo_actual, uid)
+            if not ruta_pdf or not Path(ruta_pdf).exists():
+                QMessageBox.warning(self, "Aviso", "No se encontró el archivo PDF para descargar.")
+                return
+
+            nro_rec = str(self.item_seleccionado.get("nro_recibo") or "000000")
+            nombre_sugerido = f"Recibo_{self.periodo_actual}_{nro_rec}_{nom.replace(' ', '_')}.pdf"
+            ruta_destino, _ = QFileDialog.getSaveFileName(
+                self,
+                "Guardar Recibo PDF Como...",
+                str(Path.home() / "Downloads" / nombre_sugerido),
+                "Documentos PDF (*.pdf)",
+            )
+            if ruta_destino:
+                import shutil
+                shutil.copy2(ruta_pdf, ruta_destino)
+                self.alerta_flash.mostrar(f"Recibo guardado: {Path(ruta_destino).name}", "exito")
+                QMessageBox.information(
+                    self,
+                    "Recibo Descargado",
+                    f"El recibo PDF se guardó exitosamente en:\n\n{ruta_destino}",
+                )
+        except Exception as e:
+            mostrar_dialogo_error(self, "Error al guardar recibo PDF", str(e))
 
     def _accion_generar_individual(self) -> None:
         if not self.item_seleccionado:
@@ -982,6 +1104,8 @@ class PaginaCobros(QWidget):
             act_emitir.triggered.connect(self._accion_generar_individual)
             act_cobrar = menu.addAction(f"💳 Emitir y cobrar S/. {tot:,.2f}")
             act_cobrar.triggered.connect(self._accion_marcar_pagado)
+            act_ver = menu.addAction("🖨️ Emitir e imprimir PDF")
+            act_ver.triggered.connect(self._accion_ver_recibo)
         else:
             if not esta_pag:
                 act_cobrar = menu.addAction(f"💳 Marcar como pagado (S/. {tot:,.2f})")
@@ -989,8 +1113,10 @@ class PaginaCobros(QWidget):
             else:
                 act_anular = menu.addAction(f"↩️ Anular cobro de {nom}")
                 act_anular.triggered.connect(self._accion_anular_cobro)
-            act_ver = menu.addAction("🖨️ Ver / Imprimir recibo")
+            act_ver = menu.addAction("🖨️ Imprimir / Descargar recibo PDF")
             act_ver.triggered.connect(self._accion_ver_recibo)
+            act_guardar = menu.addAction("💾 Guardar recibo PDF en otra carpeta...")
+            act_guardar.triggered.connect(self._accion_guardar_recibo_como)
 
         menu.exec(self.tabla.viewport().mapToGlobal(pos))
 

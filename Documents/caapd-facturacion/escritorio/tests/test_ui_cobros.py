@@ -316,6 +316,11 @@ def test_ui_pagina_cobros_flujo_unificado(qtbot, servicio_memoria_cobros):
     assert pagina.btn_marcar_pagado.isHidden()
     assert pagina.btn_anular_cobro.isEnabled() is True
 
+    # Verificar botón Imprimir / Descargar recibo PDF
+    assert "Imprimir / Descargar" in pagina.btn_ver_recibo.text()
+    assert pagina.btn_ver_recibo.isEnabled() is True
+    assert pagina.btn_imprimir_pdf_top.isEnabled() is True
+
 
 def test_dialogo_asistente_recibos(qtbot, servicio_memoria_cobros):
     # Simular mes cerrado con un medidor pendiente de lectura

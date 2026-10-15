@@ -45,6 +45,13 @@ class ModeloLectores(QAbstractTableModel):
             return None
 
         lector = self._datos[index.row()]
+        if isinstance(lector, str):
+            lector = {
+                "uid": lector,
+                "email": lector,
+                "display_name": lector.split("@")[0] if "@" in lector else lector,
+                "disabled": False,
+            }
         col = index.column()
 
         if role == Qt.ItemDataRole.DisplayRole:
@@ -151,6 +158,14 @@ class ProxyLectores(QSortFilterProxyModel):
         lector = model.obtener_lector(source_row)
         if not lector:
             return False
+
+        if isinstance(lector, str):
+            lector = {
+                "uid": lector,
+                "email": lector,
+                "display_name": lector.split("@")[0] if "@" in lector else lector,
+                "disabled": False,
+            }
 
         # Filtro por estado
         disabled = bool(lector.get("disabled", False))

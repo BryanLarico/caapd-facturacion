@@ -7,7 +7,7 @@ banners de modo contingencia y cola offline, botones de respaldo y control de ci
 import os
 from typing import Dict, Optional
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QThreadPool, QTimer, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -27,6 +27,7 @@ import rutas
 from servicios import cola_offline
 from servicios.datos import ServicioDatos
 from servicios.metricas_monitoring import consultar_metricas_hoy
+from ui.hilos import Worker, mostrar_dialogo_error
 from ui.paginas.cobros import PaginaCobros
 from ui.paginas.configuracion import PaginaConfiguracion
 from ui.paginas.inicio import PaginaInicio
@@ -164,18 +165,19 @@ class VentanaPrincipal(QMainWindow):
         self.lbl_cola_texto.setStyleSheet("color: #9a3412; font-size: 13px; font-weight: 500;")
         lay.addWidget(self.lbl_cola_texto)
 
-        btn_sinc = QPushButton("🔄 Sincronizar ahora")
-        btn_sinc.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_sinc.setStyleSheet("""
+        self.btn_sinc_cola = QPushButton("🔄 Sincronizar ahora")
+        self.btn_sinc_cola.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_sinc_cola.setStyleSheet("""
             QPushButton {
                 background-color: #ea580c; color: #ffffff;
                 font-weight: bold; font-size: 11px;
                 padding: 4px 10px; border-radius: 4px;
             }
             QPushButton:hover { background-color: #c2410c; }
+            QPushButton:disabled { background-color: #94a3b8; color: #f1f5f9; }
         """)
-        btn_sinc.clicked.connect(self._verificar_y_sincronizar_cola)
-        lay.addWidget(btn_sinc)
+        self.btn_sinc_cola.clicked.connect(self._accion_sincronizar_manual)
+        lay.addWidget(self.btn_sinc_cola)
         lay.addStretch(1)
         return banner
 
@@ -391,15 +393,95 @@ class VentanaPrincipal(QMainWindow):
         else:
             self.banner_cola.hide()
 
+    def _accion_sincronizar_manual(self) -> None:
+        """Disparado cuando el usuario hace clic en el botón 'Sincronizar ahora'."""
+        self._sincronizar_cola_servidor(manual=True)
+
     def _verificar_y_sincronizar_cola(self) -> None:
-        if getattr(self.servicio, "es_contingencia", False) or getattr(self.servicio, "es_local_first", False):
+        """Disparado periódicamente por el temporizador cada 60s."""
+        self._sincronizar_cola_servidor(manual=False)
+
+    def _sincronizar_cola_servidor(self, manual: bool = False) -> None:
+        n_pend = cola_offline.cantidad_pendientes()
+        if n_pend == 0:
             self._actualizar_banner_cola()
+            if manual:
+                QMessageBox.information(
+                    self,
+                    "Sincronización al Día",
+                    "No hay cambios pendientes de sincronizar con el servidor.",
+                )
             return
 
-        res = cola_offline.sincronizar_cola(self.servicio)
-        self._actualizar_banner_cola()
-        if res["enviados"] > 0:
+        # En modo contingencia forzado (offline absoluto) no se conecta a Firebase
+        if getattr(self.servicio, "es_contingencia", False):
+            self._actualizar_banner_cola()
+            if manual:
+                QMessageBox.warning(
+                    self,
+                    "Modo Contingencia",
+                    "La aplicación se inició en Modo Contingencia (sin conexión a Firebase).\n\n"
+                    "Para sincronizar con la nube, inicie la aplicación normalmente con conexión a internet.",
+                )
+            return
+
+        if manual:
+            if hasattr(self, "btn_sinc_cola"):
+                self.btn_sinc_cola.setEnabled(False)
+            self.mostrar_progreso(25, f"Sincronizando {n_pend} cambio(s) con Firebase...")
+
+        def tarea_sinc():
+            from servicios.datos import ServicioDatosFirebase
+            servicio_remoto = ServicioDatosFirebase()
+            return cola_offline.sincronizar_cola(servicio_remoto)
+
+        def al_terminar(res):
+            if hasattr(self, "btn_sinc_cola"):
+                self.btn_sinc_cola.setEnabled(True)
+            self._actualizar_banner_cola()
             self.actualizar_barra_estado()
+
+            enviados = res.get("enviados", 0)
+            fallidos = res.get("fallidos", 0)
+            pendientes = res.get("pendientes", 0)
+
+            if manual:
+                if fallidos == 0 and enviados > 0:
+                    self.ocultar_progreso(f"¡{enviados} cambio(s) sincronizados!")
+                    QMessageBox.information(
+                        self,
+                        "Sincronización Exitosa",
+                        f"¡Sincronización completada!\n\n"
+                        f"Se enviaron {enviados} cambio(s) a Firebase Firestore correctamente.\n"
+                        f"La nube y los datos locales están ahora al día.",
+                    )
+                elif fallidos > 0:
+                    self.ocultar_progreso("Aviso en sincronización")
+                    QMessageBox.warning(
+                        self,
+                        "Aviso de Sincronización",
+                        f"Se enviaron {enviados} cambio(s), pero {fallidos} cambio(s) no se pudieron sincronizar.\n"
+                        f"Quedan {pendientes} cambio(s) en cola.\n\n"
+                        f"Revisa tu conexión a internet e inténtalo de nuevo.",
+                    )
+                else:
+                    self.ocultar_progreso()
+            else:
+                if enviados > 0:
+                    self.ocultar_progreso(f"¡{enviados} cambio(s) sincronizados en segundo plano!")
+
+        def al_fallar(err):
+            if hasattr(self, "btn_sinc_cola"):
+                self.btn_sinc_cola.setEnabled(True)
+            self.ocultar_progreso()
+            self._actualizar_banner_cola()
+            if manual:
+                mostrar_dialogo_error(self, "Error al sincronizar con Firebase", str(err))
+
+        worker = Worker(tarea_sinc)
+        worker.signals.resultado.connect(al_terminar)
+        worker.signals.error.connect(al_fallar)
+        QThreadPool.globalInstance().start(worker)
 
     def _accion_respaldar_ahora(self) -> None:
         ruta = respaldo.ejecutar_respaldo_ahora()

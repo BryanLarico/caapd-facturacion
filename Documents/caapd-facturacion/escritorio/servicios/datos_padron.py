@@ -1210,7 +1210,20 @@ class ServicioDatosPadron(ServicioDatos):
         return str(p)
 
     def listar_lectores(self) -> List[Dict[str, Any]]:
-        return self.config.get("lectores") or []
+        raw = self.config.get("lectores") or []
+        res = []
+        for item in raw:
+            if isinstance(item, dict):
+                res.append(item)
+            elif isinstance(item, str):
+                res.append({
+                    "uid": item,
+                    "email": item,
+                    "display_name": item.split("@")[0] if "@" in item else item,
+                    "disabled": False,
+                    "activo": True,
+                })
+        return res
 
     def crear_lector(self, email: str, password: str, display_name: Optional[str] = None) -> Dict[str, Any]:
         lectores = self.config.setdefault("lectores", [])
