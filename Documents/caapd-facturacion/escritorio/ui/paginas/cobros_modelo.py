@@ -6,14 +6,19 @@ Tabla optimizada de 7 columnas:
 1. N° Recibo
 2. Titular
 3. Sector
-4. Cons. (m³)
+4. m³ (consumo del mes)
 5. Total (S/.)
 6. Estado
+
+Color de fila según morosidad:
+- 2 meses adeudados  -> fila naranja
+- 3 o más meses      -> fila roja
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter
+from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 import codigos
 
@@ -22,10 +27,19 @@ COLUMNAS_COBROS = [
     "N° RECIBO",
     "TITULAR",
     "SECTOR",
-    "CONS. (m³)",
+    "m³",
     "TOTAL (S/.)",
     "ESTADO",
 ]
+
+TOOLTIP_COLUMNAS = {
+    4: "Consumo del mes en metros cúbicos (m³)",
+}
+
+# Colores de fila por morosidad: (fondo, texto)
+COLOR_FILA_DOS_MESES = (QColor("#fdba74"), QColor("#7c2d12"))   # Naranja
+COLOR_FILA_CORTE = (QColor("#fca5a5"), QColor(
+    "#7f1d1d"))       # Rojo (3+ meses)
 
 # Abreviaturas legibles de sectores si se desea, manteniendo el nombre completo en ToolTip
 SECTOR_ABREV = {
@@ -36,6 +50,47 @@ SECTOR_ABREV = {
     "CHAUPICERCA": "Chaupicerca",
     "AYACUCHO": "Ayacucho",
 }
+
+
+def color_fila_morosidad(doc: Dict[str, Any]):
+    """
+    Devuelve (fondo, texto) para la fila según los meses adeudados, o None si no aplica.
+    Solo se colorea si tiene recibo emitido y aún tiene saldo pendiente.
+    """
+    tot_pagar = float(doc.get("total_a_pagar") or 0.0)
+    m_pagado = float(doc.get("monto_pagado") or 0.0)
+    saldo = max(0.0, round(tot_pagar - m_pagado, 2))
+    meses = int(doc.get("meses_adeudados") or 1)
+    tiene_recibo = bool(doc.get("nro_recibo"))
+    if not tiene_recibo or saldo <= 0.0:
+        return None
+    if meses >= 3:
+        return COLOR_FILA_CORTE
+    if meses == 2:
+        return COLOR_FILA_DOS_MESES
+    return None
+
+
+class DelegadoFilasCobros(QStyledItemDelegate):
+    """
+    Pinta el fondo de la fila completa con el color de morosidad.
+
+    Necesario porque la hoja de estilos (tema.qss) define `QTableView::item { padding; border }`
+    y, cuando eso ocurre, Qt ignora el Qt.BackgroundRole del modelo. Este delegado pinta
+    el color directamente antes de dibujar el contenido de la celda.
+    """
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        brush = index.data(Qt.ItemDataRole.BackgroundRole)
+        if brush is not None and not (option.state & QStyle.StateFlag.State_Selected):
+            painter.save()
+            painter.fillRect(option.rect, brush)
+            painter.restore()
+            # Evitar que el estilo repinte el fondo alterno encima del color de morosidad
+            option = QStyleOptionViewItem(option)
+            option.features &= ~QStyleOptionViewItem.ViewItemFeature.Alternate
+            option.backgroundBrush = brush
+        super().paint(painter, option, index)
 
 
 class ModeloCobros(QAbstractTableModel):
@@ -57,6 +112,8 @@ class ModeloCobros(QAbstractTableModel):
         if orientation == Qt.Orientation.Horizontal:
             if role == Qt.ItemDataRole.DisplayRole:
                 return COLUMNAS_COBROS[section]
+            if role == Qt.ItemDataRole.ToolTipRole:
+                return TOOLTIP_COLUMNAS.get(section)
             if role == Qt.ItemDataRole.TextAlignmentRole:
                 if section in (0, 1, 6):
                     return int(Qt.AlignmentFlag.AlignCenter)
@@ -101,6 +158,8 @@ class ModeloCobros(QAbstractTableModel):
         else:
             estado_txt = "Pendiente"
 
+        color_fila = color_fila_morosidad(doc)
+
         if role == Qt.ItemDataRole.DisplayRole:
             if col == 0:
                 con = doc.get("nro_conexion")
@@ -123,6 +182,8 @@ class ModeloCobros(QAbstractTableModel):
         elif role == Qt.ItemDataRole.ToolTipRole:
             if col == 3:
                 return doc.get("sector") or ""
+            elif col == 4:
+                return f"{int(consumo_m3)} m³ consumidos este mes" if consumo_m3 is not None else ""
             elif col == 6 and tiene_alertas:
                 return f"Alerta de medidor: {', '.join(novedades_alertables)}"
 
@@ -134,12 +195,21 @@ class ModeloCobros(QAbstractTableModel):
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         elif role == Qt.ItemDataRole.FontRole:
-            if col in (0, 5):
+            if col in (0, 5) or (color_fila is not None and col == 6):
                 f = QFont()
                 f.setBold(True)
                 return f
 
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            # Fila completa coloreada según morosidad (naranja 2 meses, rojo 3+ meses)
+            if color_fila is not None:
+                return QBrush(color_fila[0])
+
         elif role == Qt.ItemDataRole.ForegroundRole:
+            # En filas coloreadas usamos un texto oscuro uniforme para buena legibilidad
+            if color_fila is not None:
+                return QBrush(color_fila[1])
+
             if col == 0:
                 return QBrush(QColor("#0369a1"))
             elif col == 1:
@@ -157,7 +227,8 @@ class ModeloCobros(QAbstractTableModel):
                     return QBrush(QColor("#dc2626"))  # Rojo corte 3+ meses
                 elif m_adeudados == 2:
                     return QBrush(QColor("#ea580c"))  # Naranja fuerte 2 meses
-                return QBrush(QColor("#d97706"))      # Ámbar / naranja pendiente 1 mes
+                # Ámbar / naranja pendiente 1 mes
+                return QBrush(QColor("#d97706"))
 
         return None
 
@@ -180,7 +251,8 @@ class ProxyCobros(QSortFilterProxyModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._filtro_sector: str = "todos"
-        self._filtro_estado: str = "todos"  # todos, sin_facturar, pendientes, dos_meses, corte, pagados, con_alertas
+        # todos, sin_facturar, pendientes, dos_meses, corte, pagados, con_alertas
+        self._filtro_estado: str = "todos"
         self._texto_filtro: str = ""
 
     def set_filtro_sector(self, sector: str) -> None:
@@ -232,7 +304,8 @@ class ProxyCobros(QSortFilterProxyModel):
         elif self._filtro_estado == "con_alertas":
             meds = doc.get("medidores") or []
             tiene_alerta = any(
-                str(m.get("novedad") or "").strip().upper() not in ("", "NORMAL")
+                str(m.get("novedad") or "").strip(
+                ).upper() not in ("", "NORMAL")
                 or bool(str(m.get("nota") or "").strip())
                 for m in meds
             )
@@ -277,7 +350,8 @@ class ProxyCobros(QSortFilterProxyModel):
                     return True
                 return False
             else:
-                palabras = [codigos.quitar_tildes(p).lower() for p in q_limpia.split() if p]
+                palabras = [codigos.quitar_tildes(
+                    p).lower() for p in q_limpia.split() if p]
                 nom_norm = codigos.quitar_tildes(nombre).lower()
                 dni_norm = dni.lower()
 
@@ -313,7 +387,7 @@ class ProxyCobros(QSortFilterProxyModel):
             return str(d_left.get("nombre") or "").upper() < str(d_right.get("nombre") or "").upper()
         elif col == 3:  # Sector
             return str(d_left.get("sector") or "").upper() < str(d_right.get("sector") or "").upper()
-        elif col == 4:  # Cons. m3
+        elif col == 4:  # m³
             c_l = float(d_left.get("consumo_total_m3") or 0.0)
             c_r = float(d_right.get("consumo_total_m3") or 0.0)
             return c_l < c_r

@@ -31,7 +31,8 @@ def buscar_archivos_base_datos(dir_bd: Optional[Path | str] = None) -> List[Path
     if not directorio.exists():
         return []
     patron = re.compile(r"^PADRON_MES_\d{4}-\d{2}.*\.xlsx$", re.IGNORECASE)
-    archivos = [p for p in directorio.glob("*.xlsx") if patron.match(p.name) and not p.name.startswith("~$")]
+    archivos = [p for p in directorio.glob(
+        "*.xlsx") if patron.match(p.name) and not p.name.startswith("~$")]
     archivos.sort(key=lambda p: p.name)
     return archivos
 
@@ -51,7 +52,8 @@ def validar_archivos_sin_duplicados(archivos: List[Path]) -> Tuple[List[Path], L
     seleccionados = []
     for per, lista in por_periodo.items():
         # Priorizar archivo con nombre canónico exacto PADRON_MES_{per}.xlsx
-        lista.sort(key=lambda p: (0 if p.name.upper() == f"PADRON_MES_{per}.XLSX" else 1, p.name))
+        lista.sort(key=lambda p: (0 if p.name.upper() ==
+                   f"PADRON_MES_{per}.XLSX" else 1, p.name))
         if len(lista) > 1:
             advertencias.append(
                 f"Se detectaron múltiples archivos para el mes {per}: "
@@ -67,11 +69,13 @@ def validar_archivos_sin_duplicados(archivos: List[Path]) -> Tuple[List[Path], L
 def buscar_archivo_respaldo() -> Optional[Path]:
     """Busca el archivo de respaldo RESPALDO_*.xlsx más reciente."""
     dir_resp = rutas.ruta_respaldos()
-    archivos = [p for p in dir_resp.glob("RESPALDO_*.xlsx") if not p.name.startswith("~$")]
+    archivos = [p for p in dir_resp.glob(
+        "RESPALDO_*.xlsx") if not p.name.startswith("~$")]
     if not archivos:
         dir_raiz = dir_resp.parent / "respaldos"
         if dir_raiz.exists():
-            archivos = [p for p in dir_raiz.glob("RESPALDO_*.xlsx") if not p.name.startswith("~$")]
+            archivos = [p for p in dir_raiz.glob(
+                "RESPALDO_*.xlsx") if not p.name.startswith("~$")]
     if archivos:
         archivos.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return archivos[0]
@@ -95,7 +99,8 @@ def buscar_archivo_padron_mes() -> Optional[Path]:
             return c
 
     dir_datos = rutas.ruta_datos()
-    padrones = [p for p in dir_datos.glob("PADRON_MES_*.xlsx") if not p.name.startswith("~$")]
+    padrones = [p for p in dir_datos.glob(
+        "PADRON_MES_*.xlsx") if not p.name.startswith("~$")]
     if padrones:
         padrones.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return padrones[0]
@@ -124,11 +129,13 @@ class ServicioDatosPadron(ServicioDatos):
         archivos_bd = buscar_archivos_base_datos(self.base_dir)
         if archivos_bd:
             res = self.cargar_desde_carpeta_base_datos(dir_bd=self.base_dir)
-            cargado_completo = bool(res.get("exito")) and len(self.usuarios) > 0
+            cargado_completo = bool(
+                res.get("exito")) and len(self.usuarios) > 0
 
         # 2. Si no había bases allí, intentar cargar desde RESPALDO_*.xlsx
         if not cargado_completo:
-            self.ruta_excel: Optional[Path] = Path(ruta_archivo) if ruta_archivo else buscar_archivo_respaldo()
+            self.ruta_excel: Optional[Path] = Path(
+                ruta_archivo) if ruta_archivo else buscar_archivo_respaldo()
             if self.ruta_excel and self.ruta_excel.exists():
                 cargado_completo = self._cargar_desde_excel(self.ruta_excel)
 
@@ -207,7 +214,8 @@ class ServicioDatosPadron(ServicioDatos):
             cfg = datos.get("config") or {}
             usr = datos.get("usuarios") or {}
             mes = datos.get("mes_docs") or {}
-            periodo = datos.get("periodo") or (cfg.get("mes_actual") or {}).get("periodo") or "2026-10"
+            periodo = datos.get("periodo") or (
+                cfg.get("mes_actual") or {}).get("periodo") or "2026-10"
 
             if not usr or not mes:
                 return False
@@ -322,8 +330,10 @@ class ServicioDatosPadron(ServicioDatos):
                 continue
 
             uid = dni
-            l_ant_int = int(lec_ant) if lec_ant is not None and str(lec_ant).isdigit() else 0
-            l_act_int = int(lec_act) if lec_act is not None and str(lec_act).isdigit() else None
+            l_ant_int = int(lec_ant) if lec_ant is not None and str(
+                lec_ant).isdigit() else 0
+            l_act_int = int(lec_act) if lec_act is not None and str(
+                lec_act).isdigit() else None
 
             med_obj = {
                 "nro_medidor": nro_medidor,
@@ -383,7 +393,8 @@ class ServicioDatosPadron(ServicioDatos):
         todos_con_lectura = True
 
         for uid, doc in self.mes.items():
-            tiene_pendientes = any(m.get("lectura_actual") is None for m in doc.get("medidores", []))
+            tiene_pendientes = any(
+                m.get("lectura_actual") is None for m in doc.get("medidores", []))
             if tiene_pendientes:
                 todos_con_lectura = False
                 doc["nro_recibo"] = None
@@ -393,7 +404,8 @@ class ServicioDatosPadron(ServicioDatos):
                 continue
 
             cat_cod = doc.get("codigo_categoria", "A")
-            cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
+            cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [
+                {"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
             try:
                 calc = calculos.calcular_recibo(
                     medidores=doc.get("medidores", []),
@@ -421,11 +433,13 @@ class ServicioDatosPadron(ServicioDatos):
 
         self.config["ultimo_recibo"] = ultimo_recibo
         if "mes_actual" in self.config:
-            self.config["mes_actual"]["estado"] = "FACTURADO" if todos_con_lectura and len(self.mes) > 0 else "ABIERTO"
+            self.config["mes_actual"]["estado"] = "FACTURADO" if todos_con_lectura and len(
+                self.mes) > 0 else "ABIERTO"
 
     def guardar_en_respaldo_local(self, periodo: Optional[str] = None) -> Path:
         """Guarda el estado actual en el archivo de respaldo Excel local y en Base de datos/."""
-        p_obj = periodo or self.periodo or self.config.get("mes_actual", {}).get("periodo") or "2026-10"
+        p_obj = periodo or self.periodo or self.config.get(
+            "mes_actual", {}).get("periodo") or "2026-10"
         es_prueba = rutas.es_entorno_prueba()
 
         # En entorno de prueba, SOLO escribe en escritorio/Base de datos PRUEBA/
@@ -494,7 +508,8 @@ class ServicioDatosPadron(ServicioDatos):
         def _norm_k(h: Any) -> str:
             import re
             s = str(h or "").lower().strip()
-            s = s.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+            s = s.replace("á", "a").replace("é", "e").replace(
+                "í", "i").replace("ó", "o").replace("ú", "u")
             s = re.sub(r"[^a-z0-9]", "_", s)
             return re.sub(r"_+", "_", s).strip("_")
 
@@ -526,24 +541,42 @@ class ServicioDatosPadron(ServicioDatos):
             val = _norm_k(ws.cell(row=1, column=c).value)
             if not val:
                 continue
-            if val in ("conexion", "nro_conexion", "n_conexion", "cod_con", "nro_con"): col_map["conexion"] = c
-            elif val in ("dni", "id_usuario", "dni_id", "documento"): col_map["dni"] = c
-            elif val in ("nombre", "titular_beneficiario", "titular", "usuario", "abonado", "persona"): col_map["nombre"] = c
-            elif val in ("sector", "barrio"): col_map["sector"] = c
-            elif val in ("direccion", "calle", "lugar"): col_map["direccion"] = c
-            elif val in ("categoria", "codigo_categoria", "cat"): col_map["categoria"] = c
-            elif val in ("n_medidor", "nro_medidor", "medidor", "num_med"): col_map["medidor"] = c
-            elif val in ("lect_anterior", "lectura_anterior", "lec_ant", "anterior"): col_map["anterior"] = c
-            elif val in ("lect_actual", "lectura_actual", "lec_act", "actual"): col_map["actual"] = c
-            elif val in ("observacion", "novedad", "estado_med"): col_map["novedad"] = c
-            elif val in ("nota", "detalle", "comentario"): col_map["nota"] = c
-            elif val in ("deuda_ant_s", "deuda_ant", "deuda_anterior"): col_map["deuda_ant"] = c
-            elif val in ("deuda_actual_s", "deuda_actual"): col_map["deuda_actual"] = c
-            elif val in ("total_pagar_s", "total_pagar", "total_a_pagar"): col_map["total_pagar"] = c
-            elif val in ("meses", "meses_adeudados"): col_map["meses"] = c
-            elif val == "pago": col_map["pago"] = c
-            elif val in ("pagado", "monto_pagado_s", "monto_pagado"): col_map["monto_pagado"] = c
-            elif val in ("fecha_pago", "f_pago"): col_map["fecha_pago"] = c
+            if val in ("conexion", "nro_conexion", "n_conexion", "cod_con", "nro_con"):
+                col_map["conexion"] = c
+            elif val in ("dni", "id_usuario", "dni_id", "documento"):
+                col_map["dni"] = c
+            elif val in ("nombre", "titular_beneficiario", "titular", "usuario", "abonado", "persona"):
+                col_map["nombre"] = c
+            elif val in ("sector", "barrio"):
+                col_map["sector"] = c
+            elif val in ("direccion", "calle", "lugar"):
+                col_map["direccion"] = c
+            elif val in ("categoria", "codigo_categoria", "cat"):
+                col_map["categoria"] = c
+            elif val in ("n_medidor", "nro_medidor", "medidor", "num_med"):
+                col_map["medidor"] = c
+            elif val in ("lect_anterior", "lectura_anterior", "lec_ant", "anterior"):
+                col_map["anterior"] = c
+            elif val in ("lect_actual", "lectura_actual", "lec_act", "actual"):
+                col_map["actual"] = c
+            elif val in ("observacion", "novedad", "estado_med"):
+                col_map["novedad"] = c
+            elif val in ("nota", "detalle", "comentario"):
+                col_map["nota"] = c
+            elif val in ("deuda_ant_s", "deuda_ant", "deuda_anterior"):
+                col_map["deuda_ant"] = c
+            elif val in ("deuda_actual_s", "deuda_actual"):
+                col_map["deuda_actual"] = c
+            elif val in ("total_pagar_s", "total_pagar", "total_a_pagar"):
+                col_map["total_pagar"] = c
+            elif val in ("meses", "meses_adeudados"):
+                col_map["meses"] = c
+            elif val == "pago":
+                col_map["pago"] = c
+            elif val in ("pagado", "monto_pagado_s", "monto_pagado"):
+                col_map["monto_pagado"] = c
+            elif val in ("fecha_pago", "f_pago"):
+                col_map["fecha_pago"] = c
 
         usuarios: Dict[str, Dict[str, Any]] = {}
         mes: Dict[str, Dict[str, Any]] = {}
@@ -555,22 +588,33 @@ class ServicioDatosPadron(ServicioDatos):
             if not dni or dni.lower() in ("dni", "dni_id", "none"):
                 continue
 
-            nro_conexion = str(ws.cell(row=r, column=col_map["conexion"]).value or "").strip()
-            nombre = str(ws.cell(row=r, column=col_map["nombre"]).value or "").strip().upper()
-            sector = str(ws.cell(row=r, column=col_map["sector"]).value or "").strip().upper()
-            direccion = str(ws.cell(row=r, column=col_map["direccion"]).value or "").strip()
-            categoria = str(ws.cell(row=r, column=col_map["categoria"]).value or "A").strip().upper()
-            nro_medidor = str(ws.cell(row=r, column=col_map["medidor"]).value or "").strip()
+            nro_conexion = str(
+                ws.cell(row=r, column=col_map["conexion"]).value or "").strip()
+            nombre = str(
+                ws.cell(row=r, column=col_map["nombre"]).value or "").strip().upper()
+            sector = str(
+                ws.cell(row=r, column=col_map["sector"]).value or "").strip().upper()
+            direccion = str(
+                ws.cell(row=r, column=col_map["direccion"]).value or "").strip()
+            categoria = str(
+                ws.cell(row=r, column=col_map["categoria"]).value or "A").strip().upper()
+            nro_medidor = str(
+                ws.cell(row=r, column=col_map["medidor"]).value or "").strip()
 
             lec_ant = ws.cell(row=r, column=col_map["anterior"]).value
             lec_act = ws.cell(row=r, column=col_map["actual"]).value
-            novedad = str(ws.cell(row=r, column=col_map["novedad"]).value or "NORMAL").strip()
-            nota = str(ws.cell(row=r, column=col_map["nota"]).value or "").strip()
+            novedad = str(
+                ws.cell(row=r, column=col_map["novedad"]).value or "NORMAL").strip()
+            nota = str(
+                ws.cell(row=r, column=col_map["nota"]).value or "").strip()
 
-            l_ant_int = int(lec_ant) if lec_ant is not None and str(lec_ant).isdigit() else 0
-            l_act_int = int(lec_act) if lec_act is not None and str(lec_act).isdigit() else None
+            l_ant_int = int(lec_ant) if lec_ant is not None and str(
+                lec_ant).isdigit() else 0
+            l_act_int = int(lec_act) if lec_act is not None and str(
+                lec_act).isdigit() else None
 
-            d_ant_val = ws.cell(row=r, column=col_map["deuda_ant"]).value if col_map.get("deuda_ant") else 0.0
+            d_ant_val = ws.cell(row=r, column=col_map["deuda_ant"]).value if col_map.get(
+                "deuda_ant") else 0.0
             try:
                 d_ant_f = float(d_ant_val or 0.0)
             except Exception:
@@ -580,22 +624,29 @@ class ServicioDatosPadron(ServicioDatos):
             tot_pagar_f = 0.0
             if col_map.get("deuda_actual"):
                 try:
-                    d_act_f = float(ws.cell(row=r, column=col_map["deuda_actual"]).value or 0.0)
+                    d_act_f = float(
+                        ws.cell(row=r, column=col_map["deuda_actual"]).value or 0.0)
                     tot_pagar_f = round(d_ant_f + d_act_f, 2)
                 except Exception:
                     tot_pagar_f = d_ant_f
             elif col_map.get("total_pagar"):
                 try:
-                    tot_pagar_f = float(ws.cell(row=r, column=col_map["total_pagar"]).value or 0.0)
+                    tot_pagar_f = float(
+                        ws.cell(row=r, column=col_map["total_pagar"]).value or 0.0)
                     d_act_f = max(0.0, round(tot_pagar_f - d_ant_f, 2))
                 except Exception:
                     tot_pagar_f = 0.0
 
-            pago_val = ws.cell(row=r, column=col_map["pago"]).value if col_map.get("pago") else None
-            monto_pag_val = ws.cell(row=r, column=col_map["monto_pagado"]).value if col_map.get("monto_pagado") else None
-            fecha_pag_val = ws.cell(row=r, column=col_map["fecha_pago"]).value if col_map.get("fecha_pago") else None
-            meses_val = ws.cell(row=r, column=col_map["meses"]).value if col_map.get("meses") else None
-            meses_num = int(meses_val) if (meses_val is not None and str(meses_val).isdigit()) else 1
+            pago_val = ws.cell(row=r, column=col_map["pago"]).value if col_map.get(
+                "pago") else None
+            monto_pag_val = ws.cell(row=r, column=col_map["monto_pagado"]).value if col_map.get(
+                "monto_pagado") else None
+            fecha_pag_val = ws.cell(row=r, column=col_map["fecha_pago"]).value if col_map.get(
+                "fecha_pago") else None
+            meses_val = ws.cell(row=r, column=col_map["meses"]).value if col_map.get(
+                "meses") else None
+            meses_num = int(meses_val) if (
+                meses_val is not None and str(meses_val).isdigit()) else 1
 
             uid = dni
             med_obj = {
@@ -654,10 +705,12 @@ class ServicioDatosPadron(ServicioDatos):
                 mes[uid]["monto_pagado"] = tot_pagar_f
                 mes[uid]["pago"] = "SI"
                 mes[uid]["meses_adeudados"] = 0
-                mes[uid]["fecha_pago"] = str(fecha_pag_val or datetime.date.today().isoformat())
+                mes[uid]["fecha_pago"] = str(
+                    fecha_pag_val or datetime.date.today().isoformat())
             elif monto_pag_val is not None and str(monto_pag_val).replace(".", "", 1).isdigit():
                 mes[uid]["monto_pagado"] = round(float(monto_pag_val), 2)
-                mes[uid]["fecha_pago"] = str(fecha_pag_val or datetime.date.today().isoformat())
+                mes[uid]["fecha_pago"] = str(
+                    fecha_pag_val or datetime.date.today().isoformat())
                 if mes[uid]["monto_pagado"] >= tot_pagar_f and tot_pagar_f > 0:
                     mes[uid]["pago"] = "SI"
                     mes[uid]["meses_adeudados"] = 0
@@ -676,9 +729,11 @@ class ServicioDatosPadron(ServicioDatos):
         Permite al usuario colocar bases simuladas de meses anteriores o actuales,
         recalculando usuarios, consumos y estados de pago en memoria sin consultar Firebase.
         """
-        directorio = Path(dir_bd) if dir_bd else (self.base_dir or rutas.ruta_base_de_datos())
+        directorio = Path(dir_bd) if dir_bd else (
+            self.base_dir or rutas.ruta_base_de_datos())
         archivos_encontrados = buscar_archivos_base_datos(directorio)
-        archivos, advertencias = validar_archivos_sin_duplicados(archivos_encontrados)
+        archivos, advertencias = validar_archivos_sin_duplicados(
+            archivos_encontrados)
 
         if not archivos:
             p_alt = buscar_archivo_padron_mes()
@@ -703,9 +758,11 @@ class ServicioDatosPadron(ServicioDatos):
                 if uid not in usuarios_consolidados:
                     usuarios_consolidados[uid] = dict(u)
                 else:
-                    meds_exist = usuarios_consolidados[uid].setdefault("medidores", [])
+                    meds_exist = usuarios_consolidados[uid].setdefault(
+                        "medidores", [])
                     for m in u.get("medidores") or []:
-                        m_str = m.get("nro_medidor") if isinstance(m, dict) else str(m)
+                        m_str = m.get("nro_medidor") if isinstance(
+                            m, dict) else str(m)
                         if m_str and m_str not in meds_exist:
                             meds_exist.append(m_str)
 
@@ -745,7 +802,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         if "mes_actual" in self.config:
             self.config["mes_actual"]["periodo"] = periodo_reciente
-            estado_reciente = (cfg_reciente.get("mes_actual") or {}).get("estado")
+            estado_reciente = (cfg_reciente.get(
+                "mes_actual") or {}).get("estado")
             if estado_reciente:
                 self.config["mes_actual"]["estado"] = estado_reciente
 
@@ -756,7 +814,8 @@ class ServicioDatosPadron(ServicioDatos):
                 self._archivos_mtime[str(a)] = a.stat().st_mtime
 
         if callback_progreso:
-            callback_progreso(100, "¡Base de datos local actualizada con éxito!")
+            callback_progreso(
+                100, "¡Base de datos local actualizada con éxito!")
 
         return {
             "archivos": total_archivos,
@@ -828,7 +887,14 @@ class ServicioDatosPadron(ServicioDatos):
         t_inicio = time.perf_counter()
 
         if callback_progreso:
+<<<<<<< HEAD
             callback_progreso(5, "Iniciando respaldo de seguridad local...")
+=======
+            callback_progreso(
+                30, f"Escribiendo {total_usuarios} usuarios en Firebase...")
+        fb.guardar_usuarios_lote(self.usuarios)
+        total_escrituras += total_usuarios
+>>>>>>> origin/Andres
 
         # 1. Respaldo previo de seguridad de Base de datos/*.xlsx
         dir_bd = rutas.ruta_base_de_datos()
@@ -892,11 +958,20 @@ class ServicioDatosPadron(ServicioDatos):
             batch.commit()
             self.ops["escrituras"] += len(chunk)
             if callback_progreso:
+<<<<<<< HEAD
                 pct = 20 + int((idx / max(1, len(chunks_subir))) * 40)
                 callback_progreso(pct, f"Subiendo usuarios del mes ({min(idx * batch_size, total_items)}/{total_items})...")
+=======
+                pct = 30 + int((i / (total_meses + 1)) * 50)
+                callback_progreso(
+                    pct, f"Escribiendo mes {periodo} ({len(docs_mes)} registros)...")
+            fb.guardar_mes_lote(periodo, docs_mes)
+            total_escrituras += len(docs_mes)
+>>>>>>> origin/Andres
 
         # 4. Actualizar config/general
         if callback_progreso:
+<<<<<<< HEAD
             callback_progreso(65, "Actualizando configuración general en Firestore...")
         mes_actual_cfg = self.config.get("mes_actual") or {}
         datos_cfg_nube = {
@@ -911,6 +986,12 @@ class ServicioDatosPadron(ServicioDatos):
         }
         db.collection("config").document("general").set(datos_cfg_nube, merge=True)
         self.ops["escrituras"] += 1
+=======
+            callback_progreso(
+                90, "Actualizando configuración general en la nube...")
+        fb.guardar_config(self.config)
+        total_escrituras += 1
+>>>>>>> origin/Andres
 
         # 5. Detectar sobrantes usando list_documents() (SOLO IDs, NUNCA stream())
         if callback_progreso:
@@ -972,7 +1053,12 @@ class ServicioDatosPadron(ServicioDatos):
             pass
 
         if callback_progreso:
+<<<<<<< HEAD
             callback_progreso(100, f"¡Envío completado en {duracion:.2f} s!")
+=======
+            callback_progreso(
+                100, f"¡{total_escrituras} documentos sincronizados con éxito en Firebase!")
+>>>>>>> origin/Andres
 
         return {
             "usuarios_subidos": total_items,
@@ -1116,12 +1202,45 @@ class ServicioDatosPadron(ServicioDatos):
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.config["ultima_descarga_lectores"] = ahora_str
         try:
+<<<<<<< HEAD
             self.guardar_config(self.config)
         except Exception:
             pass
 
         if callback_progreso:
             callback_progreso(100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
+=======
+            import firebase_client as fb
+            docs = fb.db().collection(fb.nombre_coleccion_mes(p)).stream()
+            for doc in docs:
+                datos = doc.to_dict()
+                uid = doc.id
+                if uid in self.mes:
+                    meds_cloud = datos.get("medidores") or []
+                    meds_local = self.mes[uid].get("medidores") or []
+                    for mc in meds_cloud:
+                        nro = mc.get("nro_medidor")
+                        ml = next((m for m in meds_local if m.get(
+                            "nro_medidor") == nro), None)
+                        if ml and mc.get("lectura_actual") is not None:
+                            ml["lectura_actual"] = mc.get("lectura_actual")
+                            ml["estado_lectura"] = mc.get(
+                                "estado_lectura", "LEIDO")
+                            ml["novedad"] = mc.get("novedad", "NORMAL")
+                            ml["nota"] = mc.get("nota", "")
+                            ml["fecha_lectura"] = mc.get("fecha_lectura")
+                            actualizados += 1
+
+                    if datos.get("monto_pagado", 0) > 0 and self.mes[uid].get("monto_pagado", 0) == 0:
+                        self.mes[uid]["monto_pagado"] = datos.get(
+                            "monto_pagado")
+                        self.mes[uid]["fecha_pago"] = datos.get("fecha_pago")
+
+            self.guardar_en_respaldo_local()
+
+        except Exception as e:
+            errores.append(str(e))
+>>>>>>> origin/Andres
 
         return {
             "periodo": p,
@@ -1328,7 +1447,8 @@ class ServicioDatosPadron(ServicioDatos):
             if id_usuario_actual and uid == id_usuario_actual:
                 continue
             for m in u.get("medidores") or []:
-                num = str(m.get("nro_medidor") if isinstance(m, dict) else m).strip()
+                num = str(m.get("nro_medidor") if isinstance(
+                    m, dict) else m).strip()
                 if num:
                     meds_existentes[num] = u.get("nombre") or uid
         for med in medidores:
@@ -1461,9 +1581,11 @@ class ServicioDatosPadron(ServicioDatos):
     ) -> Dict[str, Any]:
         doc = self.mes.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
 
-        med_obj = next((m for m in doc.get("medidores", []) if m.get("nro_medidor") == nro_medidor), None)
+        med_obj = next((m for m in doc.get("medidores", [])
+                       if m.get("nro_medidor") == nro_medidor), None)
         if med_obj:
             med_obj["lectura_actual"] = int(lectura_actual)
             med_obj["fecha_lectura"] = datetime.date.today().isoformat()
@@ -1495,8 +1617,10 @@ class ServicioDatosPadron(ServicioDatos):
         estado = mes_act.get("estado") or "FACTURADO"
 
         rec_gen = sum(1 for d in self.mes.values() if d.get("nro_recibo"))
-        tot_fac = sum(float(d.get("total_a_pagar") or 0.0) for d in self.mes.values())
-        pagados = sum(1 for d in self.mes.values() if float(d.get("monto_pagado") or 0) >= float(d.get("total_a_pagar") or 0) and float(d.get("total_a_pagar") or 0) > 0)
+        tot_fac = sum(float(d.get("total_a_pagar") or 0.0)
+                      for d in self.mes.values())
+        pagados = sum(1 for d in self.mes.values() if float(d.get("monto_pagado") or 0) >= float(
+            d.get("total_a_pagar") or 0) and float(d.get("total_a_pagar") or 0) > 0)
 
         faltantes = []
         for uid, d in self.mes.items():
@@ -1528,7 +1652,8 @@ class ServicioDatosPadron(ServicioDatos):
     def generar_recibo_usuario(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
         doc = self.mes.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
 
         for m in doc.get("medidores", []):
             if m.get("lectura_actual") is None:
@@ -1543,7 +1668,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         categorias = self.config.get("categorias", {})
         cat_cod = doc.get("codigo_categoria", "A")
-        cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
+        cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [
+            {"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
 
         calc = calculos.calcular_recibo(
             medidores=doc.get("medidores", []),
@@ -1593,12 +1719,57 @@ class ServicioDatosPadron(ServicioDatos):
         self.guardar_en_respaldo_local()
         return {"periodo": p, "total_generados": procesados}
 
+    def _historial_consumos(self, id_usuario: str, periodo: str, n: int = 5) -> List[Optional[float]]:
+        """
+        Reconstruye los consumos (m3) de los `n` meses ANTERIORES a `periodo` usando los
+        padrones ya cargados en memoria desde 'Base de datos/' (self.meses_encontrados).
+        Se usa como respaldo cuando la columna 'Historial m3' del Excel viene vacia.
+        Devuelve la lista en orden cronologico (mas antiguo primero), sin meses iniciales inexistentes.
+        """
+        try:
+            anio, mes = [int(p) for p in periodo.split("-")]
+        except Exception:
+            return []
+        serie: List[Optional[float]] = []
+        for k in range(n, 0, -1):
+            m_i, a_i = mes - k, anio
+            while m_i <= 0:
+                m_i += 12
+                a_i -= 1
+            per = f"{a_i:04d}-{m_i:02d}"
+            docs_per = self.meses_encontrados.get(per)
+            if docs_per is None:
+                # ese mes no existe en Base de datos/
+                serie.append(None)
+                continue
+            d = docs_per.get(id_usuario)
+            if not d:
+                # el usuario aun no existia ese mes (sin dato)
+                serie.append(None)
+                continue
+            v = d.get("consumo_total_m3")
+            try:
+                serie.append(float(v) if v not in (None, "") else None)
+            except (TypeError, ValueError):
+                serie.append(None)
+        # Quitar meses iniciales sin dato; los None intermedios se dibujan como "sin dato"
+        while serie and serie[0] is None:
+            serie.pop(0)
+        return serie
+
+    def _doc_para_pdf(self, doc: Dict[str, Any], id_usuario: str, periodo: str) -> Dict[str, Any]:
+        """Copia del doc con historial_m3 completado desde los padrones previos si esta vacio."""
+        d = dict(doc)
+        if not d.get("historial_m3"):
+            d["historial_m3"] = self._historial_consumos(id_usuario, periodo)
+        return d
+
     def generar_pdf_recibo(self, periodo: str, id_usuario: str) -> str:
         doc = self.mes.get(id_usuario)
         if not doc:
             raise ValueError(f"Usuario {id_usuario} no encontrado.")
         from servicios.generador_pdf import generar_recibo_pdf_para_usuario
-        return str(generar_recibo_pdf_para_usuario(doc, self.config, periodo))
+        return str(generar_recibo_pdf_para_usuario(self._doc_para_pdf(doc, id_usuario, periodo), self.config, periodo))
 
     def generar_zip_recibos(self, periodo: str, sector: Optional[str] = None) -> Optional[str]:
         from servicios.generador_pdf import generar_recibo_pdf_para_usuario, empaquetar_recibos_en_zip
@@ -1606,7 +1777,8 @@ class ServicioDatosPadron(ServicioDatos):
             if sector and doc.get("sector") != sector:
                 continue
             if doc.get("nro_recibo"):
-                generar_recibo_pdf_para_usuario(doc, self.config, periodo)
+                generar_recibo_pdf_para_usuario(self._doc_para_pdf(
+                    doc, uid, periodo), self.config, periodo)
         ruta_zip = empaquetar_recibos_en_zip(periodo, sector)
         return str(ruta_zip) if ruta_zip else None
 
@@ -1619,7 +1791,8 @@ class ServicioDatosPadron(ServicioDatos):
     ) -> Dict[str, Any]:
         doc = self.mes.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         fecha = fecha_pago or datetime.date.today().isoformat()
         monto = round(float(monto_pagado), 2)
         doc["monto_pagado"] = monto
@@ -1639,7 +1812,8 @@ class ServicioDatosPadron(ServicioDatos):
     def anular_pago(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
         doc = self.mes.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         doc["monto_pagado"] = 0.0
         doc["fecha_pago"] = None
 
@@ -1657,7 +1831,8 @@ class ServicioDatosPadron(ServicioDatos):
         periodo: Optional[str] = None,
         ruta_salida: Optional[str] = None,
     ) -> str:
-        p = Path(ruta_salida) if ruta_salida else rutas.ruta_salida(f"reporte_morosos_{periodo or self.periodo}.xlsx")
+        p = Path(ruta_salida) if ruta_salida else rutas.ruta_salida(
+            f"reporte_morosos_{periodo or self.periodo}.xlsx")
         p.parent.mkdir(parents=True, exist_ok=True)
         import openpyxl
         from openpyxl.styles import Font, PatternFill
@@ -1670,13 +1845,16 @@ class ServicioDatosPadron(ServicioDatos):
         ws["A1"].font = Font(name="Arial", size=12, bold=True, color="FFFFFF")
         ws.merge_cells("A1:G1")
         for col in range(1, 8):
-            ws.cell(row=1, column=col).fill = PatternFill(start_color="DC2626", end_color="DC2626", fill_type="solid")
+            ws.cell(row=1, column=col).fill = PatternFill(
+                start_color="DC2626", end_color="DC2626", fill_type="solid")
 
-        headers = ["Nro Conexión", "DNI", "Titular", "Sector", "Meses Deuda", "Total Deuda S/.", "Medidor"]
+        headers = ["Nro Conexión", "DNI", "Titular", "Sector",
+                   "Meses Deuda", "Total Deuda S/.", "Medidor"]
         for c, h in enumerate(headers, 1):
             cell = ws.cell(row=3, column=c, value=h)
             cell.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-            cell.fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+            cell.fill = PatternFill(
+                start_color="1E293B", end_color="1E293B", fill_type="solid")
 
         r_idx = 4
         for d in self.mes.values():
@@ -1684,7 +1862,8 @@ class ServicioDatosPadron(ServicioDatos):
             pagado = float(d.get("monto_pagado") or 0)
             total = float(d.get("total_a_pagar") or 0)
             if meses >= 3 and pagado < total:
-                med_str = ", ".join(m.get("nro_medidor", "") for m in d.get("medidores", []))
+                med_str = ", ".join(m.get("nro_medidor", "")
+                                    for m in d.get("medidores", []))
                 ws.cell(row=r_idx, column=1, value=d.get("nro_conexion", ""))
                 ws.cell(row=r_idx, column=2, value=d.get("id_usuario", ""))
                 ws.cell(row=r_idx, column=3, value=d.get("nombre", ""))
@@ -1760,4 +1939,3 @@ class ServicioDatosPadron(ServicioDatos):
             p_mes = buscar_archivo_padron_mes()
             if p_mes and p_mes.exists():
                 self._cargar_desde_padron_excel(p_mes)
-

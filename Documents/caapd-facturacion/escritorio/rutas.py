@@ -39,6 +39,64 @@ def ruta_salida(*partes: str) -> Path:
     return p
 
 
+# ======================= NUEVO (1 de 2) =======================
+def ruta_escritorio_usuario() -> Path:
+    """
+    Devuelve la carpeta Escritorio del usuario actual.
+
+    En Windows consulta la carpeta real del Escritorio (funciona aunque esté
+    redirigida a OneDrive). En otros sistemas usa ~/Desktop o ~/Escritorio.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class _GUID(ctypes.Structure):
+                _fields_ = [
+                    ("Data1", wintypes.DWORD),
+                    ("Data2", wintypes.WORD),
+                    ("Data3", wintypes.WORD),
+                    ("Data4", wintypes.BYTE * 8),
+                ]
+
+            # FOLDERID_Desktop = {B4BFCC3A-DB2C-424C-B029-7FE99A87C641}
+            folder_id = _GUID(
+                0xB4BFCC3A, 0xDB2C, 0x424C,
+                (wintypes.BYTE * 8)(0xB0, 0x29, 0x7F, 0xE9, 0x9A, 0x87, 0xC6, 0x41),
+            )
+            puntero = ctypes.c_wchar_p()
+            res = ctypes.windll.shell32.SHGetKnownFolderPath(
+                ctypes.byref(folder_id), 0, None, ctypes.byref(puntero)
+            )
+            if res == 0 and puntero.value:
+                ruta = Path(puntero.value)
+                ctypes.windll.ole32.CoTaskMemFree(puntero)
+                return ruta
+        except Exception:
+            pass
+
+    for nombre in ("Desktop", "Escritorio"):
+        candidata = Path.home() / nombre
+        if candidata.exists():
+            return candidata
+    return Path.home() / "Desktop"
+
+
+# ======================= NUEVO (2 de 2) =======================
+def ruta_recibos(*partes: str) -> Path:
+    """
+    Carpeta de salida de los recibos PDF: <Escritorio del usuario>/recibos/...
+
+    Ejemplo: ruta_recibos("2026-09", "BARRIO DE CHAUPI") -> Escritorio/recibos/2026-09/BARRIO DE CHAUPI
+    La carpeta se crea si no existe.
+    """
+    p = ruta_escritorio_usuario().joinpath("recibos", *partes)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+# ============ DESDE AQUÍ TODO ES IGUAL A TU VERSIÓN ============
 def es_entorno_prueba() -> bool:
     """Indica si el sistema se está ejecutando en modo de prueba (CAAPD_ENTORNO=prueba)."""
     import os
@@ -51,7 +109,8 @@ def ruta_respaldos(*partes: str) -> Path:
         dir_resp = DIR_BASE.joinpath("Base de datos PRUEBA", "respaldos")
     else:
         # Priorizar respaldos en la raíz si existe, sino en escritorio
-        dir_resp = DIR_BASE.parent.joinpath("respaldos") if DIR_BASE.parent.joinpath("respaldos").exists() else DIR_BASE.joinpath("respaldos")
+        dir_resp = DIR_BASE.parent.joinpath("respaldos") if DIR_BASE.parent.joinpath(
+            "respaldos").exists() else DIR_BASE.joinpath("respaldos")
     p = dir_resp.joinpath(*partes)
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
@@ -76,4 +135,3 @@ def ruta_plantillas(*partes: str) -> Path:
     if partes:
         p.parent.mkdir(parents=True, exist_ok=True)
     return p
-
