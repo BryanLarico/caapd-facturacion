@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 from PySide6.QtCore import QEvent, QThread, QThreadPool, QTimer, Qt, Signal, Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -443,3 +444,8 @@ class VentanaPrincipal(QMainWindow):
         except Exception:
             pass
         event.accept()
+        # main.py desactiva quitOnLastWindowClosed: el programa termina SOLO aquí,
+        # cuando el usuario cierra la ventana principal y no hay Workers activos.
+        app = QApplication.instance()
+        if app is not None:
+            QTimer.singleShot(0, app.quit)

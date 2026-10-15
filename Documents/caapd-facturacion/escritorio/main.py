@@ -17,8 +17,15 @@ import rutas
 from PySide6.QtGui import QFont, QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication
 
-from ui.hilos import esperar_hilos
+from ui.hilos import esperar_hilos, instalar_diagnostico_cierre, precargar_firebase_en_hilo_principal
 from ui.ventana_principal import VentanaPrincipal
+
+# Importar firebase_admin/gRPC desde el hilo principal poco después de abrir la
+# ventana. Evita que la PRIMERA importación del código nativo de gRPC ocurra dentro
+# de un hilo del QThreadPool (causa de cierres silenciosos en Windows al usar
+# «Traer lecturas de los lectores» / «Enviar mes a los lectores»).
+PRECARGAR_FIREBASE_AL_INICIO = True
+RETARDO_PRECARGA_MS = 1500
 
 
 def configurar_fuentes(app: QApplication) -> None:
@@ -63,6 +70,15 @@ def main() -> None:
     app.setStyle("Fusion")
     app.setApplicationName("CAAPD Ispacas Facturación")
 
+    # El programa SOLO termina cuando el usuario cierra la ventana principal
+    # (VentanaPrincipal.closeEvent llama a app.quit()). Así, ningún diálogo,
+    # ventana auxiliar o estado transitorio puede provocar que Qt salga del
+    # bucle de eventos mientras un Worker sigue trabajando.
+    app.setQuitOnLastWindowClosed(False)
+    # Deja en logs/hilos.log el motivo de cualquier cierre (lastWindowClosed,
+    # aboutToQuit, excepciones no capturadas) para diagnosticar cierres sin traceback.
+    instalar_diagnostico_cierre(app)
+
     # Configuración de estilos y tipografía
     configurar_fuentes(app)
     cargar_estilos(app)
@@ -90,6 +106,11 @@ def main() -> None:
 
     # Carga de datos asíncrona de Inicio (la ventana se muestra inmediatamente)
     ventana.pagina_inicio.cargar_datos_asincrono()
+
+    # Precarga de Firebase/gRPC en el hilo principal (solo importación, 0 lecturas).
+    if PRECARGAR_FIREBASE_AL_INICIO:
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(RETARDO_PRECARGA_MS, precargar_firebase_en_hilo_principal)
 
     # Antes de destruir QApplication, esperar a los Workers del pool (cierre limpio).
     app.aboutToQuit.connect(lambda: esperar_hilos(5000))

@@ -36,19 +36,63 @@ _lock_credenciales = threading.Lock()
 _credenciales_cache: Dict[str, Any] = {"ruta": None, "creds": None, "project_id": None}
 
 
-def ruta_credenciales() -> Optional[Path]:
-    """Localiza el archivo JSON de la cuenta de servicio (FIREBASE_KEY_PATH o *adminsdk*.json)."""
-    candidatos: List[Path] = []
+def precargar_dependencias() -> bool:
+    """
+    Importa en el HILO ACTUAL (debe ser el principal) las librerías que usa la
+    descarga REST: requests, google-auth (service_account, AuthorizedSession) y
+    sus dependencias criptográficas. Así, cuando el Worker del QThreadPool ejecute
+    la descarga, no habrá ninguna primera importación de código nativo dentro de
+    un hilo secundario. Devuelve True si todo se importó.
+    """
     try:
-        import firebase_client
-        ruta_cfg = getattr(firebase_client, "FIREBASE_KEY_PATH", None)
-        if ruta_cfg:
-            candidatos.append(Path(ruta_cfg))
-            if not Path(ruta_cfg).is_absolute():
-                candidatos.append(rutas.DIR_BASE / ruta_cfg)
-                candidatos.append(rutas.DIR_BASE.parent / ruta_cfg)
+        import requests  # noqa: F401
+        from google.oauth2 import service_account  # noqa: F401
+        from google.auth.transport.requests import AuthorizedSession  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def _ruta_clave_configurada() -> Optional[str]:
+    """
+    Reproduce la resolución de FIREBASE_KEY_PATH de firebase_client.py SIN importarlo.
+
+    IMPORTANTE (cierre silencioso en Windows): `import firebase_client` arrastra
+    firebase_admin -> google.cloud.firestore -> gRPC (cygrpc, código nativo). Si esa
+    primera importación ocurre dentro de un hilo del QThreadPool (como pasaba en
+    «Traer lecturas de los lectores»), la pila nativa de gRPC se inicializa fuera del
+    hilo principal y el programa puede cerrarse sin traceback (solo se ve
+    «QThreadStorage: entry N destroyed before end of thread»). Esta ruta REST debe
+    permanecer 100 % libre de gRPC, por eso aquí solo se lee la configuración.
+    """
+    import sys
+
+    env = os.environ.get("FIREBASE_KEY_PATH")
+    if env:
+        return env
+    if getattr(sys, "frozen", False):
+        return str(rutas.ruta_aplicacion("serviceAccountKey.json"))
+    try:
+        import importlib
+        cfg = importlib.import_module("config_local")   # módulo local, puro Python
+        ruta = getattr(cfg, "FIREBASE_KEY_PATH", None)
+        if ruta:
+            return str(ruta)
     except Exception:
         pass
+    return str(rutas.ruta_aplicacion("serviceAccountKey.json"))
+
+
+def ruta_credenciales() -> Optional[Path]:
+    """Localiza el archivo JSON de la cuenta de servicio (FIREBASE_KEY_PATH o *adminsdk*.json).
+    No importa firebase_client ni gRPC (ver _ruta_clave_configurada)."""
+    candidatos: List[Path] = []
+    ruta_cfg = _ruta_clave_configurada()
+    if ruta_cfg:
+        candidatos.append(Path(ruta_cfg))
+        if not Path(ruta_cfg).is_absolute():
+            candidatos.append(rutas.DIR_BASE / ruta_cfg)
+            candidatos.append(rutas.DIR_BASE.parent / ruta_cfg)
 
     env = os.environ.get("FIREBASE_KEY_PATH")
     if env:

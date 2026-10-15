@@ -1,19 +1,36 @@
 """
 servicios/generador_pdf.py — Generador de recibos en PDF para CAAPD Ispacas.
 
-Basado en las coordenadas exactas de datos/codepdf.py y las especificaciones
-de docs/FASE_4_RECIBOS_PDF.md.
+VERSION AJUSTADA A LA HOJA FISICA 15.5 x 22 cm
+==============================================
+Problema original: la pagina del PDF era "media carta" (13.97 x 21.59 cm) y
+el fondo se dibujaba a pagina completa. Al imprimir sobre una hoja fisica de
+15.5 x 22 cm cuya impresora NO imprime 1.9 cm a cada lado, 0.2 cm arriba y
+0.1 cm abajo, el recibo salia descentrado y recortado.
+
+Solucion (ver bloque "GEOMETRIA DE IMPRESION"):
+  1. La pagina del PDF ahora mide EXACTAMENTE lo que mide la hoja fisica
+     (15.5 x 22 cm). Asi, al imprimir a "Tamano real / 100%" no hay escalado
+     ni recorte sorpresa.
+  2. Se define un AREA UTIL centrada de 11.7 x 21.0 cm:
+        15.5 - 1.9 - 1.9 = 11.7 cm de ancho   (borde blanco 1.9 cm por lado)
+        22.0 - 0.5 - 0.5 = 21.0 cm de alto    (borde blanco 0.5 cm arriba/abajo)
+     Como la impresora no toca 1.9 cm laterales ni 0.2/0.1 cm arriba/abajo,
+     TODO el area util cae dentro de la zona imprimible.
+  3. El fondo (PNG) se dibuja ocupando exactamente el area util.
+  4. Todos los textos, tablas, histograma y QR conservan sus coordenadas
+     originales (pensadas para 13.97 x 21.59) y se proyectan automaticamente
+     dentro del area util mediante la clase _Lienzo, que reescala las
+     coordenadas. No hace falta tocar ninguna coordenada del diseno.
 
 Soporta:
-- Selección automática del fondo según nivel de mora:
-    * 1 mes de deuda o al día  -> recursos/fondo_azul.png
+- Seleccion automatica del fondo segun nivel de mora:
+    * 1 mes de deuda o al dia  -> recursos/fondo_azul.png
     * 2 meses de deuda         -> recursos/fondo_naranja.png
-    * 3 a más meses (corte)    -> recursos/fondo_rojo.png
-- Dimensiones MEDIA CARTA: 13.97 cm de ancho x 21.59 cm de alto (5.5 x 8.5 pulgadas).
-- El fondo se dibuja a pagina completa ANTES del ajuste de impresion (sin borde blanco).
+    * 3 a mas meses (corte)    -> recursos/fondo_rojo.png
 - Dibujo de histograma de 6 meses vectorial.
-- QR dinámico de atención / WhatsApp en el talón troquelado.
-- Conversión a letras en español con calculos.numero_a_letras().
+- QR dinamico de atencion / WhatsApp en el talon troquelado.
+- Conversion a letras en espanol con calculos.numero_a_letras().
 """
 from __future__ import annotations
 import io
@@ -25,20 +42,173 @@ import qrcode
 from PIL import Image
 from reportlab.lib import colors
 from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 import rutas
 from calculos import calcular_nivel_mora, numero_a_letras, periodo_a_temporada
 
-ANCHO_RECIBO = 13.97 * cm
-ALTO_RECIBO = 20.59 * cm
+# =============================================================================
+# GEOMETRIA DE IMPRESION  (lo unico que necesitas tocar para calibrar)
+# =============================================================================
 
+# 1) Hoja fisica real que entra en la impresora.
+ANCHO_HOJA_CM = 15.5
+ALTO_HOJA_CM = 22.0
+
+# 2) Bordes blancos deseados alrededor del recibo (en cm, sobre la hoja fisica).
+#    Laterales = zona que la impresora no imprime (1.9 cm). Arriba/abajo = 0.5 cm
+#    (mayor que los 0.2 / 0.1 cm que la impresora no toca, asi nunca se recorta).
+MARGEN_IZQUIERDO_CM = 1.9
+MARGEN_DERECHO_CM = 1.9
+MARGEN_SUPERIOR_CM = 0.5
+MARGEN_INFERIOR_CM = 0.5
+
+# 3) Espacio de DISENO: las coordenadas de todo el recibo (textos, tablas,
+#    histograma, QR) y los PNG de fondo (1294 x 2000 px) estan pensados para
+#    media carta. NO cambiar: es la "regla" con la que se dibujo el recibo.
+ANCHO_DISENO_CM = 13.97
+ALTO_DISENO_CM = 21.59
+
+# 4) Como encajar el diseno dentro del area util:
+#    "estirar"      -> el recibo ocupa EXACTAMENTE 11.7 x 21.0 cm. Como la
+#                      proporcion del diseno (0.647) no es igual a la del area
+#                      (0.557), el FONDO se alarga ~16% en vertical. Los textos
+#                      NO se deforman (se reescalan de forma uniforme), solo se
+#                      separan un poco mas entre lineas.  <- lo que pediste.
+#    "proporcional" -> el recibo se reduce sin deformar nada; ocupa 11.7 x 18.08
+#                      cm y queda centrado, dejando ~1.96 cm blancos arriba y
+#                      abajo en vez de 0.5 cm.
+MODO_AJUSTE = "estirar"
+
+# 5) Correccion fina para la impresora (en cm REALES sobre la hoja). Si al
+#    imprimir todo sale, por ejemplo, 2 mm hacia la izquierda, pon 0.2 aqui.
+#    Mueve TODO el recibo (fondo + textos) sin cambiar su tamano.
 DESPLAZAMIENTO_X_CM = 0.0
 DESPLAZAMIENTO_Y_CM = 0.0
 
+# 6) Ajuste SOLO de textos/tablas/histograma/QR respecto al fondo (en cm de
+#    DISENO, como el antiguo DESPLAZAMIENTO_*). El fondo NO se mueve. Util si
+#    quieres subir/bajar todo el texto respecto a las franjas del fondo.
+AJUSTE_TEXTO_X_CM = 0.0
+AJUSTE_TEXTO_Y_CM = 0.0
+
+# 7) Ajuste vertical SOLO del talon inferior (en cm de DISENO, como antes).
 AJUSTE_TALON_Y_CM = 0.5
 
-X_DERECHA = 13.3 * cm
+# 8) Dibuja un marco fino alrededor del area util para calibrar con una regla
+#    sobre la hoja impresa. Dejar en False para produccion.
+DIBUJAR_MARCO_GUIA = False
+
+# --- Valores derivados (no tocar) --------------------------------------------
+ANCHO_HOJA = ANCHO_HOJA_CM * cm
+ALTO_HOJA = ALTO_HOJA_CM * cm
+ANCHO_AREA = (ANCHO_HOJA_CM - MARGEN_IZQUIERDO_CM - MARGEN_DERECHO_CM) * cm   # 11.7 cm
+ALTO_AREA = (ALTO_HOJA_CM - MARGEN_SUPERIOR_CM - MARGEN_INFERIOR_CM) * cm    # 21.0 cm
+ANCHO_DISENO = ANCHO_DISENO_CM * cm
+ALTO_DISENO = ALTO_DISENO_CM * cm
+
+# Compatibilidad con codigo que importaba estas constantes
+ANCHO_RECIBO = ANCHO_DISENO
+ALTO_RECIBO = ALTO_DISENO
+
+X_DERECHA = 13.3 * cm   # margen derecho de los importes (en cm de diseno)
+
+
+def calcular_geometria() -> Dict[str, float]:
+    """
+    Devuelve el origen (ox, oy) y los factores de escala (sx, sy) que llevan
+    el espacio de diseno (13.97 x 21.59) al area util sobre la hoja fisica.
+    """
+    sx = ANCHO_AREA / ANCHO_DISENO
+    if MODO_AJUSTE == "proporcional":
+        sy = sx
+        alto_real = ALTO_DISENO * sy
+        oy = MARGEN_INFERIOR_CM * cm + (ALTO_AREA - alto_real) / 2
+        ancho_fondo, alto_fondo = ANCHO_AREA, alto_real
+    else:  # "estirar"
+        sy = ALTO_AREA / ALTO_DISENO
+        oy = MARGEN_INFERIOR_CM * cm
+        ancho_fondo, alto_fondo = ANCHO_AREA, ALTO_AREA
+    ox = MARGEN_IZQUIERDO_CM * cm
+    return {
+        "ox": ox, "oy": oy, "sx": sx, "sy": sy,
+        "ancho_fondo": ancho_fondo, "alto_fondo": alto_fondo,
+    }
+
+
+class _Lienzo:
+    """
+    Envoltorio del canvas de ReportLab que proyecta coordenadas de DISENO
+    (13.97 x 21.59 cm) al area util real de la hoja. Permite conservar todas
+    las coordenadas originales del recibo sin modificarlas.
+
+    - Posiciones (x, y) -> (ox + x*sx, oy + y*sy)
+    - Anchos/altos de rectangulos e imagenes -> *sx / *sy
+    - Tamano de fuente -> *sx (uniforme: las letras no se deforman)
+    """
+
+    def __init__(self, pdf: canvas.Canvas, ox: float, oy: float, sx: float, sy: float):
+        self.pdf = pdf
+        self.ox, self.oy, self.sx, self.sy = ox, oy, sx, sy
+        self._dx = 0.0  # translate acumulado (en unidades de diseno)
+        self._dy = 0.0
+        self._pila: List[Tuple[float, float]] = []
+
+    # -- mapeo --------------------------------------------------------------
+    def _x(self, x: float) -> float:
+        return self.ox + (x + self._dx) * self.sx
+
+    def _y(self, y: float) -> float:
+        return self.oy + (y + self._dy) * self.sy
+
+    # -- estado -------------------------------------------------------------
+    def translate(self, dx: float, dy: float) -> None:
+        self._dx += dx
+        self._dy += dy
+
+    def saveState(self) -> None:
+        self._pila.append((self._dx, self._dy))
+        self.pdf.saveState()
+
+    def restoreState(self) -> None:
+        if self._pila:
+            self._dx, self._dy = self._pila.pop()
+        self.pdf.restoreState()
+
+    def setFont(self, nombre: str, tam: float) -> None:
+        self.pdf.setFont(nombre, tam * self.sx)
+
+    def setLineWidth(self, w: float) -> None:
+        self.pdf.setLineWidth(w * self.sx)
+
+    # -- texto --------------------------------------------------------------
+    def drawString(self, x, y, texto, **kw):
+        self.pdf.drawString(self._x(x), self._y(y), texto, **kw)
+
+    def drawRightString(self, x, y, texto, **kw):
+        self.pdf.drawRightString(self._x(x), self._y(y), texto, **kw)
+
+    def drawCentredString(self, x, y, texto, **kw):
+        self.pdf.drawCentredString(self._x(x), self._y(y), texto, **kw)
+
+    # -- formas -------------------------------------------------------------
+    def rect(self, x, y, w, h, **kw):
+        self.pdf.rect(self._x(x), self._y(y), w * self.sx, h * self.sy, **kw)
+
+    def line(self, x1, y1, x2, y2):
+        self.pdf.line(self._x(x1), self._y(y1), self._x(x2), self._y(y2))
+
+    def drawImage(self, img, x, y, width=None, height=None, cuadrado=False, **kw):
+        """`cuadrado=True` mantiene la imagen sin deformar (util para el QR)."""
+        w = (width or 0) * self.sx
+        h = (height or 0) * (self.sx if cuadrado else self.sy)
+        self.pdf.drawImage(img, self._x(x), self._y(y), width=w, height=h, **kw)
+
+    # -- todo lo demas pasa directo (setFillColor, setStrokeColor, ...) -----
+    def __getattr__(self, nombre):
+        return getattr(self.pdf, nombre)
+
 
 PALETA_HISTOGRAMA = {
     "AZUL":    {"barra": "#0284c7", "actual": "#0c4a6e", "texto": "#1e293b"},
@@ -127,7 +297,7 @@ def resolver_fondo(
 
 
 def dibujar_histograma(
-    pdf: canvas.Canvas,
+    pdf,
     historico: Dict[str, Optional[float]] | List[Tuple[str, Optional[float]]],
     x: float,
     y: float,
@@ -138,14 +308,7 @@ def dibujar_histograma(
 ) -> None:
     """
     Dibuja un histograma de barras con los consumos (m3) de los ultimos meses.
-
-    - SIEMPRE reserva `columnas` (6) espacios: si el usuario tiene menos meses,
-      las barras quedan del mismo ancho y alineadas a la derecha (mes actual al final).
-    - Un valor None significa "sin dato": se dibuja el mes y un guion, sin barra.
-    - Escala Y DINAMICA con tope "bonito" (5, 10, 20, 50...) para que las barras
-      siempre se vean grandes, y lineas guia con su valor.
-    - La barra del mes actual (ultima) se resalta en color mas oscuro.
-    - `paleta` define los colores (ver PALETA_HISTOGRAMA); por defecto la azul.
+    (Sin cambios de logica; recibe el _Lienzo y funciona con coordenadas de diseno.)
     """
     pal = paleta or PALETA_HISTOGRAMA["AZUL"]
     c_barra = colors.HexColor(pal["barra"])
@@ -253,32 +416,10 @@ def generar_recibo_pdf(
     molde_png: Optional[str | Path] = None,
 ) -> Path:
     """
-    Genera un archivo PDF para un recibo individual siguiendo las coordenadas de codepdf.py.
-
-    datos espera las siguientes claves:
-        - numero_recibo (int|str)
-        - periodo (str 'AAAA-MM' o 'AAAA/MM')
-        - fecha_emision (str)
-        - ultimo_dia_pago (str)
-        - conexion (str)
-        - nombre (str)
-        - dni_ruc (str)
-        - zona (str)
-        - direccion (str)
-        - categoria (str)
-        - medidores (list[dict]: medidor, lectura_anterior, fecha_anterior, lectura_actual, fecha_actual, consumo)
-        - servicio_agua (float)
-        - servicio_desague (float)
-        - cargo_fijo (float)
-        - deuda_anterior (float)
-        - meses_adeudados (int)
-        - subtotal (float)
-        - igv (float)
-        - redondeo (float)
-        - total_a_pagar (float)
-        - consumos_historicos (dict[mes, m3] o list)
-        - resolucion (str, opcional)
-        - whatsapp_url (str, opcional)
+    Genera un archivo PDF para un recibo individual.
+    La pagina mide lo mismo que la hoja fisica (15.5 x 22 cm) y el recibo
+    queda centrado en el area util (11.7 x 21 cm). Ver GEOMETRIA DE IMPRESION.
+    (Las claves esperadas en `datos` no cambian respecto a la version anterior.)
     """
     salida_path = Path(ruta_salida)
     salida_path.parent.mkdir(parents=True, exist_ok=True)
@@ -296,25 +437,37 @@ def generar_recibo_pdf(
         fondo_path = Path(molde_png)
     paleta = PALETA_HISTOGRAMA.get(color_mora, PALETA_HISTOGRAMA["AZUL"])
 
-    pdf = canvas.Canvas(str(salida_path), pagesize=(ANCHO_RECIBO, ALTO_RECIBO))
+    # ------------------------------------------------------------------
+    # 0. PAGINA = HOJA FISICA (15.5 x 22 cm). Fondo blanco por defecto.
+    # ------------------------------------------------------------------
+    pdf_real = canvas.Canvas(str(salida_path), pagesize=(ANCHO_HOJA, ALTO_HOJA))
+    pdf_real.setTitle(f"Recibo {datos.get('numero_recibo', '')}")
+
+    # Correccion fina de la impresora: mueve TODO el recibo (fondo + texto).
+    pdf_real.translate(DESPLAZAMIENTO_X_CM * cm, DESPLAZAMIENTO_Y_CM * cm)
+
+    geo = calcular_geometria()
 
     # ------------------------------------------------------------------
-    # 1. FONDO: se dibuja PRIMERO, a pagina completa y SIN desplazamiento.
-    #    Asi nunca aparece borde blanco aunque se ajuste la posicion del texto.
-    DIBUJAR_FONDO = True
+    # 1. FONDO: ocupa exactamente el area util centrada en la hoja.
     # ------------------------------------------------------------------
-    if DIBUJAR_FONDO:
-        pdf.drawImage(
-            str(fondo_path), 0, 0,
-            width=ANCHO_RECIBO, height=ALTO_RECIBO,
-            preserveAspectRatio=False, mask="auto",
-        )
+    pdf_real.drawImage(
+        str(fondo_path), geo["ox"], geo["oy"],
+        width=geo["ancho_fondo"], height=geo["alto_fondo"],
+        preserveAspectRatio=False, mask="auto",
+    )
+
+    if DIBUJAR_MARCO_GUIA:
+        pdf_real.setStrokeColor(colors.HexColor("#ff00ff"))
+        pdf_real.setLineWidth(0.3)
+        pdf_real.rect(geo["ox"], geo["oy"], geo["ancho_fondo"], geo["alto_fondo"], fill=0, stroke=1)
 
     # ------------------------------------------------------------------
-    # 2. Ajuste de impresion: a partir de aqui TODO lo que se dibuja
-    #    (textos, tablas, histograma, QR) se mueve con el desplazamiento.
+    # 2. A partir de aqui se dibuja con coordenadas de DISENO (13.97 x 21.59)
+    #    y el _Lienzo las proyecta dentro del area util.
     # ------------------------------------------------------------------
-    pdf.translate(DESPLAZAMIENTO_X_CM * cm, DESPLAZAMIENTO_Y_CM * cm)
+    pdf = _Lienzo(pdf_real, geo["ox"], geo["oy"], geo["sx"], geo["sy"])
+    pdf.translate(AJUSTE_TEXTO_X_CM * cm, AJUSTE_TEXTO_Y_CM * cm)
 
     # 3. Encabezado institucional
     resolucion = datos.get("resolucion") or "RESOLUCION 192-2017"
@@ -483,7 +636,7 @@ def generar_recibo_pdf(
     pdf.saveState()
     pdf.translate(0, AJUSTE_TALON_Y_CM * cm)
 
-    # 13. Codigo QR (WhatsApp) con fondo transparente
+    # 13. Codigo QR (WhatsApp) con fondo transparente (se mantiene cuadrado)
     whatsapp_url = datos.get("whatsapp_url") or (
         "https://api.whatsapp.com/send?phone=51983365260&text=Hola%20buenos%20dias%20quisiera%20mi%20boleta%20de%20agua"
     )
@@ -491,9 +644,8 @@ def generar_recibo_pdf(
     qr_buffer = io.BytesIO()
     img_qr.save(qr_buffer, format="PNG")
     qr_buffer.seek(0)
-    from reportlab.lib.utils import ImageReader
     pdf.drawImage(ImageReader(qr_buffer), 0.5 * cm, 1.0 * cm,
-                  width=2.0 * cm, height=2.0 * cm, mask="auto")
+                  width=2.0 * cm, height=2.0 * cm, cuadrado=True, mask="auto")
 
     # 14. Talon inferior
     pdf.setFillColor(colors.black)
@@ -514,7 +666,7 @@ def generar_recibo_pdf(
     pdf.drawString(8.8 * cm, 1.5 * cm, f"{total_pagar:.2f}")
 
     pdf.restoreState()
-    pdf.save()
+    pdf_real.save()
     return salida_path
 
 
@@ -582,7 +734,6 @@ def preparar_datos_recibo_desde_doc(
     serie_completa = [None] * (6 - len(serie_completa)) + serie_completa
 
     # Asignar nombres de mes a las barras
-    import datetime
     try:
         y, m_num = [int(p) for p in periodo.split("-")]
     except Exception:

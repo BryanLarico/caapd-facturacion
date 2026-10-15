@@ -119,6 +119,7 @@ class Worker(QRunnable):
 
     def run(self) -> None:
         nombre = getattr(self.fn, "__qualname__", None) or getattr(self.fn, "__name__", "tarea")
+        _log.info("Hilo '%s' iniciado (thread=%s).", nombre, hex(id(QThread.currentThread())))
         try:
             res = self.fn(*self.args, **self.kwargs)
         except Exception as e:
@@ -127,6 +128,7 @@ class Worker(QRunnable):
         else:
             self._emitir(self.signals.resultado, res)
         finally:
+            _log.info("Hilo '%s' terminado.", nombre)
             self._emitir(self.signals.finalizado)
 
 
@@ -169,6 +171,89 @@ def esperar_hilos(ms: int = 8000) -> bool:
     except Exception:
         _log.exception("No se pudo esperar la finalización de los Workers.")
         return False
+
+
+def precargar_firebase_en_hilo_principal() -> bool:
+    """
+    Importa firebase_client (firebase_admin + gRPC nativo) y las librerías de la
+    ruta REST desde el HILO PRINCIPAL, antes de que cualquier Worker las necesite.
+
+    Motivo: en Windows, si la PRIMERA importación de gRPC (cygrpc) ocurre dentro de
+    un hilo del QThreadPool, el proceso puede cerrarse sin traceback mostrando solo
+    «QThreadStorage: entry N destroyed before end of thread». Importar aquí NO abre
+    conexiones ni hace lecturas a Firebase; solo carga el código.
+    Debe llamarse desde el hilo GUI (por ejemplo con QTimer.singleShot tras mostrar
+    la ventana). Devuelve True si la precarga fue completa.
+    """
+    app = QCoreApplication.instance()
+    if app is not None and QThread.currentThread() is not app.thread():
+        _log.warning("precargar_firebase_en_hilo_principal() llamado fuera del hilo GUI; se omite.")
+        return False
+    ok = True
+    try:
+        from servicios import firestore_rest
+        if not firestore_rest.precargar_dependencias():
+            ok = False
+    except Exception as e:
+        _log.warning("No se pudo precargar la ruta REST: %s", e)
+        ok = False
+    try:
+        import firebase_client  # noqa: F401  (firebase_admin + gRPC, solo importación)
+    except Exception as e:
+        # Sin credenciales o sin firebase_admin: no es fatal, las acciones que lo
+        # necesiten mostrarán su propio error en español.
+        _log.warning("No se pudo precargar firebase_client: %s", e)
+        ok = False
+    _log.info("Precarga de Firebase/gRPC en hilo principal: %s", "completa" if ok else "parcial")
+    return ok
+
+
+def instalar_diagnostico_cierre(app: QCoreApplication) -> None:
+    """
+    Registra en logs/hilos.log POR QUÉ se cierra el programa, para que un cierre
+    inesperado deje rastro aunque la consola no muestre traceback:
+      - lastWindowClosed / aboutToQuit con la pila de llamadas Python del momento.
+      - Excepciones no capturadas en el hilo principal y en hilos de threading.
+    """
+    import sys
+    import threading
+
+    def _pila() -> str:
+        return "".join(traceback.format_stack(limit=12))
+
+    def _al_cerrar_ultima_ventana() -> None:
+        _log.warning("Qt emitió lastWindowClosed. Pila:\n%s", _pila())
+
+    def _al_salir() -> None:
+        activos = QThreadPool.globalInstance().activeThreadCount()
+        _log.warning("Qt emitió aboutToQuit (workers activos: %d). Pila:\n%s", activos, _pila())
+
+    try:
+        app.lastWindowClosed.connect(_al_cerrar_ultima_ventana)
+        app.aboutToQuit.connect(_al_salir)
+    except Exception:
+        pass
+
+    hook_anterior = sys.excepthook
+
+    def _excepthook(tipo, valor, tb):
+        _log.error("Excepción no capturada en el hilo principal:\n%s",
+                   "".join(traceback.format_exception(tipo, valor, tb)))
+        try:
+            hook_anterior(tipo, valor, tb)
+        except Exception:
+            pass
+
+    sys.excepthook = _excepthook
+
+    def _thread_hook(args):
+        _log.error("Excepción no capturada en hilo '%s':\n%s", getattr(args.thread, "name", "?"),
+                   "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)))
+
+    try:
+        threading.excepthook = _thread_hook
+    except Exception:
+        pass
 
 
 def _crear_caja(padre: Optional[QWidget], icono: Any, titulo: str, mensaje: str, ancho_min: int) -> QMessageBox:
