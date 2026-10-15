@@ -6,9 +6,8 @@ import re
 from typing import Any, Dict, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
-    QFormLayout,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -38,19 +37,24 @@ class DialogoLector(QDialog):
 
         titulo = "Editar Lector" if self.es_edicion else "Nuevo Lector Móvil"
         self.setWindowTitle(titulo)
-        self.setMinimumWidth(560)
+        self.resize(540, 570)
         self.setModal(True)
 
         self._construir_ui()
 
     def _construir_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 24, 28, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
 
         # Encabezado
-        lbl_titulo = QLabel("Editar Lector Móvil" if self.es_edicion else "Registrar Nuevo Lector")
-        lbl_titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #0f172a;")
+        texto_titulo = (
+            f"✏️ Editar Lector: {self.lector.get('display_name') or self.lector.get('email', '')}"
+            if self.es_edicion
+            else "➕ Registrar Nuevo Lector"
+        )
+        lbl_titulo = QLabel(texto_titulo)
+        lbl_titulo.setObjectName("dialogo_titulo")
         layout.addWidget(lbl_titulo)
 
         subtexto = (
@@ -59,123 +63,70 @@ class DialogoLector(QDialog):
             else "Cree una cuenta autorizada para que el lector inicie sesión en la app Android."
         )
         lbl_sub = QLabel(subtexto)
+        lbl_sub.setObjectName("dialogo_subtitulo")
         lbl_sub.setWordWrap(True)
-        lbl_sub.setStyleSheet("font-size: 13px; color: #64748b; margin-bottom: 4px;")
         layout.addWidget(lbl_sub)
 
-        # Formulario
-        form_frame = QFrame()
-        form_frame.setProperty("class", "tarjeta")
-        l_form = QVBoxLayout(form_frame)
-        l_form.setContentsMargins(20, 20, 20, 20)
-        l_form.setSpacing(14)
-
-        # Estilo para etiquetas de campos
-        estilo_label = "font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;"
-        estilo_input = """
-            QLineEdit {
-                min-height: 40px;
-                font-size: 13px;
-                color: #0f172a;
-                background-color: #ffffff;
-                border: 1.5px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QLineEdit:focus {
-                border-color: #0284c7;
-            }
-            QLineEdit:disabled {
-                background-color: #f1f5f9;
-                color: #475569;
-                border-color: #e2e8f0;
-            }
-        """
-
         # Campo: Correo Electrónico
-        col_email = QVBoxLayout()
-        col_email.setSpacing(4)
-        lbl_email = QLabel("Correo electrónico *:")
-        lbl_email.setStyleSheet(estilo_label)
-        col_email.addWidget(lbl_email)
-
-        self.txt_email = QLineEdit()
-        self.txt_email.setStyleSheet(estilo_input)
-        self.txt_email.setPlaceholderText("ej. lector1@caapd.org")
+        self.txt_email = self._crear_campo(
+            layout,
+            "Correo electrónico *:",
+            "Ej. lector1@caapd.org",
+        )
         if self.es_edicion:
             self.txt_email.setText(self.lector.get("email", ""))
             self.txt_email.setEnabled(False)
-        col_email.addWidget(self.txt_email)
-        l_form.addLayout(col_email)
 
         # Campo: Nombre completo
-        col_nom = QVBoxLayout()
-        col_nom.setSpacing(4)
-        lbl_nom = QLabel("Nombre completo del lector:")
-        lbl_nom.setStyleSheet(estilo_label)
-        col_nom.addWidget(lbl_nom)
-
-        self.txt_nombre = QLineEdit()
-        self.txt_nombre.setStyleSheet(estilo_input)
-        self.txt_nombre.setPlaceholderText("ej. Carlos Quispe Mamani")
+        self.txt_nombre = self._crear_campo(
+            layout,
+            "Nombre completo del lector:",
+            "Ej. Carlos Quispe Mamani",
+        )
         if self.es_edicion:
             self.txt_nombre.setText(self.lector.get("display_name", ""))
-        col_nom.addWidget(self.txt_nombre)
-        l_form.addLayout(col_nom)
 
         # Campo: Contraseña
-        col_pass = QVBoxLayout()
-        col_pass.setSpacing(4)
-        lbl_pass = QLabel("Contraseña *:" if not self.es_edicion else "Nueva contraseña (opcional):")
-        lbl_pass.setStyleSheet(estilo_label)
-        col_pass.addWidget(lbl_pass)
-
-        fila_pass = QHBoxLayout()
-        fila_pass.setSpacing(6)
-        self.txt_password = QLineEdit()
-        self.txt_password.setStyleSheet(estilo_input)
+        texto_contrasena = (
+            "Nueva contraseña (opcional):"
+            if self.es_edicion
+            else "Contraseña *:"
+        )
+        placeholder_contrasena = (
+            "Dejar en blanco para mantener la contraseña actual"
+            if self.es_edicion
+            else "Mínimo 6 caracteres"
+        )
+        self.txt_password = self._crear_campo(
+            layout, texto_contrasena, placeholder_contrasena
+        )
         self.txt_password.setEchoMode(QLineEdit.EchoMode.Password)
-        if self.es_edicion:
-            self.txt_password.setPlaceholderText("Dejar en blanco para mantener la contraseña actual")
-        else:
-            self.txt_password.setPlaceholderText("Mínimo 6 caracteres")
-        fila_pass.addWidget(self.txt_password, stretch=1)
-
-        self.btn_ver_pass = QPushButton("👁️")
-        self.btn_ver_pass.setFixedSize(44, 40)
-        self.btn_ver_pass.setProperty("class", "boton boton_secundario")
-        self.btn_ver_pass.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_ver_pass.setToolTip("Ver/ocultar contraseña")
-        self.btn_ver_pass.clicked.connect(self._toggle_ver_pass)
-        fila_pass.addWidget(self.btn_ver_pass)
-        col_pass.addLayout(fila_pass)
-
-        if self.es_edicion:
-            lbl_pass_hint = QLabel("Deje este campo vacío si no desea cambiar la contraseña actual.")
-            lbl_pass_hint.setStyleSheet("font-size: 12px; color: #64748b;")
-            col_pass.addWidget(lbl_pass_hint)
-
-        l_form.addLayout(col_pass)
 
         # Campo: Confirmar Contraseña
-        col_conf = QVBoxLayout()
-        col_conf.setSpacing(4)
-        lbl_conf = QLabel("Confirmar contraseña:")
-        lbl_conf.setStyleSheet(estilo_label)
-        col_conf.addWidget(lbl_conf)
-
-        self.txt_confirm_pass = QLineEdit()
-        self.txt_confirm_pass.setStyleSheet(estilo_input)
+        self.txt_confirm_pass = self._crear_campo(
+            layout,
+            "Confirmar contraseña:",
+            "Repita la contraseña para confirmar",
+        )
         self.txt_confirm_pass.setEchoMode(QLineEdit.EchoMode.Password)
-        self.txt_confirm_pass.setPlaceholderText("Repita la contraseña para confirmar")
-        col_conf.addWidget(self.txt_confirm_pass)
-        l_form.addLayout(col_conf)
 
-        layout.addWidget(form_frame)
+        self.chk_mostrar_contrasenas = QCheckBox("Mostrar contraseñas")
+        self.chk_mostrar_contrasenas.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_mostrar_contrasenas.toggled.connect(
+            self._alternar_visibilidad_contrasenas
+        )
+        layout.addWidget(self.chk_mostrar_contrasenas)
+
+        if self.es_edicion:
+            lbl_pass_hint = QLabel(
+                "Deje la contraseña en blanco si no desea cambiarla."
+            )
+            lbl_pass_hint.setObjectName("dialogo_ayuda")
+            layout.addWidget(lbl_pass_hint)
 
         # Mensaje de error inline
         self.lbl_error = QLabel("")
-        self.lbl_error.setStyleSheet("color: #dc2626; font-size: 13px; font-weight: bold; padding: 4px 8px;")
+        self.lbl_error.setObjectName("dialogo_error")
         self.lbl_error.setWordWrap(True)
         self.lbl_error.hide()
         layout.addWidget(self.lbl_error)
@@ -192,23 +143,37 @@ class DialogoLector(QDialog):
         self.btn_cancelar.clicked.connect(self.reject)
         fila_botones.addWidget(self.btn_cancelar)
 
-        self.btn_guardar = QPushButton("Guardar Cambios" if self.es_edicion else "Crear Lector")
+        self.btn_guardar = QPushButton(
+            "Guardar Cambios" if self.es_edicion else "Guardar Lector"
+        )
         self.btn_guardar.setProperty("class", "boton boton_primario")
         self.btn_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_guardar.setMinimumHeight(38)
-        self.btn_guardar.setMinimumWidth(140)
+        self.btn_guardar.setMinimumWidth(160)
         self.btn_guardar.clicked.connect(self._guardar)
         fila_botones.addWidget(self.btn_guardar)
 
         layout.addLayout(fila_botones)
 
-    def _toggle_ver_pass(self) -> None:
-        if self.txt_password.echoMode() == QLineEdit.EchoMode.Password:
-            self.txt_password.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.txt_confirm_pass.setEchoMode(QLineEdit.EchoMode.Normal)
-        else:
-            self.txt_password.setEchoMode(QLineEdit.EchoMode.Password)
-            self.txt_confirm_pass.setEchoMode(QLineEdit.EchoMode.Password)
+    @staticmethod
+    def _crear_campo(
+        layout: QVBoxLayout, etiqueta: str, placeholder: str
+    ) -> QLineEdit:
+        lbl = QLabel(etiqueta)
+        layout.addWidget(lbl)
+        campo = QLineEdit()
+        campo.setPlaceholderText(placeholder)
+        layout.addWidget(campo)
+        return campo
+
+    def _alternar_visibilidad_contrasenas(self, visible: bool) -> None:
+        modo = (
+            QLineEdit.EchoMode.Normal
+            if visible
+            else QLineEdit.EchoMode.Password
+        )
+        self.txt_password.setEchoMode(modo)
+        self.txt_confirm_pass.setEchoMode(modo)
 
     def _mostrar_error(self, mensaje: str) -> None:
         self.lbl_error.setText(f"⚠️ {mensaje}")

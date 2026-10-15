@@ -213,6 +213,7 @@ class PaginaCobros(QWidget):
         self.proxy.setSourceModel(self.modelo)
 
         self.tabla = QTableView()
+        self.tabla.setObjectName("tabla_cobros")
         self.tabla.setModel(self.proxy)
         self.tabla.setItemDelegate(DelegadoFilasCobros(self.tabla))
         self.tabla.setSelectionBehavior(

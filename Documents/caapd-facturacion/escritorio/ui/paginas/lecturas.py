@@ -343,7 +343,9 @@ class PaginaLecturas(QWidget):
             self.lbl_info_mes.setText("⚠️ <b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
             self.lbl_avance_total.setText("")
             self.btn_estado_mes.setEnabled(False)
-            self.btn_abrir_mes.setEnabled(True)
+            puede_abrir, motivo, _ = self.servicio.verificar_puede_abrir_mes()
+            self.btn_abrir_mes.setEnabled(puede_abrir)
+            self.btn_abrir_mes.setToolTip("" if puede_abrir else motivo)
             self.lista_items_completa = []
             self.modelo_base.actualizar_datos([])
             self._construir_pestanas_sectores([])
@@ -358,7 +360,9 @@ class PaginaLecturas(QWidget):
             f"Periodo: <b>{periodo}</b> &nbsp;·&nbsp; Estado: <b>{self.estado_mes}</b> &nbsp;·&nbsp; "
             f"Emisión: {emision} &nbsp;·&nbsp; Vencimiento: {venc}"
         )
-        self.btn_abrir_mes.setEnabled(self.estado_mes == "FACTURADO")
+        puede_abrir, motivo, _ = self.servicio.verificar_puede_abrir_mes()
+        self.btn_abrir_mes.setEnabled(puede_abrir)
+        self.btn_abrir_mes.setToolTip("" if puede_abrir else motivo)
 
         # Botón de estado del mes
         if self.estado_mes == "ABIERTO":

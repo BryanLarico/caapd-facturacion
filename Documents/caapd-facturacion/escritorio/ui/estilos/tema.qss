@@ -400,6 +400,10 @@ QTableView::item:hover {
     background-color: #f0f9ff;
 }
 
+QTableView#tabla_cobros::item:hover {
+    background-color: transparent;
+}
+
 QTableView QLineEdit,
 QTableWidget QLineEdit {
     border: none;
@@ -802,6 +806,24 @@ QDialog QLabel#dialogo_titulo {
     font-size: 18px;
     font-weight: bold;
     color: #0369a1;
+}
+
+QDialog QLabel#dialogo_subtitulo {
+    color: #64748b;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+QDialog QLabel#dialogo_ayuda {
+    color: #64748b;
+    font-size: 12px;
+}
+
+QDialog QLabel#dialogo_error {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 8px;
 }
 
 /* --- Tablas (QTableView) --- */

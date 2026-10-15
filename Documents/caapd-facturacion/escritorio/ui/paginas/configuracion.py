@@ -135,8 +135,8 @@ class PaginaConfiguracion(QWidget):
         self.indicador_carga = IndicadorCarga()
         fila_encabezado.addWidget(self.indicador_carga)
 
-        # Botón Recargar
-        self.btn_recargar = QPushButton("🔄 Recargar")
+        # Botón Reestablecer
+        self.btn_recargar = QPushButton("🔄 Reestablecer")
         self.btn_recargar.setProperty("class", "boton boton_secundario")
         self.btn_recargar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_recargar.clicked.connect(

@@ -66,13 +66,13 @@ class PaginaLectores(QWidget):
         col_titulos.setSpacing(4)
 
         lbl_titulo = QLabel("📱 Lectores Móviles")
-        lbl_titulo.setObjectName("titulo_pantalla")
+        lbl_titulo.setObjectName("encabezado_titulo")
         col_titulos.addWidget(lbl_titulo)
 
         lbl_subtitulo = QLabel(
             "Gestión de accesos y cuentas para la aplicación móvil Android de toma de lecturas"
         )
-        lbl_subtitulo.setObjectName("subtitulo_pantalla")
+        lbl_subtitulo.setObjectName("encabezado_subtitulo")
         col_titulos.addWidget(lbl_subtitulo)
 
         fila_encabezado.addLayout(col_titulos)
@@ -236,11 +236,37 @@ class PaginaLectores(QWidget):
     def _al_recibir_datos(self, resultado: Any) -> None:
         self.indicador_carga.detener()
         self.btn_actualizar.setEnabled(True)
-        self.lista_lectores_completa = list(resultado)
+        lectores = list(resultado or [])
+        self.lista_lectores_completa = [
+            lector for lector in lectores if self._tiene_correo(lector)
+        ]
+        omitidos = len(lectores) - len(self.lista_lectores_completa)
+        if omitidos:
+            self.alerta_flash.set_mensaje(
+                f"Se ocultaron {omitidos} registros sin correo válido. "
+                "No se modificaron ni eliminaron esos datos.",
+                "aviso",
+            )
+        else:
+            self.alerta_flash.hide()
 
         self.modelo_base.actualizar_datos(self.lista_lectores_completa)
         self._actualizar_contadores_y_etiqueta()
         self._al_cambiar_seleccion()
+
+    @staticmethod
+    def _tiene_correo(lector: Any) -> bool:
+        if isinstance(lector, str):
+            correo = lector.strip()
+        elif isinstance(lector, dict):
+            correo = str(lector.get("email") or "").strip()
+        else:
+            return False
+
+        if correo.count("@") != 1 or any(caracter.isspace() for caracter in correo):
+            return False
+        usuario, dominio = correo.split("@")
+        return bool(usuario and dominio)
 
     def _al_fallar_carga(self, err: str) -> None:
         self.indicador_carga.detener()

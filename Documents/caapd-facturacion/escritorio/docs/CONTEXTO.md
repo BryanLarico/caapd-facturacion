@@ -12,7 +12,7 @@
 - Aprox. 800 usuarios. Plan gratuito de Firebase: máx. 50 000 lecturas y 20 000 escrituras por día.
 
 ## 2. Reglas de oro
-1. **Pocas operaciones en Firebase.** Sin listeners en tiempo real. Carga usuarios y el mes actual UNA vez por sesión a memoria; refresca solo con el botón Actualizar. Escrituras en lotes de máximo 500.
+1. **Pocas operaciones en Firebase.** Sin listeners en tiempo real. Carga usuarios y el mes actual UNA vez por sesión a memoria; refresca solo con el botón Actualizar. Escrituras en lotes de máximo 500. La pestaña **Lectores** administra las cuentas de Firebase Authentication también cuando la aplicación de escritorio trabaja en modo local-first con Excel; no toma esas cuentas de la configuración local ni las mezcla con los sectores.
 2. **Una sola capa de datos.** Todo acceso a Firestore pasa por `firebase_client.py`. Ningún otro módulo llama a Firestore directamente (esto permite el modo contingencia de la Fase 6).
 3. **Estilo centralizado.** Ningún color, tamaño ni fuente suelto en el código de las pantallas: el diseño vive en un solo lugar según la interfaz (ver `INTERFAZ_HTML.md` o `INTERFAZ_ESCRITORIO.md`), para poder cambiarlo después.
 4. **Todo en español**: interfaz, mensajes y comentarios.

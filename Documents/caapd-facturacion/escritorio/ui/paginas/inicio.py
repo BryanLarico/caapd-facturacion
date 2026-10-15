@@ -200,11 +200,16 @@ class PaginaInicio(QWidget):
                     if hasattr(ventana, "ocultar_progreso"):
                         ventana.ocultar_progreso("¡Mes enviado a los lectores!")
                     self.cargar_datos_asincrono(limpiar_cache=True)
+                    periodos = res.get("periodos_subidos") or [res.get("periodo", "")]
+                    por_periodo = res.get("subidos_por_periodo") or {}
+                    detalle_meses = "\n".join(
+                        f"    - Mes {per}: {por_periodo.get(per, 0)} usuarios" for per in periodos
+                    )
                     QMessageBox.information(
                         self,
                         "Envío a Lectores Completado",
-                        f"¡Mes {res.get('periodo', '')} enviado exitosamente a Firebase!\n\n"
-                        f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote.\n"
+                        f"¡{len(periodos)} mes(es) enviados exitosamente a Firebase ({', '.join(periodos)})!\n\n"
+                        f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote:\n{detalle_meses}\n"
                         f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
                         f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
                     )
@@ -362,12 +367,6 @@ class PaginaInicio(QWidget):
                 btn2.clicked.connect(self.abrir_dialogo_nuevo_mes)
                 botones_layout.addWidget(btn2)
 
-            btn_respaldo = QPushButton("📥 Respaldo Excel")
-            btn_respaldo.setProperty("class", "boton boton_secundario")
-            btn_respaldo.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_respaldo.clicked.connect(lambda: self.solicitar_navegacion.emit("cobros"))
-            botones_layout.addWidget(btn_respaldo)
-
             banner_layout.addLayout(botones_layout)
             self.layout_mes.addWidget(banner)
 
@@ -503,4 +502,3 @@ class PaginaInicio(QWidget):
         worker.signals.error.connect(lambda err: mostrar_dialogo_error(self, "Error", err))
         worker.signals.finalizado.connect(self._al_finalizar_carga)
         self.thread_pool.start(worker)
-

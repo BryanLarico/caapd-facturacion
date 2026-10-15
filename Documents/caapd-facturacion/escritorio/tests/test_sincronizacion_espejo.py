@@ -156,6 +156,45 @@ def servicio_prueba(tmp_path):
     return s
 
 
+def test_guardar_en_respaldo_local_solo_genera_padron_en_base_de_datos(
+    tmp_path, monkeypatch
+):
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.periodo = "2026-10"
+    servicio.config = {"mes_actual": {"periodo": "2026-10"}}
+    servicio.usuarios = {}
+    servicio.mes = {}
+    servicio._archivos_mtime = {}
+
+    ruta_padron = tmp_path / "Base de datos" / "PADRON_MES_2026-10.xlsx"
+    monkeypatch.setattr(
+        "servicios.datos_padron.rutas.ruta_base_de_datos",
+        lambda nombre: ruta_padron,
+    )
+    monkeypatch.setattr(
+        "servicios.datos_padron.rutas.ruta_respaldos",
+        lambda *args: pytest.fail("No debe generarse un archivo redundante en Respaldos"),
+    )
+
+    def generar_padron(**kwargs):
+        ruta = kwargs["ruta_archivo"]
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_bytes(b"padron")
+        return ruta
+
+    monkeypatch.setattr(
+        "servicios.datos_padron.respaldo_excel.generar_respaldo_excel",
+        generar_padron,
+    )
+
+    resultado = servicio.guardar_en_respaldo_local()
+
+    assert resultado == ruta_padron
+    assert servicio.ruta_excel == ruta_padron
+    assert ruta_padron.exists()
+    assert str(ruta_padron) in servicio._archivos_mtime
+
+
 def test_accion_a_enviar_mes_sin_dinero_y_con_batch(servicio_prueba, tmp_path):
     """Acción A: Verifica que el payload subido no contenga campos monetarios y use WriteBatch."""
     mock_db = MagicMock()
@@ -369,7 +408,7 @@ def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
 
 
 def test_dialogo_confirmacion_requiere_escribir_confirmar(qapp, tmp_path):
-    """Verifica que el diálogo de confirmación aborte si no se escribe CONFIRMAR."""
+    """Verifica que el paso '¿Está seguro?' solo habilite el envío si se escribe CONFIRMAR."""
     dir_bd = tmp_path / "Base de datos"
     dir_bd.mkdir()
     (dir_bd / "PADRON_MES_2026-09.xlsx").write_bytes(b"fake")
@@ -377,17 +416,31 @@ def test_dialogo_confirmacion_requiere_escribir_confirmar(qapp, tmp_path):
     with patch("rutas.ruta_base_de_datos", return_value=dir_bd):
         dlg = DialogoActualizarBaseDatos()
 
-        # Simular que el usuario cancela o escribe otra cosa
-        with patch("PySide6.QtWidgets.QInputDialog.getText", return_value=("SI", True)), \
-             patch("PySide6.QtWidgets.QMessageBox.information") as mock_info:
-            dlg._elegir_subir()
-            assert dlg.resultado_accion != DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE
-            assert mock_info.called
+        # Al elegir "Sobreescribe Nube" se muestra el paso 2 (¿Está seguro?) con el botón deshabilitado
+        dlg._mostrar_confirmacion(DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE)
+        assert dlg.pila.currentIndex() == 1
+        assert not dlg.btn_si.isEnabled()
+
+        # Simular que el usuario escribe otra cosa: no procede y muestra error en línea
+        dlg.txt_confirmar.setText("SI")
+        assert not dlg.btn_si.isEnabled()
+        assert dlg._elegir_subir() is False
+        assert dlg.resultado_accion != DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE
+        assert not dlg.lbl_error_confirmar.isHidden()
 
         # Simular que el usuario escribe exactamente CONFIRMAR
-        with patch("PySide6.QtWidgets.QInputDialog.getText", return_value=("CONFIRMAR", True)):
-            dlg._elegir_subir()
-            assert dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE
+        dlg.txt_confirmar.setText("CONFIRMAR")
+        assert dlg.btn_si.isEnabled()
+        assert dlg._elegir_subir() is True
+        assert dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_SUBIR_FIREBASE
+
+        # "Descarga Espejo" no exige palabra clave, pero sí pasa por ¿Está seguro?
+        dlg2 = DialogoActualizarBaseDatos()
+        dlg2._mostrar_confirmacion(DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE)
+        assert dlg2.pila.currentIndex() == 1
+        assert dlg2.btn_si.isEnabled()
+        dlg2._confirmar_accion()
+        assert dlg2.resultado_accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE
 
 
 def test_verificar_cambios_externos(servicio_prueba):
@@ -425,3 +478,59 @@ def test_cerrar_y_reabrir_lecturas_refleja_en_firebase(servicio_prueba):
         res_reabrir = servicio_prueba.reabrir_lecturas()
         assert res_reabrir["estado"] == "ABIERTO"
         assert servicio_prueba.config["mes_actual"]["estado"] == "ABIERTO"
+
+def test_accion_a_sube_dos_ultimos_meses(servicio_prueba):
+    """Acción A: sube el mes activo y el anterior; conserva ambas colecciones y borra las más antiguas."""
+    doc_prev = {
+        "id_usuario": "30771152", "nro_conexion": "000527", "nombre": "CARLOS", "sector": "AYACUCHO",
+        "direccion": "S/N", "codigo_categoria": "A", "consumo_total_m3": 7, "historial_m3": [5, 6, 7],
+        "medidores": [{"nro_medidor": "2001887", "lectura_anterior": 100, "lectura_actual": 107}],
+        "monto_pagado": 15.0, "total_a_pagar": 15.0,  # dinero: NO debe subir
+    }
+    servicio_prueba.meses_encontrados = {
+        "2026-07": {"30771152": dict(doc_prev)},
+        "2026-08": {"30771152": dict(doc_prev)},
+        "2026-09": servicio_prueba.mes,
+    }
+    assert servicio_prueba._periodos_para_nube() == ["2026-09", "2026-08"]
+
+    mock_db = MagicMock()
+    mock_batch = MagicMock()
+    mock_db.batch.return_value = mock_batch
+
+    colecciones = {}
+    def _collection(nombre):
+        if nombre not in colecciones:
+            c = MagicMock(); c.id = nombre
+            c.list_documents.return_value = []
+            colecciones[nombre] = c
+        return colecciones[nombre]
+    mock_db.collection.side_effect = _collection
+
+    col_vieja = MagicMock(); col_vieja.id = "mes_2026-07"
+    ref_viejo = MagicMock(); ref_viejo.id = "DOC_VIEJO"
+    col_vieja.list_documents.return_value = [ref_viejo]
+    mock_db.collections.return_value = [col_vieja]
+
+    escritos = []
+    mock_batch.set.side_effect = lambda ref, data, **kw: escritos.append((ref, data))
+    borrados = []
+    mock_batch.delete.side_effect = lambda ref: borrados.append(ref.id)
+
+    with patch("firebase_client.db", return_value=mock_db), \
+         patch("rutas.ruta_base_de_datos", return_value=servicio_prueba.base_dir), \
+         patch.object(servicio_prueba, "guardar_config", return_value=None):
+        res = servicio_prueba.enviar_mes_a_lectores()
+
+    assert res["exito"] is True
+    assert res["periodo"] == "2026-09"
+    assert res["periodos_subidos"] == ["2026-09", "2026-08"]
+    assert res["subidos_por_periodo"]["2026-08"] == 1
+    assert res["usuarios_subidos"] == len(servicio_prueba.mes) + 1
+    assert "mes_2026-09" in colecciones and "mes_2026-08" in colecciones
+    assert borrados == ["DOC_VIEJO"]
+    assert res["sobrantes_borrados"] == 1
+    for _ref, data in escritos:
+        assert "monto_pagado" not in data and "total_a_pagar" not in data
+    args, kwargs = colecciones["config"].document.return_value.set.call_args
+    assert args[0]["periodos_disponibles"] == ["2026-09", "2026-08"]

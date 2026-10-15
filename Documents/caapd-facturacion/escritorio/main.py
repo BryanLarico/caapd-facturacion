@@ -4,6 +4,7 @@ main.py — Punto de entrada del programa de escritorio CAAPD Ispacas.
 Inicia la aplicación PySide6, aplica fuentes y tema QSS, y abre la ventana principal.
 """
 from pathlib import Path
+import faulthandler
 import sys
 
 # Configuración inicial de rutas
@@ -42,6 +43,15 @@ def cargar_estilos(app: QApplication) -> None:
 
 
 def main() -> None:
+    # Registro de fallos nativos (cierres sin traceback): escritorio/logs/crash.log
+    try:
+        ruta_crash = rutas.ruta_recurso("logs", "crash.log")
+        ruta_crash.parent.mkdir(parents=True, exist_ok=True)
+        _archivo_crash = open(ruta_crash, "a", encoding="utf-8")
+        faulthandler.enable(file=_archivo_crash, all_threads=True)
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setApplicationName("CAAPD Ispacas Facturación")

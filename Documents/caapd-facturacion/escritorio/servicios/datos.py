@@ -5,8 +5,39 @@ Proporciona una interfaz unificada para acceder a los datos, permitiendo
 usar firebase_client en producción y dobles en memoria en pruebas unitarias.
 Implementa importación perezosa (lazy) para que la ventana se abra al instante (< 1 s).
 """
+import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from servicios.estadisticas import calcular_estadisticas_inicio
+
+
+def obtener_periodo_actual(fecha: Optional[datetime.date] = None) -> str:
+    """Devuelve el periodo calendario actual en formato AAAA-MM."""
+    return (fecha or datetime.date.today()).strftime("%Y-%m")
+
+
+def siguiente_periodo(periodo: str) -> str:
+    """Devuelve el mes siguiente a un periodo AAAA-MM."""
+    fecha = datetime.datetime.strptime(periodo, "%Y-%m")
+    if fecha.strftime("%Y-%m") != periodo:
+        raise ValueError(f"Periodo inválido: {periodo}")
+    anio = fecha.year + (1 if fecha.month == 12 else 0)
+    mes = 1 if fecha.month == 12 else fecha.month + 1
+    return f"{anio:04d}-{mes:02d}"
+
+
+def todas_lecturas_completas(mes: Dict[str, Dict[str, Any]]) -> bool:
+    """Indica si todos los medidores del mes tienen una lectura registrada."""
+    medidores = [
+        medidor
+        for usuario in mes.values()
+        if isinstance(usuario, dict)
+        for medidor in (usuario.get("medidores") or [])
+        if isinstance(medidor, dict)
+    ]
+    return bool(medidores) and all(
+        str(medidor.get("estado_lectura") or "").upper() == "LEIDO"
+        for medidor in medidores
+    )
 
 
 class ServicioDatos:
@@ -581,7 +612,10 @@ class ServicioDatosMemoria(ServicioDatos):
         periodo_actual = mes_act.get("periodo")
         estado_actual = (mes_act.get("estado") or "").upper()
 
-        if periodo_actual and estado_actual in ("ABIERTO", "CERRADO"):
+        periodo_calendario = obtener_periodo_actual()
+        siguiente = siguiente_periodo(periodo_actual) if periodo_actual else periodo_calendario
+
+        if periodo_actual and estado_actual == "ABIERTO":
             return (
                 False,
                 f"Ya existe una base activa para el mes {periodo_actual} (Estado: {estado_actual}). "
@@ -589,14 +623,21 @@ class ServicioDatosMemoria(ServicioDatos):
                 periodo_actual,
             )
 
-        if periodo_actual:
-            partes = periodo_actual.split("-")
-            y, m = int(partes[0]), int(partes[1])
-            siguiente = f"{y + 1:04d}-01" if m == 12 else f"{y:04d}-{m + 1:02d}"
-        else:
-            siguiente = "2026-09"
+        lecturas_completas = todas_lecturas_completas(self.mes)
+        if periodo_actual and estado_actual != "FACTURADO" and not (
+            estado_actual == "CERRADO"
+            and lecturas_completas
+        ):
+            return (
+                False,
+                f"Ya existe una base activa para el mes {periodo_actual} "
+                f"(Estado: {estado_actual or 'SIN ESTADO'}). "
+                "Debe cerrarse y facturarse antes de abrir un nuevo mes.",
+                periodo_actual,
+            )
 
-        return True, "Listo para abrir un nuevo mes.", siguiente
+        periodo_sugerido = max(siguiente, periodo_calendario)
+        return True, "Listo para abrir un nuevo mes.", periodo_sugerido
 
     def verificar_periodo_disponible(self, periodo: str) -> Tuple[bool, str]:
         if hasattr(self, "meses_existentes") and periodo in self.meses_existentes:

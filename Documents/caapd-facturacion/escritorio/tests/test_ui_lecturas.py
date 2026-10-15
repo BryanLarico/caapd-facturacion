@@ -9,11 +9,19 @@ Cubre:
 5. ModeloLecturas, ProxyLecturas, filtrado por sector y filtros rápidos por estado.
 6. Diálogo de registro/corrección de lecturas y validación de alertas.
 """
+import datetime
+
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHeaderView, QMessageBox
 
-from servicios.datos import ServicioDatosMemoria
+from servicios.datos import (
+    ServicioDatosMemoria,
+    obtener_periodo_actual,
+    siguiente_periodo,
+    todas_lecturas_completas,
+)
+from servicios.datos_padron import ServicioDatosPadron
 from ui.paginas.lecturas_dialogo import DialogoLectura
 from ui.paginas.lecturas import PaginaLecturas
 from ui.paginas.lecturas_modelo import ModeloLecturas, ProxyLecturas
@@ -76,11 +84,13 @@ def servicio_mock():
     return ServicioDatosMemoria(config=config, usuarios=usuarios)
 
 
-def test_verificar_puede_abrir_mes_bloquea_si_hay_mes_activo(servicio_mock):
+def test_verificar_puede_abrir_mes_bloquea_si_hay_mes_activo(servicio_mock, monkeypatch):
+    monkeypatch.setattr("servicios.datos.obtener_periodo_actual", lambda: "2026-10")
+
     # Sin mes activo: debe permitir abrir
     puede, motivo, sugerido = servicio_mock.verificar_puede_abrir_mes()
     assert puede is True
-    assert sugerido is not None
+    assert sugerido == "2026-10"
 
     # Con mes ABIERTO en curso: debe bloquear
     servicio_mock.config["mes_actual"] = {"periodo": "2026-09", "estado": "ABIERTO"}
@@ -99,6 +109,96 @@ def test_verificar_puede_abrir_mes_bloquea_si_hay_mes_activo(servicio_mock):
     puede, _, sugerido = servicio_mock.verificar_puede_abrir_mes()
     assert puede is True
     assert sugerido == "2026-10"
+
+
+def test_periodo_actual_se_obtiene_de_la_fecha_del_sistema():
+    assert obtener_periodo_actual(datetime.date(2026, 10, 15)) == "2026-10"
+    assert siguiente_periodo("2026-12") == "2027-01"
+
+
+def test_todas_lecturas_completas_exige_estado_leido():
+    assert todas_lecturas_completas({
+        "usuario": {"medidores": [{"estado_lectura": "LEIDO"}]}
+    })
+    assert not todas_lecturas_completas({
+        "usuario": {"medidores": [{"estado_lectura": "PENDIENTE"}]}
+    })
+    assert not todas_lecturas_completas({
+        "usuario": {"medidores": [{"estado_lectura": "SIN_ACCESO"}]}
+    })
+
+
+def test_mes_cerrado_antiguo_permite_abrir_el_periodo_calendario_actual(
+    servicio_mock, monkeypatch
+):
+    monkeypatch.setattr("servicios.datos.obtener_periodo_actual", lambda: "2026-10")
+    servicio_mock.config["mes_actual"] = {
+        "periodo": "2026-08",
+        "estado": "CERRADO",
+    }
+    servicio_mock.mes = {
+        "usuario": {"medidores": [{"estado_lectura": "LEIDO"}]}
+    }
+
+    puede, motivo, sugerido = servicio_mock.verificar_puede_abrir_mes()
+
+    assert puede is True
+    assert sugerido == "2026-10"
+
+    # Aunque el periodo sea el mes anterior, no se puede avanzar con lecturas pendientes.
+    servicio_mock.config["mes_actual"]["periodo"] = "2026-09"
+    servicio_mock.mes["usuario"]["medidores"][0]["estado_lectura"] = "PENDIENTE"
+    puede, _, _ = servicio_mock.verificar_puede_abrir_mes()
+    assert puede is False
+
+    # Nunca se permite saltar una base que continúa abierta.
+    servicio_mock.config["mes_actual"] = {
+        "periodo": "2026-06",
+        "estado": "ABIERTO",
+    }
+    puede, _, _ = servicio_mock.verificar_puede_abrir_mes()
+    assert puede is False
+
+
+def test_mes_cerrado_con_lecturas_completas_permite_abrir_el_siguiente(
+    servicio_mock, monkeypatch
+):
+    monkeypatch.setattr("servicios.datos.obtener_periodo_actual", lambda: "2026-09")
+    servicio_mock.config["mes_actual"] = {
+        "periodo": "2026-08",
+        "estado": "CERRADO",
+    }
+    servicio_mock.mes = {
+        "usuario": {"medidores": [{"estado_lectura": "LEIDO"}]}
+    }
+
+    puede, _, sugerido = servicio_mock.verificar_puede_abrir_mes()
+
+    assert puede is True
+    assert sugerido == "2026-09"
+
+
+def test_servicio_padron_permite_mes_actual_si_la_ultima_base_es_antigua(monkeypatch):
+    monkeypatch.setattr(
+        "servicios.datos_padron.obtener_periodo_actual", lambda: "2026-10"
+    )
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.config = {
+        "mes_actual": {"periodo": "2026-08", "estado": "CERRADO"}
+    }
+    servicio.periodo = "2026-08"
+    servicio.mes = {
+        "usuario": {"medidores": [{"estado_lectura": "LEIDO"}]}
+    }
+
+    puede, motivo, sugerido = servicio.verificar_puede_abrir_mes()
+
+    assert puede is True
+    assert sugerido == "2026-10"
+
+    servicio.mes["usuario"]["medidores"][0]["estado_lectura"] = "PENDIENTE"
+    puede, _, _ = servicio.verificar_puede_abrir_mes()
+    assert puede is False
 
 
 def test_verificar_periodo_disponible_bloquea_si_base_existe(servicio_mock):
@@ -374,3 +474,54 @@ def test_dialogo_abrir_mes_ui(qtbot, servicio_mock):
     diag.input_periodo.setText("2026-08")
     assert diag.btn_abrir.isEnabled() is False
     assert not diag.lbl_alerta_periodo.isHidden()
+
+
+def test_dialogo_sugiere_mes_actual_si_la_ultima_base_es_antigua(
+    qtbot, servicio_mock, monkeypatch
+):
+    monkeypatch.setattr("servicios.datos.obtener_periodo_actual", lambda: "2026-10")
+    servicio_mock.config["mes_actual"] = {
+        "periodo": "2026-08",
+        "estado": "CERRADO",
+    }
+    servicio_mock.mes = {
+        "usuario": {"medidores": [{"estado_lectura": "LEIDO"}]}
+    }
+    diag = DialogoAbrirMes(servicio_mock)
+    qtbot.addWidget(diag)
+
+    assert diag.input_periodo.text() == "2026-10"
+    assert diag.btn_abrir.isEnabled() is True
+
+
+def test_pagina_lecturas_habilita_abrir_mes_si_cerrado_y_todo_leido(
+    qtbot, servicio_mock, monkeypatch
+):
+    monkeypatch.setattr("servicios.datos.obtener_periodo_actual", lambda: "2026-09")
+    servicio_mock.config["mes_actual"] = {
+        "periodo": "2026-08",
+        "estado": "CERRADO",
+    }
+    servicio_mock.mes = {
+        "70112233": {
+            "medidores": [{"estado_lectura": "LEIDO"}],
+        },
+    }
+    pagina = PaginaLecturas(servicio_mock)
+    qtbot.addWidget(pagina)
+
+    pagina._al_recibir_datos((
+        servicio_mock.config,
+        "2026-08",
+        servicio_mock.mes,
+    ))
+
+    assert pagina.btn_abrir_mes.isEnabled() is True
+
+    servicio_mock.mes["70112233"]["medidores"][0]["estado_lectura"] = "PENDIENTE"
+    pagina._al_recibir_datos((
+        servicio_mock.config,
+        "2026-08",
+        servicio_mock.mes,
+    ))
+    assert pagina.btn_abrir_mes.isEnabled() is False

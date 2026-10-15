@@ -17,7 +17,12 @@ import calculos
 import codigos
 import respaldo_excel
 import rutas
-from servicios.datos import ServicioDatos
+from servicios.datos import (
+    ServicioDatos,
+    obtener_periodo_actual,
+    siguiente_periodo,
+    todas_lecturas_completas,
+)
 from servicios.metricas_monitoring import consultar_metricas_hoy
 
 
@@ -437,34 +442,22 @@ class ServicioDatosPadron(ServicioDatos):
                 self.mes) > 0 else "ABIERTO"
 
     def guardar_en_respaldo_local(self, periodo: Optional[str] = None) -> Path:
-        """Guarda el estado actual en el archivo de respaldo Excel local y en Base de datos/."""
+        """Guarda el padrón del mes en Base de datos/ para conservarlo y sincronizarlo."""
         p_obj = periodo or self.periodo or self.config.get(
             "mes_actual", {}).get("periodo") or "2026-10"
 
-        destino = rutas.ruta_respaldos(f"RESPALDO_{p_obj}.xlsx")
-        self.ruta_excel = destino
-        resp = respaldo_excel.generar_respaldo_excel(
+        destino = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
+        respaldo_excel.generar_respaldo_excel(
             config=self.config,
             usuarios=self.usuarios,
             mes_docs=self.mes,
             periodo=p_obj,
             ruta_archivo=destino,
         )
-        # Solo monitorear archivos en Base de datos/ (no respaldos/)
-        try:
-            destino_bd = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
-            respaldo_excel.generar_respaldo_excel(
-                config=self.config,
-                usuarios=self.usuarios,
-                mes_docs=self.mes,
-                periodo=p_obj,
-                ruta_archivo=destino_bd,
-            )
-            if destino_bd.exists():
-                self._archivos_mtime[str(destino_bd)] = destino_bd.stat().st_mtime
-        except Exception:
-            pass
-        return resp
+        self.ruta_excel = destino
+        if destino.exists():
+            self._archivos_mtime[str(destino)] = destino.stat().st_mtime
+        return destino
 
     def _extraer_datos_archivo_excel(self, ruta: Path) -> Dict[str, Any]:
         """Extrae usuarios y documentos del mes desde cualquier archivo de respaldo o padrón Excel."""
@@ -843,12 +836,55 @@ class ServicioDatosPadron(ServicioDatos):
     # -----------------------------------------------------------------------
     # Sincronización Espejo con Firebase (Acción A y Acción B)
     # -----------------------------------------------------------------------
+   # Cuántos meses (el activo + anteriores) se mantienen como espejo en Firebase.
+    MESES_EN_NUBE = 2
+
+    def _periodos_para_nube(self) -> List[str]:
+        """Devuelve los periodos a subir: el mes activo + los (MESES_EN_NUBE - 1) anteriores
+        que existan localmente, ordenados del más reciente al más antiguo."""
+        activo = self.periodo
+        meses_locales = dict(getattr(self, "meses_encontrados", {}) or {})
+        anteriores = sorted((per for per in meses_locales if per < activo), reverse=True)
+        return [activo] + anteriores[: max(0, self.MESES_EN_NUBE - 1)]
+
+    @staticmethod
+    def _preparar_docs_para_nube(docs_mes: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """Filtra un mes para la nube: SOLO datos de lectura y medidores, CERO dinero."""
+        docs_a_subir: Dict[str, Dict[str, Any]] = {}
+        for uid, doc in (docs_mes or {}).items():
+            meds_limpios = []
+            for m in (doc.get("medidores") or []):
+                meds_limpios.append({
+                    "nro_medidor": str(m.get("nro_medidor") or ""),
+                    "lectura_anterior": m.get("lectura_anterior"),
+                    "lectura_actual": m.get("lectura_actual"),
+                    "fecha_anterior": m.get("fecha_anterior"),
+                    "fecha_lectura": m.get("fecha_lectura"),
+                    "estado_lectura": m.get("estado_lectura", "PENDIENTE"),
+                    "novedad": m.get("novedad", "NORMAL"),
+                    "nota": m.get("nota", ""),
+                    "registrado_por": m.get("registrado_por"),
+                })
+            docs_a_subir[uid] = {
+                "id_usuario": uid,
+                "nro_conexion": str(doc.get("nro_conexion") or ""),
+                "nombre": str(doc.get("nombre") or ""),
+                "sector": str(doc.get("sector") or ""),
+                "direccion": str(doc.get("direccion") or ""),
+                "codigo_categoria": str(doc.get("codigo_categoria") or "A"),
+                "consumo_total_m3": doc.get("consumo_total_m3") or 0,
+                "historial_m3": doc.get("historial_m3") or [],
+                "medidores": meds_limpios,
+            }
+        return docs_a_subir
+
     def enviar_mes_a_lectores(
         self, callback_progreso: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
-        Acción A: Enviar mes a los lectores (Excel -> Nube).
-        REEMPLAZA todo lo que haya en Firebase con el mes actual de los Excel locales.
+        Acción A: Enviar meses a los lectores (Excel -> Nube).
+        REEMPLAZA lo que haya en Firebase con los últimos MESES_EN_NUBE meses (activo + anterior)
+        de los Excel locales. Cada mes va a su colección mes_{periodo}.
         OPTIMIZACIÓN OBLIGATORIA:
         - Escribe con WriteBatch de 500 documentos, sin .get() previo por documento.
         - Para detectar sobrantes usa list_documents() (solo IDs), nunca stream().
@@ -882,57 +918,41 @@ class ServicioDatosPadron(ServicioDatos):
                     pass
 
         periodo_activo = self.periodo
-        col_nombre = f"mes_{periodo_activo}"
+        periodos = self._periodos_para_nube()
+        colecciones_vigentes = {f"mes_{per}" for per in periodos}
 
-        # 2. Filtrar y preparar documentos para la nube (SOLO datos de lectura y medidores, CERO dinero)
+        # 2. Preparar documentos de cada periodo (el activo siempre desde self.mes, que tiene los cambios en memoria)
         if callback_progreso:
-            callback_progreso(15, f"Preparando {len(self.mes)} usuarios para envío a lectores...")
+            callback_progreso(15, f"Preparando {len(periodos)} mes(es) para envío a lectores ({', '.join(periodos)})...")
 
-        docs_a_subir: Dict[str, Dict[str, Any]] = {}
-        for uid, doc in self.mes.items():
-            meds_limpios = []
-            for m in (doc.get("medidores") or []):
-                meds_limpios.append({
-                    "nro_medidor": str(m.get("nro_medidor") or ""),
-                    "lectura_anterior": m.get("lectura_anterior"),
-                    "lectura_actual": m.get("lectura_actual"),
-                    "fecha_anterior": m.get("fecha_anterior"),
-                    "fecha_lectura": m.get("fecha_lectura"),
-                    "estado_lectura": m.get("estado_lectura", "PENDIENTE"),
-                    "novedad": m.get("novedad", "NORMAL"),
-                    "nota": m.get("nota", ""),
-                    "registrado_por": m.get("registrado_por"),
-                })
-
-            docs_a_subir[uid] = {
-                "id_usuario": uid,
-                "nro_conexion": str(doc.get("nro_conexion") or ""),
-                "nombre": str(doc.get("nombre") or ""),
-                "sector": str(doc.get("sector") or ""),
-                "direccion": str(doc.get("direccion") or ""),
-                "codigo_categoria": str(doc.get("codigo_categoria") or "A"),
-                "consumo_total_m3": doc.get("consumo_total_m3") or 0,
-                "historial_m3": doc.get("historial_m3") or [],
-                "medidores": meds_limpios,
-            }
+        meses_locales = dict(getattr(self, "meses_encontrados", {}) or {})
+        docs_por_periodo: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        for per in periodos:
+            fuente = self.mes if per == periodo_activo else meses_locales.get(per, {})
+            docs_por_periodo[per] = self._preparar_docs_para_nube(fuente)
 
         # 3. Subir documentos a Firestore con WriteBatch de 500 (sin .get() previo)
         db = fb.db()
-        col_ref = db.collection(col_nombre)
-        items_subir = list(docs_a_subir.items())
-        total_items = len(items_subir)
         batch_size = 500
-        chunks_subir = [items_subir[i:i + batch_size] for i in range(0, total_items, batch_size)]
+        total_items = sum(len(d) for d in docs_por_periodo.values())
+        subidos_acum = 0
+        subidos_por_periodo: Dict[str, int] = {}
 
-        for idx, chunk in enumerate(chunks_subir, 1):
-            batch = db.batch()
-            for uid, data in chunk:
-                batch.set(col_ref.document(uid), data)
-            batch.commit()
-            self.ops["escrituras"] += len(chunk)
-            if callback_progreso:
-                pct = 20 + int((idx / max(1, len(chunks_subir))) * 40)
-                callback_progreso(pct, f"Subiendo usuarios del mes ({min(idx * batch_size, total_items)}/{total_items})...")
+        for per in periodos:
+            col_ref = db.collection(f"mes_{per}")
+            items_subir = list(docs_por_periodo[per].items())
+            chunks_subir = [items_subir[i:i + batch_size] for i in range(0, len(items_subir), batch_size)]
+            for chunk in chunks_subir:
+                batch = db.batch()
+                for uid, data in chunk:
+                    batch.set(col_ref.document(uid), data)
+                batch.commit()
+                self.ops["escrituras"] += len(chunk)
+                subidos_acum += len(chunk)
+                if callback_progreso:
+                    pct = 20 + int((subidos_acum / max(1, total_items)) * 40)
+                    callback_progreso(pct, f"Subiendo mes {per} ({subidos_acum}/{total_items} documentos)...")
+            subidos_por_periodo[per] = len(items_subir)
 
         # 4. Actualizar config/general
         if callback_progreso:
@@ -945,6 +965,7 @@ class ServicioDatosPadron(ServicioDatos):
                 "fecha_emision": mes_actual_cfg.get("fecha_emision"),
                 "fecha_vencimiento": mes_actual_cfg.get("fecha_vencimiento"),
             },
+            "periodos_disponibles": periodos,
             "sectores": self.config.get("sectores") or [],
             "observaciones": self.config.get("observaciones") or [],
         }
@@ -956,20 +977,21 @@ class ServicioDatosPadron(ServicioDatos):
             callback_progreso(70, "Buscando documentos obsoletos en Firebase (list_documents)...")
 
         refs_sobrantes = []
-        uids_locales = set(docs_a_subir.keys())
 
-        # a) Sobrantes en la colección activa
-        try:
-            for doc_ref in col_ref.list_documents():
-                if doc_ref.id not in uids_locales:
-                    refs_sobrantes.append(doc_ref)
-        except Exception:
-            pass
+        # a) Sobrantes dentro de cada colección vigente (usuarios que ya no están en el Excel de ese mes)
+        for per in periodos:
+            uids_locales = set(docs_por_periodo[per].keys())
+            try:
+                for doc_ref in db.collection(f"mes_{per}").list_documents():
+                    if doc_ref.id not in uids_locales:
+                        refs_sobrantes.append(doc_ref)
+            except Exception:
+                pass
 
-        # b) Colecciones de meses antiguos y colección obsoleta 'usuarios'
+        # b) Colecciones de meses fuera de la ventana vigente y colección obsoleta 'usuarios'
         try:
             for c in db.collections():
-                if (c.id.startswith("mes_") and c.id != col_nombre) or c.id == "usuarios":
+                if (c.id.startswith("mes_") and c.id not in colecciones_vigentes) or c.id == "usuarios":
                     for doc_ref in c.list_documents():
                         refs_sobrantes.append(doc_ref)
         except Exception:
@@ -1015,6 +1037,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         return {
             "usuarios_subidos": total_items,
+            "periodos_subidos": periodos,
+            "subidos_por_periodo": subidos_por_periodo,
             "sobrantes_borrados": total_sobrantes,
             "tiempo_segundos": round(duracion, 2),
             "periodo": periodo_activo,
@@ -1388,20 +1412,23 @@ class ServicioDatosPadron(ServicioDatos):
         periodo_actual = mes_act.get("periodo") or self.periodo
         estado_actual = mes_act.get("estado") or "FACTURADO"
 
-        if estado_actual != "FACTURADO":
+        periodo_calendario = obtener_periodo_actual()
+        siguiente = siguiente_periodo(periodo_actual) if periodo_actual else periodo_calendario
+
+        if estado_actual == "ABIERTO":
+            return (
+                False,
+                f"El mes actual ({periodo_actual}) está ABIERTO. "
+                "Debe cerrarse y facturarse antes de abrir otro.",
+                "",
+            )
+
+        if estado_actual != "FACTURADO" and not (
+            estado_actual == "CERRADO" and todas_lecturas_completas(self.mes)
+        ):
             return False, f"El mes actual ({periodo_actual}) está {estado_actual}. Debe estar FACTURADO para abrir uno nuevo.", ""
 
-        try:
-            a, m = map(int, periodo_actual.split("-"))
-            m += 1
-            if m > 12:
-                m = 1
-                a += 1
-            siguiente = f"{a:04d}-{m:02d}"
-        except Exception:
-            siguiente = ""
-
-        return True, "", siguiente
+        return True, "", max(siguiente, periodo_calendario)
 
     def verificar_periodo_disponible(self, periodo: str) -> Tuple[bool, str]:
         return True, ""
@@ -1797,47 +1824,39 @@ class ServicioDatosPadron(ServicioDatos):
         wb.save(str(p))
         return str(p)
 
+    def _servicio_autenticacion_lectores(self) -> ServicioDatos:
+        servicio = getattr(self, "_servicio_auth_lectores", None)
+        if servicio is None:
+            from servicios.datos import ServicioDatosFirebase
+
+            servicio = ServicioDatosFirebase()
+            self._servicio_auth_lectores = servicio
+        return servicio
+
     def listar_lectores(self) -> List[Dict[str, Any]]:
-        raw = self.config.get("lectores") or []
-        res = []
-        for item in raw:
-            if isinstance(item, dict):
-                res.append(item)
-            elif isinstance(item, str):
-                res.append({
-                    "uid": item,
-                    "email": item,
-                    "display_name": item.split("@")[0] if "@" in item else item,
-                    "disabled": False,
-                    "activo": True,
-                })
-        return res
+        return self._servicio_autenticacion_lectores().listar_lectores()
 
     def crear_lector(self, email: str, password: str, display_name: Optional[str] = None) -> Dict[str, Any]:
-        lectores = self.config.setdefault("lectores", [])
-        nuevo = {
-            "uid": f"lector_{len(lectores) + 1}",
-            "email": email,
-            "display_name": display_name or email.split("@")[0],
-            "activo": True,
-        }
-        lectores.append(nuevo)
-        self.guardar_en_respaldo_local()
-        return nuevo
+        return self._servicio_autenticacion_lectores().crear_lector(
+            email, password, display_name
+        )
 
-    def actualizar_lector(self, uid: str, cambios: Dict[str, Any]) -> Dict[str, Any]:
-        lectores = self.config.get("lectores") or []
-        for l in lectores:
-            if l.get("uid") == uid:
-                l.update(cambios)
-                self.guardar_en_respaldo_local()
-                return l
-        raise ValueError(f"Lector {uid} no encontrado.")
+    def actualizar_lector(
+        self,
+        uid: str,
+        display_name: Optional[str] = None,
+        password: Optional[str] = None,
+        disabled: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        return self._servicio_autenticacion_lectores().actualizar_lector(
+            uid=uid,
+            display_name=display_name,
+            password=password,
+            disabled=disabled,
+        )
 
     def eliminar_lector(self, uid: str) -> None:
-        lectores = self.config.get("lectores") or []
-        self.config["lectores"] = [l for l in lectores if l.get("uid") != uid]
-        self.guardar_en_respaldo_local()
+        self._servicio_autenticacion_lectores().eliminar_lector(uid)
 
     def get_ops(self) -> Dict[str, int]:
         return self.ops

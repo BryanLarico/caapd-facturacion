@@ -16,11 +16,12 @@ Color de fila según morosidad:
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
+from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QSortFilterProxyModel, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 import codigos
+from ui.estilos.paleta import PALETA
 
 COLUMNAS_COBROS = [
     "CONEXIÓN",
@@ -75,19 +76,61 @@ class DelegadoFilasCobros(QStyledItemDelegate):
     """
     Pinta el fondo de la fila completa con el color de morosidad.
 
-    Necesario porque la hoja de estilos (tema.qss) define `QTableView::item { padding; border }`
-    y, cuando eso ocurre, Qt ignora el Qt.BackgroundRole del modelo. Este delegado pinta
-    el color directamente antes de dibujar el contenido de la celda.
+    Mantiene también el resaltado del hover en toda la fila para que una celda
+    individual no tape los colores de morosidad.
     """
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._fila_sobrevolada = -1
+        self._vista = parent
+        if self._vista is not None:
+            self._vista.setMouseTracking(True)
+            self._vista.viewport().setMouseTracking(True)
+            self._vista.entered.connect(self._al_ingresar_indice)
+            self._vista.destroyed.connect(self._al_destruir_vista)
+            self._vista.viewport().installEventFilter(self)
+
+    def _al_destruir_vista(self, *_args) -> None:
+        self._vista = None
+
+    def _al_ingresar_indice(self, index: QModelIndex) -> None:
+        self._actualizar_fila_sobrevolada(index.row() if index.isValid() else -1)
+
+    def eventFilter(self, watched, event) -> bool:
+        if self._vista is not None and watched == self._vista.viewport():
+            if event.type() == QEvent.Type.MouseMove:
+                indice = self._vista.indexAt(event.position().toPoint())
+                fila = indice.row() if indice.isValid() else -1
+                self._actualizar_fila_sobrevolada(fila)
+            elif event.type() == QEvent.Type.Leave:
+                self._actualizar_fila_sobrevolada(-1)
+        return super().eventFilter(watched, event)
+
+    def _actualizar_fila_sobrevolada(self, fila: int) -> None:
+        if fila != self._fila_sobrevolada:
+            self._fila_sobrevolada = fila
+            if self._vista is not None:
+                self._vista.viewport().update()
+
+    def color_fondo_fila(self, index: QModelIndex) -> QColor:
         brush = index.data(Qt.ItemDataRole.BackgroundRole)
+        if self._fila_sobrevolada != index.row():
+            return brush.color() if brush is not None else QColor()
+        if brush is not None:
+            return brush.color().lighter(108)
+        return QColor(PALETA.PRIMARIO_CLARO)
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        color_fondo = self.color_fondo_fila(index)
+        brush = QBrush(color_fondo) if color_fondo.isValid() else None
         if brush is not None and not (option.state & QStyle.StateFlag.State_Selected):
             painter.save()
             painter.fillRect(option.rect, brush)
             painter.restore()
-            # Evitar que el estilo repinte el fondo alterno encima del color de morosidad
-            option = QStyleOptionViewItem(option)
+        option = QStyleOptionViewItem(option)
+        option.state &= ~QStyle.StateFlag.State_MouseOver
+        if brush is not None:
             option.features &= ~QStyleOptionViewItem.ViewItemFeature.Alternate
             option.backgroundBrush = brush
         super().paint(painter, option, index)

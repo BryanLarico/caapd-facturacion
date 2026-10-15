@@ -43,7 +43,7 @@ escritorio/
 | Tarjetas y barras de progreso | `QFrame` con propiedades y `QProgressBar` |
 | Paginación de 40 en 40 | No hace falta (vista virtual) |
 | `/api/actualizar` | Botón "Actualizar" (`limpiar_cache(limpiar_config=True)` y recarga) |
-| Pie con contadores | Barra de estado con Lecturas, Escrituras, límite diario y avisos |
+| Pie con contadores | Barra de estado con Lecturas, Escrituras, límite diario y acceso a `Base de datos/` |
 
 ## Pruebas
 `pytest` más `pytest-qt` con `QT_QPA_PLATFORM=offscreen`. Las pantallas reciben su "servicio de datos" por parámetro, así que las pruebas usan un doble en memoria (sin Firebase real).

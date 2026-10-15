@@ -3,7 +3,7 @@ tests/test_ui_lectores.py — Pruebas unitarias de la pantalla y modelos de lect
 """
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog, QLineEdit
 
 from servicios.datos import ServicioDatosMemoria
 from ui.paginas.lectores import PaginaLectores
@@ -74,9 +74,48 @@ def test_pagina_lectores_creacion_y_carga(qtbot, servicio_memoria):
     assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
 
 
+def test_pagina_lectores_oculta_registros_sin_correo_sin_borrarlos(qtbot, servicio_memoria):
+    servicio_memoria.crear_lector(
+        "bryanlaricoro28@gmail.com", "123456", "Bryan Larico"
+    )
+    servicio_memoria.lectores.update({
+        sector: {
+            "uid": sector,
+            "email": sector,
+            "display_name": sector,
+            "disabled": False,
+        }
+        for sector in ("AYACUCHO", "CHAUPICERCA", "BARRIO DE CHAUPI")
+    })
+
+    pagina = PaginaLectores(servicio_memoria)
+    qtbot.addWidget(pagina)
+    qtbot.waitUntil(
+        lambda: pagina.modelo_base.rowCount() == 1
+        and not pagina.alerta_flash.isHidden(),
+        timeout=2000,
+    )
+
+    assert pagina.lista_lectores_completa[0]["email"] == "bryanlaricoro28@gmail.com"
+    assert pagina.modelo_base.rowCount() == 1
+    assert "Se ocultaron 3 registros" in pagina.alerta_flash.lbl_mensaje.text()
+    assert len(servicio_memoria.lectores) == 4
+
+
 def test_dialogo_lector_validacion(qtbot, servicio_memoria):
     diag = DialogoLector(servicio_memoria, lector=None)
     qtbot.addWidget(diag)
+
+    assert diag.lbl_error.objectName() == "dialogo_error"
+    assert diag.btn_guardar.text() == "Guardar Lector"
+    assert not hasattr(diag, "btn_ver_pass")
+    assert diag.txt_password.echoMode() == QLineEdit.EchoMode.Password
+    diag.chk_mostrar_contrasenas.setChecked(True)
+    assert diag.txt_password.echoMode() == QLineEdit.EchoMode.Normal
+    assert diag.txt_confirm_pass.echoMode() == QLineEdit.EchoMode.Normal
+    diag.chk_mostrar_contrasenas.setChecked(False)
+    assert diag.txt_password.echoMode() == QLineEdit.EchoMode.Password
+    assert diag.txt_confirm_pass.echoMode() == QLineEdit.EchoMode.Password
 
     # Intentar guardar sin correo
     diag._guardar()
@@ -160,4 +199,3 @@ def test_modelo_actualizacion_y_eliminacion_fila_unica():
     assert ok is True
     assert modelo.rowCount() == 1
     assert modelo.data(modelo.index(0, 0)) == "a@caapd.org"
-

@@ -85,6 +85,14 @@ def test_barra_estado_muestra_contadores(qtbot, servicio_memoria):
 
     assert "12" in ventana.lbl_lecturas.text()
     assert "4" in ventana.lbl_escrituras.text()
+    assert not hasattr(ventana, "lbl_ultimo_respaldo")
+    textos = [boton.text() for boton in ventana.findChildren(QPushButton)]
+    assert any("Base de datos" in texto for texto in textos)
+    assert not any(
+        etiqueta in texto
+        for texto in textos
+        for etiqueta in ("Respaldo Excel", "Respaldar ahora", "Respaldos")
+    )
 
 
 def test_inicio_sin_mes_muestra_alerta_y_boton(qtbot, monkeypatch):

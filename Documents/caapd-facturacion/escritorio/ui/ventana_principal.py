@@ -2,12 +2,12 @@
 ui/ventana_principal.py — Ventana principal de la aplicación de escritorio CAAPD Ispacas.
 
 Integra la barra superior de navegación, el QStackedWidget con las 7 pantallas,
-banners de modo contingencia y cola offline, botones de respaldo y control de cierre seguro.
+banners de modo contingencia y cola offline, y control de cierre seguro.
 """
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt
+from PySide6.QtCore import QEvent, QThread, QThreadPool, QTimer, Qt, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import respaldo
 import rutas
 from servicios.datos import ServicioDatos
 from servicios.metricas_monitoring import consultar_metricas_hoy
@@ -40,6 +39,11 @@ class VentanaPrincipal(QMainWindow):
 
     PAGINAS = ["inicio", "usuarios", "lecturas", "lectores", "cobros", "configuracion"]
 
+    # Señales internas para actualizar la barra de progreso de forma segura
+    # cuando mostrar_progreso()/ocultar_progreso() se invocan desde un hilo Worker.
+    _senal_progreso = Signal(int, str)
+    _senal_ocultar_progreso = Signal(str)
+
     def __init__(
         self,
         servicio_datos: ServicioDatos,
@@ -54,8 +58,14 @@ class VentanaPrincipal(QMainWindow):
 
         self.botones_nav: Dict[str, QPushButton] = {}
         self._verificando_archivos: bool = False
+        self._consultando_metricas: bool = False
 
         self._construir_ui()
+
+        # Las señales se procesan en el hilo de la interfaz (conexión en cola).
+        self._senal_progreso.connect(self._mostrar_progreso_ui, Qt.ConnectionType.QueuedConnection)
+        self._senal_ocultar_progreso.connect(self._ocultar_progreso_ui, Qt.ConnectionType.QueuedConnection)
+
         self.actualizar_barra_estado()
 
         # Temporizador para verificar cambios externos en los archivos Excel cada 15s
@@ -183,37 +193,6 @@ class VentanaPrincipal(QMainWindow):
         lbl_copy.setObjectName("pie_texto")
         layout.addWidget(lbl_copy)
 
-        # Info de Respaldo
-        self.lbl_ultimo_respaldo = QLabel("Último respaldo: —")
-        self.lbl_ultimo_respaldo.setStyleSheet("color: #64748b; font-size: 11px;")
-        layout.addWidget(self.lbl_ultimo_respaldo)
-
-        btn_resp_ahora = QPushButton("💾 Respaldar ahora")
-        btn_resp_ahora.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_resp_ahora.setStyleSheet("""
-            QPushButton {
-                background-color: #f1f5f9; color: #334155;
-                font-size: 11px; font-weight: 500;
-                padding: 3px 8px; border: 1px solid #cbd5e1; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #e2e8f0; }
-        """)
-        btn_resp_ahora.clicked.connect(self._accion_respaldar_ahora)
-        layout.addWidget(btn_resp_ahora)
-
-        btn_abrir_resp = QPushButton("📂 Respaldos")
-        btn_abrir_resp.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_abrir_resp.setStyleSheet("""
-            QPushButton {
-                background-color: #f1f5f9; color: #334155;
-                font-size: 11px; font-weight: 500;
-                padding: 3px 8px; border: 1px solid #cbd5e1; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #e2e8f0; }
-        """)
-        btn_abrir_resp.clicked.connect(self._accion_abrir_carpeta_respaldos)
-        layout.addWidget(btn_abrir_resp)
-
         btn_abrir_bd = QPushButton("📁 Base de datos")
         btn_abrir_bd.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_abrir_bd.setStyleSheet("""
@@ -307,35 +286,65 @@ class VentanaPrincipal(QMainWindow):
             btn.style().polish(btn)
 
     def actualizar_barra_estado(self) -> None:
-        """Actualiza los contadores de operaciones y fecha de respaldo en la barra inferior."""
-        met_cloud = consultar_metricas_hoy()
+        """Actualiza la barra inferior SIN congelar la interfaz.
 
-        if met_cloud.get("disponible"):
-            n_lect = met_cloud.get("lecturas", 0)
-            n_escr = met_cloud.get("escrituras", 0)
-            desde = met_cloud.get("desde_pacifico", "hoy")
-            self.lbl_lecturas.setText(f"🔥 Hoy: {n_lect:,} lecturas".replace(",", " "))
-            self.lbl_escrituras.setText(f"🔥 Hoy: {n_escr:,} escrituras".replace(",", " "))
-            tooltip = f"Métricas reales de Google Cloud Monitoring (desde 00:00 Pacífico: {desde}). No consume cuota de Firestore."
+        Los datos locales (contadores de sesión) se pintan al instante.
+        La consulta a Google Cloud Monitoring (red, hasta ~20 s) se ejecuta en un Worker y,
+        cuando responde, actualiza las etiquetas en el hilo GUI.
+        """
+        # 1. Datos locales inmediatos (sin red)
+        self._pintar_contadores_locales()
+
+        # 2. Métricas reales de la nube en segundo plano (una consulta a la vez)
+        if self._consultando_metricas:
+            return
+        self._consultando_metricas = True
+        worker = Worker(consultar_metricas_hoy)
+        worker.signals.resultado.connect(self._al_recibir_metricas)
+        worker.signals.finalizado.connect(self._al_terminar_metricas)
+        QThreadPool.globalInstance().start(worker)
+
+    def _pintar_contadores_locales(self) -> None:
+        """Muestra el contador de sesión local (se usa mientras no hay métricas de la nube)."""
+        ops = self.servicio.get_ops()
+        n_lect = ops.get("lecturas", 0)
+        n_escr = ops.get("escrituras", 0)
+        self.lbl_lecturas.setText(f"Lecturas: {n_lect}")
+        self.lbl_escrituras.setText(f"Escrituras: {n_escr}")
+        tooltip = (
+            "Contador de sesión local. Para ver el consumo total en la nube, asigna el rol "
+            "'Monitoring Viewer' en Google Cloud Console."
+        )
+        self.lbl_lecturas.setToolTip(tooltip)
+        self.lbl_escrituras.setToolTip(tooltip)
+
+    def _al_recibir_metricas(self, met_cloud: Dict[str, Any]) -> None:
+        """Slot (hilo GUI): pinta las métricas reales de Google Cloud Monitoring si están disponibles."""
+        if not isinstance(met_cloud, dict) or not met_cloud.get("disponible"):
+            err = (met_cloud or {}).get("error") if isinstance(met_cloud, dict) else None
+            err = err or "Rol 'Monitoring Viewer' pendiente en GCP"
+            tooltip = (
+                "Contador de sesión local. Para ver el consumo total en la nube, asigna el rol "
+                f"'Monitoring Viewer' en Google Cloud Console ({err})."
+            )
             self.lbl_lecturas.setToolTip(tooltip)
             self.lbl_escrituras.setToolTip(tooltip)
-        else:
-            ops = self.servicio.get_ops()
-            n_lect = ops.get("lecturas", 0)
-            n_escr = ops.get("escrituras", 0)
-            self.lbl_lecturas.setText(f"Lecturas: {n_lect}")
-            self.lbl_escrituras.setText(f"Escrituras: {n_escr}")
-            err = met_cloud.get("error") or "Rol 'Monitoring Viewer' pendiente en GCP"
-            tooltip = f"Contador de sesión local. Para ver el consumo total en la nube, asigna el rol 'Monitoring Viewer' en Google Cloud Console ({err})."
-            self.lbl_lecturas.setToolTip(tooltip)
-            self.lbl_escrituras.setToolTip(tooltip)
+            return
 
-        # Info del último respaldo
-        info_resp = respaldo.obtener_info_ultimo_respaldo()
-        if info_resp.get("fecha_hora"):
-            self.lbl_ultimo_respaldo.setText(f"Último respaldo: {info_resp['fecha_hora']}")
-        else:
-            self.lbl_ultimo_respaldo.setText("Último respaldo: Pendiente")
+        n_lect = met_cloud.get("lecturas", 0)
+        n_escr = met_cloud.get("escrituras", 0)
+        desde = met_cloud.get("desde_pacifico", "hoy")
+        self.lbl_lecturas.setText(f"🔥 Hoy: {n_lect:,} lecturas".replace(",", " "))
+        self.lbl_escrituras.setText(f"🔥 Hoy: {n_escr:,} escrituras".replace(",", " "))
+        tooltip = (
+            f"Métricas reales de Google Cloud Monitoring (desde 00:00 Pacífico: {desde}). "
+            "No consume cuota de Firestore."
+        )
+        self.lbl_lecturas.setToolTip(tooltip)
+        self.lbl_escrituras.setToolTip(tooltip)
+
+    def _al_terminar_metricas(self) -> None:
+        self._consultando_metricas = False
 
     def _verificar_archivos_externos(self) -> None:
         """Comprueba si algún archivo en 'Base de datos/' fue modificado externamente."""
@@ -378,29 +387,6 @@ class VentanaPrincipal(QMainWindow):
                 self._verificando_archivos = False
                 self.timer_archivos.start()
 
-    def _accion_respaldar_ahora(self) -> None:
-        ruta = respaldo.ejecutar_respaldo_ahora()
-        self.actualizar_barra_estado()
-        if ruta and ruta.exists():
-            QMessageBox.information(
-                self,
-                "Respaldo Completado",
-                f"El respaldo en Excel se generó exitosamente en:\n\n{ruta}",
-            )
-        else:
-            QMessageBox.warning(
-                self,
-                "Aviso de Respaldo",
-                "El respaldo se programó pero no se completó de inmediato.",
-            )
-
-    def _accion_abrir_carpeta_respaldos(self) -> None:
-        p = rutas.ruta_respaldos()
-        try:
-            os.startfile(p)
-        except Exception:
-            pass
-
     def _accion_abrir_carpeta_base_datos(self) -> None:
         p = rutas.ruta_base_de_datos()
         try:
@@ -408,16 +394,35 @@ class VentanaPrincipal(QMainWindow):
         except Exception:
             pass
 
+    def _en_hilo_gui(self) -> bool:
+        """True si el código actual se ejecuta en el hilo principal de la interfaz."""
+        return QThread.currentThread() is self.thread()
+
     def mostrar_progreso(self, porcentaje: int, texto: str = "") -> None:
-        """Actualiza y muestra la barrita de progreso inferior."""
-        self.barra_progreso.setValue(porcentaje)
+        """Actualiza y muestra la barrita de progreso inferior (seguro desde cualquier hilo)."""
+        if not self._en_hilo_gui():
+            # Llamado desde un Worker: reenviar al hilo GUI mediante señal en cola.
+            self._senal_progreso.emit(int(porcentaje), str(texto or ""))
+            return
+        self._mostrar_progreso_ui(porcentaje, texto)
+
+    def _mostrar_progreso_ui(self, porcentaje: int, texto: str = "") -> None:
+        """Actualiza los widgets. SOLO debe ejecutarse en el hilo GUI."""
+        self.barra_progreso.setValue(int(porcentaje))
         self.barra_progreso.show()
         if texto:
             self.lbl_estado_progreso.setText(texto)
             self.lbl_estado_progreso.show()
 
     def ocultar_progreso(self, texto_final: str = "") -> None:
-        """Oculta la barrita de progreso."""
+        """Oculta la barrita de progreso (seguro desde cualquier hilo)."""
+        if not self._en_hilo_gui():
+            self._senal_ocultar_progreso.emit(str(texto_final or ""))
+            return
+        self._ocultar_progreso_ui(texto_final)
+
+    def _ocultar_progreso_ui(self, texto_final: str = "") -> None:
+        """Oculta los widgets. SOLO debe ejecutarse en el hilo GUI."""
         if texto_final:
             self.lbl_estado_progreso.setText(texto_final)
             QTimer.singleShot(2500, self._limpiar_progreso)

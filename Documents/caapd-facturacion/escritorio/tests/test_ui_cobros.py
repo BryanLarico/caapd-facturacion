@@ -328,6 +328,49 @@ def test_ui_pagina_cobros_flujo_unificado(qtbot, servicio_memoria_cobros):
     assert pagina.btn_ver_recibo.isEnabled() is True
 
 
+def test_hover_resalta_fila_completa_sin_tapar_color_de_morosidad(
+    qtbot, servicio_memoria_cobros
+):
+    pagina = PaginaCobros(servicio_memoria_cobros)
+    qtbot.addWidget(pagina)
+    pagina.cargar_datos_asincrono()
+    qtbot.waitUntil(lambda: pagina.modelo.rowCount() == 4, timeout=2000)
+    pagina.show()
+
+    fila_mora = next(
+        fila
+        for fila in range(pagina.proxy.rowCount())
+        if pagina.proxy.data(pagina.proxy.index(fila, 2)) == "FLORES MARIA"
+    )
+    delegado = pagina.tabla.itemDelegate()
+    colores_base = [
+        delegado.color_fondo_fila(pagina.proxy.index(fila_mora, columna))
+        for columna in range(pagina.proxy.columnCount())
+    ]
+    assert all(color == colores_base[0] for color in colores_base)
+
+    centro_celda = pagina.tabla.visualRect(
+        pagina.proxy.index(fila_mora, 3)
+    ).center()
+    assert pagina.tabla.indexAt(centro_celda).isValid(), (
+        centro_celda, pagina.tabla.viewport().size()
+    )
+    delegado._actualizar_fila_sobrevolada(fila_mora)
+
+    colores_hover = [
+        delegado.color_fondo_fila(pagina.proxy.index(fila_mora, columna))
+        for columna in range(pagina.proxy.columnCount())
+    ]
+    assert all(color == colores_hover[0] for color in colores_hover)
+    assert colores_hover[0] != colores_base[0]
+    delegado._actualizar_fila_sobrevolada(-1)
+    assert all(
+        delegado.color_fondo_fila(pagina.proxy.index(fila_mora, columna))
+        == colores_base[columna]
+        for columna in range(pagina.proxy.columnCount())
+    )
+
+
 def test_dialogo_asistente_recibos(qtbot, servicio_memoria_cobros):
     # Simular mes cerrado con un medidor pendiente de lectura
     servicio_memoria_cobros.mes["07654321"]["medidores"][0]["lectura_actual"] = None
