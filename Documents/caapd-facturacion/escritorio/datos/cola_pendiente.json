@@ -1,1 +1,59 @@
-[]
+[
+  {
+    "id_evento": "evt_20261015_014343_280528",
+    "tipo": "anular_pago",
+    "payload": {
+      "periodo": "2026-09",
+      "id_usuario": "75849301"
+    },
+    "fecha_creacion": "2026-10-15T01:43:43.280528",
+    "reintentos": 26,
+    "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
+  },
+  {
+    "id_evento": "evt_20261015_021548_376316",
+    "tipo": "pago",
+    "payload": {
+      "periodo": "2026-09",
+      "id_usuario": "30769321",
+      "monto_pagado": 77.0,
+      "fecha_pago": "2026-10-15"
+    },
+    "fecha_creacion": "2026-10-15T02:15:48.376316",
+    "reintentos": 4,
+    "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
+  },
+  {
+    "id_evento": "evt_20261015_021558_794417",
+    "tipo": "anular_pago",
+    "payload": {
+      "periodo": "2026-09",
+      "id_usuario": "30778043"
+    },
+    "fecha_creacion": "2026-10-15T02:15:58.794417",
+    "reintentos": 4,
+    "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
+  },
+  {
+    "id_evento": "evt_20261015_022000_336160",
+    "tipo": "anular_pago",
+    "payload": {
+      "periodo": "2026-09",
+      "id_usuario": "75849301"
+    },
+    "fecha_creacion": "2026-10-15T02:20:00.336160",
+    "reintentos": 1,
+    "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
+  },
+  {
+    "id_evento": "evt_20261015_023348_561498",
+    "tipo": "anular_pago",
+    "payload": {
+      "periodo": "2026-09",
+      "id_usuario": "75849301"
+    },
+    "fecha_creacion": "2026-10-15T02:33:48.561498",
+    "reintentos": 1,
+    "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
+  }
+]

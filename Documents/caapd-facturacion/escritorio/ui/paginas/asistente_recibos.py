@@ -51,7 +51,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         # Cargar info actual del mes
         cfg = self.servicio.cargar_config()
         self.periodo = cfg.get("mes_actual", {}).get("periodo") or "2026-10"
-        self.info_estado = self.servicio.verificar_estado_generacion_recibos(self.periodo)
+        self.info_estado = self.servicio.verificar_estado_generacion_recibos(
+            self.periodo)
 
         self._construir_ui()
         self._cargar_paso_1()
@@ -62,8 +63,10 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         layout_principal.setSpacing(16)
 
         # Encabezado con indicador de pasos
-        self.lbl_pasos = QLabel("PASO 1 DE 3: Revisión de Lecturas y Faltantes")
-        self.lbl_pasos.setStyleSheet("color: #0369a1; font-weight: bold; font-size: 13px; text-transform: uppercase;")
+        self.lbl_pasos = QLabel(
+            "PASO 1 DE 3: Revisión de Lecturas y Faltantes")
+        self.lbl_pasos.setStyleSheet(
+            "color: #0369a1; font-weight: bold; font-size: 13px; text-transform: uppercase;")
         layout_principal.addWidget(self.lbl_pasos)
 
         # Contenedor apilado de pasos
@@ -95,7 +98,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         self.fila_botones.addStretch(1)
 
         self.btn_siguiente = QPushButton("Continuar a Generación ➔")
-        self.btn_siguiente.setProperty("class", "boton boton_primario boton_grande")
+        self.btn_siguiente.setProperty(
+            "class", "boton boton_primario boton_grande")
         self.btn_siguiente.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_siguiente.clicked.connect(self._avanzar_paso_2)
         self.fila_botones.addWidget(self.btn_siguiente)
@@ -124,12 +128,15 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         lay_card = QVBoxLayout(self.card_info_paso1)
         lay_card.setSpacing(6)
 
-        self.lbl_titulo_paso1 = QLabel(f"Facturación para el Periodo: <b>{self.periodo}</b>")
+        self.lbl_titulo_paso1 = QLabel(
+            f"Facturación para el Periodo: <b>{self.periodo}</b>")
         self.lbl_titulo_paso1.setStyleSheet("font-size: 15px; color: #0f172a;")
         lay_card.addWidget(self.lbl_titulo_paso1)
 
-        self.lbl_resumen_lecturas = QLabel("Verificando lecturas registradas...")
-        self.lbl_resumen_lecturas.setStyleSheet("font-size: 13px; color: #475569;")
+        self.lbl_resumen_lecturas = QLabel(
+            "Verificando lecturas registradas...")
+        self.lbl_resumen_lecturas.setStyleSheet(
+            "font-size: 13px; color: #475569;")
         lay_card.addWidget(self.lbl_resumen_lecturas)
 
         lay.addWidget(self.card_info_paso1)
@@ -145,8 +152,10 @@ class DialogoAsistenteEmitirRecibos(QDialog):
             }
         """)
         lay_banner = QHBoxLayout(self.banner_faltantes)
-        self.lbl_banner_faltantes = QLabel("⚠️ Existen conexiones con lecturas pendientes.")
-        self.lbl_banner_faltantes.setStyleSheet("color: #92400e; font-size: 13px; font-weight: 500;")
+        self.lbl_banner_faltantes = QLabel(
+            "⚠️ Existen conexiones con lecturas pendientes.")
+        self.lbl_banner_faltantes.setStyleSheet(
+            "color: #92400e; font-size: 13px; font-weight: 500;")
         lay_banner.addWidget(self.lbl_banner_faltantes)
         lay.addWidget(self.banner_faltantes)
 
@@ -156,8 +165,10 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         self.tabla_faltantes.setHorizontalHeaderLabels([
             "CONEXIÓN", "TITULAR", "SECTOR", "MEDIDOR", "LECT. ANTERIOR"
         ])
-        self.tabla_faltantes.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.tabla_faltantes.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla_faltantes.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch)
+        self.tabla_faltantes.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_faltantes.setAlternatingRowColors(True)
         lay.addWidget(self.tabla_faltantes, stretch=1)
 
@@ -165,10 +176,12 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         self.fila_acciones_faltantes = QHBoxLayout()
         self.fila_acciones_faltantes.setSpacing(10)
 
-        self.btn_estimar_todos = QPushButton("⚡ Estimar faltantes con lectura anterior (Consumo 0 m³)")
+        self.btn_estimar_todos = QPushButton(
+            "⚡ Estimar faltantes con lectura anterior (Consumo 0 m³)")
         self.btn_estimar_todos.setProperty("class", "boton boton_secundario")
         self.btn_estimar_todos.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_estimar_todos.clicked.connect(self._estimar_faltantes_automatico)
+        self.btn_estimar_todos.clicked.connect(
+            self._estimar_faltantes_automatico)
         self.fila_acciones_faltantes.addWidget(self.btn_estimar_todos)
 
         self.fila_acciones_faltantes.addStretch(1)
@@ -178,7 +191,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
 
     def _cargar_paso_1(self) -> None:
         """Actualiza la vista del paso 1 con los datos de faltantes."""
-        self.info_estado = self.servicio.verificar_estado_generacion_recibos(self.periodo)
+        self.info_estado = self.servicio.verificar_estado_generacion_recibos(
+            self.periodo)
         faltantes = self.info_estado.get("faltantes") or []
         tot_usr = self.info_estado.get("total_usuarios", 0)
 
@@ -197,8 +211,10 @@ class DialogoAsistenteEmitirRecibos(QDialog):
                     padding: 10px 14px;
                 }
             """)
-            self.lbl_banner_faltantes.setText("✓ Todas las lecturas están completas. Listo para generar recibos.")
-            self.lbl_banner_faltantes.setStyleSheet("color: #166534; font-size: 13px; font-weight: bold;")
+            self.lbl_banner_faltantes.setText(
+                "✓ Todas las lecturas están completas. Listo para generar recibos.")
+            self.lbl_banner_faltantes.setStyleSheet(
+                "color: #166534; font-size: 13px; font-weight: bold;")
             self.tabla_faltantes.hide()
             self.fila_acciones_faltantes.setEnabled(False)
             self.btn_siguiente.setEnabled(True)
@@ -212,8 +228,10 @@ class DialogoAsistenteEmitirRecibos(QDialog):
                     padding: 10px 14px;
                 }
             """)
-            self.lbl_banner_faltantes.setText(f"⚠️ Hay {len(faltantes)} medidor(es) pendientes. Puedes estimarlos antes de continuar.")
-            self.lbl_banner_faltantes.setStyleSheet("color: #92400e; font-size: 13px; font-weight: 500;")
+            self.lbl_banner_faltantes.setText(
+                f"⚠️ Hay {len(faltantes)} medidor(es) pendientes. Puedes estimarlos antes de continuar.")
+            self.lbl_banner_faltantes.setStyleSheet(
+                "color: #92400e; font-size: 13px; font-weight: 500;")
             self.tabla_faltantes.show()
             self.fila_acciones_faltantes.setEnabled(True)
 
@@ -221,10 +239,14 @@ class DialogoAsistenteEmitirRecibos(QDialog):
             for r, item in enumerate(faltantes):
                 con_str = str(item.get("nro_conexion") or "").zfill(6)
                 self.tabla_faltantes.setItem(r, 0, QTableWidgetItem(con_str))
-                self.tabla_faltantes.setItem(r, 1, QTableWidgetItem(item.get("nombre") or ""))
-                self.tabla_faltantes.setItem(r, 2, QTableWidgetItem(item.get("sector") or ""))
-                self.tabla_faltantes.setItem(r, 3, QTableWidgetItem(str(item.get("nro_medidor") or "")))
-                self.tabla_faltantes.setItem(r, 4, QTableWidgetItem(str(item.get("lectura_anterior") or 0)))
+                self.tabla_faltantes.setItem(
+                    r, 1, QTableWidgetItem(item.get("nombre") or ""))
+                self.tabla_faltantes.setItem(
+                    r, 2, QTableWidgetItem(item.get("sector") or ""))
+                self.tabla_faltantes.setItem(r, 3, QTableWidgetItem(
+                    str(item.get("nro_medidor") or "")))
+                self.tabla_faltantes.setItem(r, 4, QTableWidgetItem(
+                    str(item.get("lectura_anterior") or 0)))
 
             self.btn_siguiente.setEnabled(True)
             self.btn_siguiente.setText("Continuar con Estimación ➔")
@@ -271,7 +293,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         lay.addWidget(lbl_icono)
 
         self.lbl_estado_paso2 = QLabel("Generando recibos del mes...")
-        self.lbl_estado_paso2.setStyleSheet("font-size: 18px; font-weight: bold; color: #0f172a;")
+        self.lbl_estado_paso2.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: #0f172a;")
         self.lbl_estado_paso2.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self.lbl_estado_paso2)
 
@@ -295,8 +318,10 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         """)
         lay.addWidget(self.barra_progreso)
 
-        self.lbl_detalle_paso2 = QLabel("Calculando tarifas, correlativos y deudas...")
-        self.lbl_detalle_paso2.setStyleSheet("color: #64748b; font-size: 13px;")
+        self.lbl_detalle_paso2 = QLabel(
+            "Calculando tarifas, correlativos y deudas...")
+        self.lbl_detalle_paso2.setStyleSheet(
+            "color: #64748b; font-size: 13px;")
         self.lbl_detalle_paso2.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self.lbl_detalle_paso2)
 
@@ -336,7 +361,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         def progreso_cb(actual: int, total: int) -> None:
             pct = int((actual / max(total, 1)) * 100)
             self.barra_progreso.setValue(pct)
-            self.lbl_detalle_paso2.setText(f"Procesando recibo {actual} de {total}...")
+            self.lbl_detalle_paso2.setText(
+                f"Procesando recibo {actual} de {total}...")
 
         def tarea():
             return self.servicio.generar_recibos_mes(self.periodo, callback_progreso=progreso_cb)
@@ -369,7 +395,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         lay.addWidget(lbl_exito)
 
         self.lbl_titulo_paso3 = QLabel("¡Recibos emitidos exitosamente!")
-        self.lbl_titulo_paso3.setStyleSheet("font-size: 20px; font-weight: bold; color: #15803d;")
+        self.lbl_titulo_paso3.setStyleSheet(
+            "font-size: 20px; font-weight: bold; color: #15803d;")
         self.lbl_titulo_paso3.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self.lbl_titulo_paso3)
 
@@ -386,13 +413,17 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         lay_res = QVBoxLayout(card_resumen)
         lay_res.setSpacing(8)
 
-        self.lbl_resumen_totales = QLabel("Recibos generados: — | Total facturado: S/. —")
-        self.lbl_resumen_totales.setStyleSheet("font-size: 14px; font-weight: 500; color: #166534;")
+        self.lbl_resumen_totales = QLabel(
+            "Recibos generados: — | Total facturado: S/. —")
+        self.lbl_resumen_totales.setStyleSheet(
+            "font-size: 14px; font-weight: 500; color: #166534;")
         self.lbl_resumen_totales.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay_res.addWidget(self.lbl_resumen_totales)
 
-        self.lbl_resumen_estado = QLabel(f"El periodo {self.periodo} ha pasado a estado FACTURADO.")
-        self.lbl_resumen_estado.setStyleSheet("font-size: 13px; color: #475569;")
+        self.lbl_resumen_estado = QLabel(
+            f"El periodo {self.periodo} ha pasado a estado FACTURADO.")
+        self.lbl_resumen_estado.setStyleSheet(
+            "font-size: 13px; color: #475569;")
         self.lbl_resumen_estado.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay_res.addWidget(self.lbl_resumen_estado)
 
@@ -446,9 +477,9 @@ class DialogoAsistenteEmitirRecibos(QDialog):
                 f"Se empaquetaron todos los recibos en:\n\n{ruta_zip}",
             )
         else:
-            QMessageBox.warning(self, "Aviso", "No se encontraron recibos generados para empaquetar.")
+            QMessageBox.warning(
+                self, "Aviso", "No se encontraron recibos generados para empaquetar.")
 
     def _abrir_carpeta_recibos(self) -> None:
-        dir_recibos = rutas.ruta_salida("recibos", self.periodo)
-        dir_recibos.mkdir(parents=True, exist_ok=True)
+        dir_recibos = rutas.ruta_recibos(self.periodo)
         os.startfile(str(dir_recibos))

@@ -28,12 +28,14 @@ if os.environ.get("CAAPD_ENTORNO", "").strip().lower() == "prueba":
         try:
             from config_local import FIREBASE_KEY_PATH
         except ImportError:
-            FIREBASE_KEY_PATH = os.environ.get("FIREBASE_KEY_PATH", "serviceAccountKey.json")
+            FIREBASE_KEY_PATH = os.environ.get(
+                "FIREBASE_KEY_PATH", "serviceAccountKey.json")
 else:
     try:
         from config_local import FIREBASE_KEY_PATH
     except ImportError:
-        FIREBASE_KEY_PATH = os.environ.get("FIREBASE_KEY_PATH", "serviceAccountKey.json")
+        FIREBASE_KEY_PATH = os.environ.get(
+            "FIREBASE_KEY_PATH", "serviceAccountKey.json")
 
 
 def obtener_proyecto_id() -> str:
@@ -47,6 +49,7 @@ def obtener_proyecto_id() -> str:
     except Exception:
         pass
     return PROYECTO_REAL_ID
+
 
 # ---------------------------------------------------------------------------
 # Límites del plan gratuito (Spark)
@@ -86,6 +89,11 @@ def db() -> firestore.Client:
     if _db is None:
         _inicializar()
     return _db
+
+
+def _get_db() -> firestore.Client:
+    """Alias de db(). Lo usan generar_recibo_usuario, registrar_pago y anular_pago."""
+    return db()
 
 
 # ---------------------------------------------------------------------------
@@ -373,8 +381,8 @@ def guardar_mes_lote(periodo: str, documentos: dict[str, dict]):
 
 
 def corregir_dni_en_mes(periodo: str,
-                         id_viejo: str,
-                         id_nuevo: str):
+                        id_viejo: str,
+                        id_nuevo: str):
     """Copia el doc del mes al nuevo ID y borra el viejo."""
     col_name = nombre_coleccion_mes(periodo)
     col = db().collection(col_name)
@@ -676,7 +684,8 @@ def _cargar_semilla_mes_previo() -> dict[str, Any]:
 
     candidatos = [
         Path(__file__).resolve().parent / "salida" / "semilla_mes_previo.json",
-        Path(__file__).resolve().parent.parent / "salida" / "semilla_mes_previo.json",
+        Path(__file__).resolve().parent.parent /
+        "salida" / "semilla_mes_previo.json",
         Path(__file__).resolve().parent / "datos" / "semilla_mes_previo.json",
     ]
     for c in candidatos:
@@ -719,7 +728,8 @@ def abrir_mes(
         uid: u for uid, u in todos_usuarios.items() if u.get("activo", True)
     }
     if not usuarios_activos:
-        raise ValueError("No se encontraron usuarios activos en el padrón para abrir el mes.")
+        raise ValueError(
+            "No se encontraron usuarios activos en el padrón para abrir el mes.")
 
     # 3. Determinar mes anterior para encadenar lecturas
     cols_existentes = [c for c in listar_colecciones_mes() if c < periodo]
@@ -741,19 +751,23 @@ def abrir_mes(
 
     for uid, u in usuarios_activos.items():
         doc_anterior = (mes_anterior or {}).get(uid)
-        historial_previo = (doc_anterior.get("historial_m3") or []) if doc_anterior else []
-        consumo_previo_total = doc_anterior.get("consumo_total_m3") if doc_anterior else None
+        historial_previo = (doc_anterior.get("historial_m3")
+                            or []) if doc_anterior else []
+        consumo_previo_total = doc_anterior.get(
+            "consumo_total_m3") if doc_anterior else None
 
         # Historial: últimos 5 consumos
         if consumo_previo_total is not None and isinstance(consumo_previo_total, (int, float)):
-            nuevo_historial = (historial_previo + [int(consumo_previo_total)])[-5:]
+            nuevo_historial = (historial_previo +
+                               [int(consumo_previo_total)])[-5:]
         else:
             nuevo_historial = historial_previo[-5:]
 
         # Medidores del usuario
         medidores_mes = []
         for m_item in u.get("medidores", []):
-            nro_med = m_item if isinstance(m_item, str) else m_item.get("nro_medidor", "")
+            nro_med = m_item if isinstance(
+                m_item, str) else m_item.get("nro_medidor", "")
             if not nro_med:
                 continue
 
@@ -764,14 +778,16 @@ def abrir_mes(
             if doc_anterior:
                 # Buscar el medidor en el mes anterior
                 m_ant = next(
-                    (m for m in doc_anterior.get("medidores", []) if m.get("nro_medidor") == nro_med),
+                    (m for m in doc_anterior.get("medidores", [])
+                     if m.get("nro_medidor") == nro_med),
                     None,
                 )
                 if m_ant:
                     if m_ant.get("estado_lectura") == "LEIDO" and m_ant.get("lectura_actual") is not None:
                         lectura_ant = int(m_ant["lectura_actual"])
                         fecha_ant = m_ant.get("fecha_lectura")
-                        consumo_ant = int(lectura_ant - (m_ant.get("lectura_anterior") or 0))
+                        consumo_ant = int(
+                            lectura_ant - (m_ant.get("lectura_anterior") or 0))
                     else:
                         lectura_ant = int(m_ant.get("lectura_anterior") or 0)
                         fecha_ant = m_ant.get("fecha_anterior")
@@ -846,7 +862,8 @@ def abrir_mes(
     # 7. Disparar evento de respaldo
     try:
         from respaldo import on_datos_cambiados
-        on_datos_cambiados("abrir_mes", {"periodo": periodo, "usuarios": len(documentos_mes)})
+        on_datos_cambiados(
+            "abrir_mes", {"periodo": periodo, "usuarios": len(documentos_mes)})
     except Exception:
         pass
 
@@ -887,7 +904,8 @@ def reabrir_lecturas(periodo: str | None = None) -> dict[str, Any]:
 
     estado_actual = (mes_actual.get("estado") or "").upper()
     if estado_actual == "FACTURADO":
-        raise ValueError("El mes ya fue facturado y no puede reabrirse para lecturas.")
+        raise ValueError(
+            "El mes ya fue facturado y no puede reabrirse para lecturas.")
 
     actualizar_config_campo("mes_actual.estado", "ABIERTO")
     limpiar_cache(limpiar_config=True)
@@ -916,7 +934,8 @@ def guardar_lectura_medidor(
 
     doc = obtener_doc_mes(periodo, id_usuario)
     if doc is None:
-        raise ValueError(f"No se encontró el documento para el usuario {id_usuario} en el mes {periodo}.")
+        raise ValueError(
+            f"No se encontró el documento para el usuario {id_usuario} en el mes {periodo}.")
 
     medidores = doc.get("medidores", [])
     medidor_encontrado = None
@@ -926,7 +945,8 @@ def guardar_lectura_medidor(
             break
 
     if medidor_encontrado is None:
-        raise ValueError(f"El medidor {nro_medidor} no pertenece al usuario {id_usuario}.")
+        raise ValueError(
+            f"El medidor {nro_medidor} no pertenece al usuario {id_usuario}.")
 
     hoy_str = datetime.date.today().isoformat()
     medidor_encontrado["lectura_actual"] = int(lectura_actual)
@@ -1059,7 +1079,8 @@ def estimar_lectura_medidor(
     """Estima la lectura de un medidor basándose en el consumo anterior o valor manual."""
     doc = obtener_doc_mes(periodo, id_usuario)
     if doc is None:
-        raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+        raise ValueError(
+            f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
 
     medidor_obj = None
     for m in doc.get("medidores", []):
@@ -1067,7 +1088,8 @@ def estimar_lectura_medidor(
             medidor_obj = m
             break
     if medidor_obj is None:
-        raise ValueError(f"Medidor {nro_medidor} no encontrado en el usuario {id_usuario}.")
+        raise ValueError(
+            f"Medidor {nro_medidor} no encontrado en el usuario {id_usuario}.")
 
     if consumo_estimado is not None:
         consumo = int(consumo_estimado)
@@ -1104,7 +1126,8 @@ def estimar_todas_lecturas_faltantes(periodo: str) -> dict[str, Any]:
         n_med = f["nro_medidor"]
         c_ant = f.get("consumo_anterior")
         if c_ant is not None:
-            estimar_lectura_medidor(periodo, uid, n_med, consumo_estimado=int(c_ant))
+            estimar_lectura_medidor(
+                periodo, uid, n_med, consumo_estimado=int(c_ant))
             estimados += 1
         else:
             requieren_manual.append(f)
@@ -1133,7 +1156,8 @@ def generar_recibos_mes(periodo: str | None = None) -> dict[str, Any]:
 
     docs_mes = cargar_mes(periodo_obj)
     if not docs_mes:
-        raise ValueError(f"No hay registros de usuarios en el mes {periodo_obj}.")
+        raise ValueError(
+            f"No hay registros de usuarios en el mes {periodo_obj}.")
 
     # 1. Validar que no haya lecturas pendientes
     faltantes = []
@@ -1282,7 +1306,8 @@ def generar_recibo_usuario(periodo: str | None = None, id_usuario: str = "") -> 
     docs_mes = cargar_mes(periodo_obj)
     doc = docs_mes.get(id_usuario)
     if not doc:
-        raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo_obj}.")
+        raise ValueError(
+            f"Usuario {id_usuario} no encontrado en el mes {periodo_obj}.")
 
     # Si algún medidor no tiene lectura actual, asegurar lectura anterior (consumo 0) para permitir facturar
     for m in doc.get("medidores", []):
@@ -1405,7 +1430,8 @@ def registrar_pago(
     _contar("lecturas", 1)
 
     if not doc_snap.exists:
-        raise ValueError(f"No existe el usuario {id_usuario} en el mes {periodo}.")
+        raise ValueError(
+            f"No existe el usuario {id_usuario} en el mes {periodo}.")
 
     datos_actuales = doc_snap.to_dict() or {}
 
@@ -1447,7 +1473,8 @@ def anular_pago(periodo: str, id_usuario: str) -> Dict[str, Any]:
     _contar("lecturas", 1)
 
     if not doc_snap.exists:
-        raise ValueError(f"No existe el usuario {id_usuario} en el mes {periodo}.")
+        raise ValueError(
+            f"No existe el usuario {id_usuario} en el mes {periodo}.")
 
     datos_actuales = doc_snap.to_dict() or {}
 
@@ -1486,7 +1513,8 @@ def exportar_reporte_morosos_excel(
     from openpyxl.utils import get_column_letter
 
     cfg = cargar_config()
-    periodo_obj = periodo or (cfg.get("mes_actual") or {}).get("periodo") or "2026-10"
+    periodo_obj = periodo or (cfg.get("mes_actual") or {}).get(
+        "periodo") or "2026-10"
     docs = cargar_mes(periodo_obj)
     sectores = cfg.get("sectores") or []
 
@@ -1504,11 +1532,15 @@ def exportar_reporte_morosos_excel(
     # Estilos
     fuente_titulo = Font(name="Arial", size=13, bold=True, color="1E293B")
     fuente_sub = Font(name="Arial", size=10, italic=True, color="64748B")
-    fuente_encabezado_rojo = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-    fill_rojo = PatternFill(start_color="DC2626", end_color="DC2626", fill_type="solid")
+    fuente_encabezado_rojo = Font(
+        name="Arial", size=10, bold=True, color="FFFFFF")
+    fill_rojo = PatternFill(start_color="DC2626",
+                            end_color="DC2626", fill_type="solid")
 
-    fuente_encabezado_azul = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-    fill_azul = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    fuente_encabezado_azul = Font(
+        name="Arial", size=10, bold=True, color="FFFFFF")
+    fill_azul = PatternFill(start_color="1E3A8A",
+                            end_color="1E3A8A", fill_type="solid")
 
     borde_fino = Border(
         left=Side(style="thin", color="CBD5E1"),
@@ -1519,7 +1551,8 @@ def exportar_reporte_morosos_excel(
 
     # 1. Hoja Lista de Corte
     ws_corte.merge_cells("A1:G1")
-    ws_corte["A1"] = f"CAAPD ISPACAS — USUARIOS EN LISTA DE CORTE (3 O MÁS MESES) — PERIODO {periodo_obj}"
+    ws_corte[
+        "A1"] = f"CAAPD ISPACAS — USUARIOS EN LISTA DE CORTE (3 O MÁS MESES) — PERIODO {periodo_obj}"
     ws_corte["A1"].font = fuente_titulo
     ws_corte["A1"].alignment = Alignment(vertical="center")
 
@@ -1531,7 +1564,8 @@ def exportar_reporte_morosos_excel(
         cell = ws_corte.cell(row=3, column=col_idx, value=enc)
         cell.font = fuente_encabezado_rojo
         cell.fill = fill_rojo
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.alignment = Alignment(
+            horizontal="center", vertical="center", wrap_text=True)
 
     # 2. Hoja Todos los Morosos
     ws_morosos.merge_cells("A1:H1")
@@ -1547,7 +1581,8 @@ def exportar_reporte_morosos_excel(
         cell = ws_morosos.cell(row=3, column=col_idx, value=enc)
         cell.font = fuente_encabezado_azul
         cell.fill = fill_azul
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.alignment = Alignment(
+            horizontal="center", vertical="center", wrap_text=True)
 
     def orden_sec(item):
         d = item[1]
@@ -1591,11 +1626,16 @@ def exportar_reporte_morosos_excel(
                 nivel_str = "Corte (3+ m.)"
                 cnt_corte += 1
                 # Escribir en hoja de corte
-                ws_corte.cell(row=fila_corte, column=1, value=str(d.get("nro_conexion") or "")).border = borde_fino
-                ws_corte.cell(row=fila_corte, column=2, value=str(d.get("nro_recibo") or "-")).border = borde_fino
-                ws_corte.cell(row=fila_corte, column=3, value=str(d.get("nombre") or "")).border = borde_fino
-                ws_corte.cell(row=fila_corte, column=4, value=str(d.get("sector") or "")).border = borde_fino
-                ws_corte.cell(row=fila_corte, column=5, value=str(d.get("direccion") or "")).border = borde_fino
+                ws_corte.cell(row=fila_corte, column=1, value=str(
+                    d.get("nro_conexion") or "")).border = borde_fino
+                ws_corte.cell(row=fila_corte, column=2, value=str(
+                    d.get("nro_recibo") or "-")).border = borde_fino
+                ws_corte.cell(row=fila_corte, column=3, value=str(
+                    d.get("nombre") or "")).border = borde_fino
+                ws_corte.cell(row=fila_corte, column=4, value=str(
+                    d.get("sector") or "")).border = borde_fino
+                ws_corte.cell(row=fila_corte, column=5, value=str(
+                    d.get("direccion") or "")).border = borde_fino
                 c_m = ws_corte.cell(row=fila_corte, column=6, value=meses)
                 c_m.alignment = Alignment(horizontal="center")
                 c_m.border = borde_fino
@@ -1611,15 +1651,21 @@ def exportar_reporte_morosos_excel(
                 cnt_al_dia += 1
 
             # Escribir en hoja de morosos
-            ws_morosos.cell(row=fila_morosos, column=1, value=str(d.get("nro_conexion") or "")).border = borde_fino
-            ws_morosos.cell(row=fila_morosos, column=2, value=str(d.get("nro_recibo") or "-")).border = borde_fino
-            ws_morosos.cell(row=fila_morosos, column=3, value=str(d.get("nombre") or "")).border = borde_fino
-            ws_morosos.cell(row=fila_morosos, column=4, value=str(d.get("sector") or "")).border = borde_fino
-            ws_morosos.cell(row=fila_morosos, column=5, value=str(d.get("direccion") or "")).border = borde_fino
+            ws_morosos.cell(row=fila_morosos, column=1, value=str(
+                d.get("nro_conexion") or "")).border = borde_fino
+            ws_morosos.cell(row=fila_morosos, column=2, value=str(
+                d.get("nro_recibo") or "-")).border = borde_fino
+            ws_morosos.cell(row=fila_morosos, column=3, value=str(
+                d.get("nombre") or "")).border = borde_fino
+            ws_morosos.cell(row=fila_morosos, column=4, value=str(
+                d.get("sector") or "")).border = borde_fino
+            ws_morosos.cell(row=fila_morosos, column=5, value=str(
+                d.get("direccion") or "")).border = borde_fino
             c_m2 = ws_morosos.cell(row=fila_morosos, column=6, value=meses)
             c_m2.alignment = Alignment(horizontal="center")
             c_m2.border = borde_fino
-            c_niv = ws_morosos.cell(row=fila_morosos, column=7, value=nivel_str)
+            c_niv = ws_morosos.cell(
+                row=fila_morosos, column=7, value=nivel_str)
             c_niv.alignment = Alignment(horizontal="center")
             c_niv.border = borde_fino
             c_sal = ws_morosos.cell(row=fila_morosos, column=8, value=saldo)
@@ -1637,7 +1683,8 @@ def exportar_reporte_morosos_excel(
         ("Total Usuarios / Recibos", tot_recibos, False),
         ("Recibos Pagados", tot_pagados, False),
         ("Recibos Pendientes de Pago", tot_pendientes, False),
-        ("Efectividad de Cobro (%)", round((tot_pagados / tot_recibos * 100), 1) if tot_recibos else 0.0, False),
+        ("Efectividad de Cobro (%)", round(
+            (tot_pagados / tot_recibos * 100), 1) if tot_recibos else 0.0, False),
         ("Total Facturado (S/.)", tot_facturado, True),
         ("Total Recaudado (S/.)", tot_recaudado, True),
         ("Saldo por Cobrar (S/.)", tot_saldo_pendiente, True),
@@ -1670,4 +1717,3 @@ def exportar_reporte_morosos_excel(
     p_salida.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(p_salida))
     return str(p_salida)
-

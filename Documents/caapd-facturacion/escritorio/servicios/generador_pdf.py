@@ -659,9 +659,8 @@ def generar_recibo_pdf_para_usuario(
         nombre_limpio = re.sub(r"[^\w\s-]", "", nombre_raw)[:30].strip()
         nombre_archivo = f"recibo_{conexion}_{nombre_limpio}.pdf"
 
-        # Guardar en recibos/aaaa-mm/<sector>/
-        dir_sector = rutas.DIR_BASE.parent / "recibos" / periodo / sector_limpio
-        dir_sector.mkdir(parents=True, exist_ok=True)
+        # Guardar en <Escritorio>/recibos/aaaa-mm/<sector>/
+        dir_sector = rutas.ruta_recibos(periodo, sector_limpio)
         ruta_salida = dir_sector / nombre_archivo
 
     return generar_recibo_pdf(datos, ruta_salida=ruta_salida)
@@ -674,7 +673,7 @@ def empaquetar_recibos_en_zip(
 ) -> Optional[Path]:
     """Empaqueta todos los PDFs de recibos en un archivo .ZIP."""
     import zipfile
-    dir_recibos = rutas.DIR_BASE.parent / "recibos" / periodo
+    dir_recibos = rutas.ruta_recibos(periodo)
     if not dir_recibos.exists():
         return None
 

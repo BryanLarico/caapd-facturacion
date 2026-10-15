@@ -19,10 +19,14 @@ from ui.paginas.cobros_modelo import ModeloCobros, ProxyCobros
 @pytest.fixture(autouse=True)
 def mock_message_boxes(monkeypatch):
     """Evita diálogos bloqueantes de QMessageBox en pruebas."""
-    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(QMessageBox, "information", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Yes)
 
 
 @pytest.fixture
@@ -261,7 +265,8 @@ def test_servicio_registro_y_anulacion_pago(servicio_memoria_cobros):
     ops_inicial = servicio.get_ops()["escrituras"]
 
     # 1. Pago de QUISPE CARLOS (17.50)
-    res_pago = servicio.registrar_pago("2026-10", "07654321", 17.50, fecha_pago="2026-10-13")
+    res_pago = servicio.registrar_pago(
+        "2026-10", "07654321", 17.50, fecha_pago="2026-10-13")
     assert res_pago["monto_pagado"] == 17.50
     assert res_pago["fecha_pago"] == "2026-10-13"
     assert servicio.mes["07654321"]["monto_pagado"] == 17.50
@@ -279,7 +284,8 @@ def test_exportar_reporte_morosos_excel(servicio_memoria_cobros, tmp_path):
     servicio = servicio_memoria_cobros
     ruta_test = tmp_path / "test_morosos.xlsx"
 
-    ruta_generada = servicio.exportar_reporte_morosos_excel("2026-10", str(ruta_test))
+    ruta_generada = servicio.exportar_reporte_morosos_excel(
+        "2026-10", str(ruta_test))
     assert os.path.exists(ruta_generada)
     assert os.path.getsize(ruta_generada) > 0
 
@@ -289,7 +295,8 @@ def test_ui_pagina_cobros_flujo_unificado(qtbot, servicio_memoria_cobros):
     qtbot.addWidget(pagina)
 
     pagina.cargar_datos_asincrono()
-    qtbot.waitUntil(lambda: len(pagina.lista_items_completa) == 4, timeout=2000)
+    qtbot.waitUntil(lambda: len(pagina.lista_items_completa)
+                    == 4, timeout=2000)
 
     assert pagina.modelo.rowCount() == 4
 
@@ -319,7 +326,6 @@ def test_ui_pagina_cobros_flujo_unificado(qtbot, servicio_memoria_cobros):
     # Verificar botón Imprimir / Descargar recibo PDF
     assert "Imprimir / Descargar" in pagina.btn_ver_recibo.text()
     assert pagina.btn_ver_recibo.isEnabled() is True
-    assert pagina.btn_imprimir_pdf_top.isEnabled() is True
 
 
 def test_dialogo_asistente_recibos(qtbot, servicio_memoria_cobros):
