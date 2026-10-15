@@ -1304,7 +1304,8 @@ class ServicioDatosPadron(ServicioDatos):
         Acción B: Traer lecturas de los lectores (Nube -> Excel).
         Descarga por la API REST de Firestore (servicios/firestore_rest.py), NO por gRPC.
         La versión anterior usaba `col.select([...]).stream()`, que en Windows podía
-        colgarse dentro de gRPC y cerrar el proceso con un «access violation».
+        colgarse dentro de gRPC, congelar la ventana ("No responde") y cerrar el
+        proceso con un «access violation».
         La fusión con el Excel local la hace `fusionar_lecturas_nube`.
         """
         import time
@@ -1368,7 +1369,7 @@ class ServicioDatosPadron(ServicioDatos):
             "metodo": "REST",
             "exito": True,
         }
-
+    
     def sincronizar_desde_firebase(self, periodo: Optional[str] = None) -> Dict[str, Any]:
         """Compatibilidad con versiones previas: invoca traer_lecturas_de_lectores."""
         return self.traer_lecturas_de_lectores(periodo=periodo)
