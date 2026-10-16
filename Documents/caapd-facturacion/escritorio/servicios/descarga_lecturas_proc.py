@@ -45,39 +45,19 @@ def _emitir(evento: dict) -> None:
         pass
 
 
-def _plano(valor):
-    """Convierte cualquier valor de Firestore en algo serializable a JSON."""
-    if valor is None or isinstance(valor, (bool, int, float, str)):
-        return valor
-    if isinstance(valor, dict):
-        return {str(k): _plano(v) for k, v in valor.items()}
-    if isinstance(valor, (list, tuple)):
-        return [_plano(v) for v in valor]
-    metodo = getattr(valor, "isoformat", None)
-    if callable(metodo):
-        try:
-            return metodo()
-        except Exception:
-            pass
-    return str(valor)
-
-
 def descargar(periodo: str, timeout_stream: float) -> dict:
     """Lee la colección mes_aaaa-mm y devuelve {'docs': {...}, 'recibidos': n}."""
-    _emitir({"t": "fase", "msg": "Autenticando con Firebase..."})
-    import firebase_client as fb
+    _emitir({"t": "fase", "msg": "Autenticando con Firebase (API REST)..."})
+    from servicios import firestore_rest
 
-    db = fb.db()
     _emitir({"t": "fase", "msg": "Leyendo las lecturas del mes en la nube..."})
-
-    col = db.collection(f"mes_{periodo}")
-    docs: dict = {}
-    n = 0
-    for doc in col.select(["medidores", "nombre"]).stream(timeout=timeout_stream):
-        n += 1
-        docs[str(doc.id)] = _plano(doc.to_dict() or {})
-        _emitir({"t": "prog", "n": n})
-
+    docs = firestore_rest.descargar_documentos_mes(
+        periodo,
+        campos=("medidores", "nombre"),
+        timeout=(firestore_rest.TIMEOUT_CONEXION_S, timeout_stream),
+        callback_progreso=lambda n, _texto: _emitir({"t": "prog", "n": n}),
+    )
+    n = len(docs)
     _emitir({"t": "fin", "n": n})
     return {"docs": docs, "recibidos": n}
 
@@ -86,7 +66,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--periodo", required=True)
     parser.add_argument("--salida", required=True)
-    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--timeout", type=float, default=45.0)
     args = parser.parse_args()
 
     detener = threading.Event()
@@ -123,5 +103,4 @@ if __name__ == "__main__":
         sys.stderr.flush()
     except Exception:
         pass
-    # Salida inmediata: evita que la limpieza de gRPC se quede colgada al cerrar.
     os._exit(codigo)

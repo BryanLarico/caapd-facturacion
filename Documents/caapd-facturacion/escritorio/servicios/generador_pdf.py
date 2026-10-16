@@ -59,10 +59,10 @@ ALTO_HOJA_CM = 22.0
 # 2) Bordes blancos deseados alrededor del recibo (en cm, sobre la hoja fisica).
 #    Laterales = zona que la impresora no imprime (1.9 cm). Arriba/abajo = 0.5 cm
 #    (mayor que los 0.2 / 0.1 cm que la impresora no toca, asi nunca se recorta).
-MARGEN_IZQUIERDO_CM = 1.9
-MARGEN_DERECHO_CM = 1.9
-MARGEN_SUPERIOR_CM = 0.5
-MARGEN_INFERIOR_CM = 0.5
+MARGEN_IZQUIERDO_CM = 0.0 
+MARGEN_DERECHO_CM = 0.0
+MARGEN_SUPERIOR_CM = 0.0
+MARGEN_INFERIOR_CM = 0.65
 
 # 3) Espacio de DISENO: las coordenadas de todo el recibo (textos, tablas,
 #    histograma, QR) y los PNG de fondo (1294 x 2000 px) estan pensados para
@@ -91,10 +91,10 @@ DESPLAZAMIENTO_Y_CM = 0.0
 #    DISENO, como el antiguo DESPLAZAMIENTO_*). El fondo NO se mueve. Util si
 #    quieres subir/bajar todo el texto respecto a las franjas del fondo.
 AJUSTE_TEXTO_X_CM = 0.0
-AJUSTE_TEXTO_Y_CM = 0.0
+AJUSTE_TEXTO_Y_CM = 0.55
 
 # 7) Ajuste vertical SOLO del talon inferior (en cm de DISENO, como antes).
-AJUSTE_TALON_Y_CM = 0.5
+AJUSTE_TALON_Y_CM = 0.0
 
 # 8) Dibuja un marco fino alrededor del area util para calibrar con una regla
 #    sobre la hoja impresa. Dejar en False para produccion.

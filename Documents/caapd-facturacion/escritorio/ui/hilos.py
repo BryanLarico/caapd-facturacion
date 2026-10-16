@@ -13,6 +13,7 @@ Blindaje contra cierres silenciosos (crash nativo) de PySide6 + QThreadPool:
 from __future__ import annotations
 
 import functools
+import gc
 import logging
 import traceback
 from typing import Any, Callable, Optional, Set
@@ -31,6 +32,7 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import QLabel, QMessageBox, QWidget
 
 import rutas
+from servicios.cancelacion import cierre_solicitado
 
 _log = logging.getLogger("caapd.hilos")
 if not _log.handlers:
@@ -111,6 +113,8 @@ class Worker(QRunnable):
 
     @staticmethod
     def _emitir(senal: Any, *args: Any) -> None:
+        if cierre_solicitado():
+            return
         try:
             senal.emit(*args)
         except RuntimeError:
@@ -119,17 +123,20 @@ class Worker(QRunnable):
 
     def run(self) -> None:
         nombre = getattr(self.fn, "__qualname__", None) or getattr(self.fn, "__name__", "tarea")
-        _log.info("Hilo '%s' iniciado (thread=%s).", nombre, hex(id(QThread.currentThread())))
+        if not cierre_solicitado():
+            _log.info("Hilo '%s' iniciado (thread=%s).", nombre, hex(id(QThread.currentThread())))
         try:
             res = self.fn(*self.args, **self.kwargs)
         except Exception as e:
-            _log.error("Error en hilo '%s': %s\n%s", nombre, e, traceback.format_exc())
+            if not cierre_solicitado():
+                _log.error("Error en hilo '%s': %s\n%s", nombre, e, traceback.format_exc())
             self._emitir(self.signals.error, str(e) or e.__class__.__name__)
         else:
             self._emitir(self.signals.resultado, res)
         finally:
-            _log.info("Hilo '%s' terminado.", nombre)
             self._emitir(self.signals.finalizado)
+            if not cierre_solicitado():
+                _log.info("Hilo '%s' terminado.", nombre)
 
 
 def slot_seguro(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -162,6 +169,22 @@ def slot_seguro(fn: Callable[..., Any]) -> Callable[..., Any]:
 
     return envoltura
 
+class RecolectorBasuraGUI(QObject):
+    """Ejecuta el GC de Python SOLO en el hilo GUI: así ningún QWidget/QObject
+    se destruye desde un hilo del QThreadPool (causa del cierre nativo)."""
+    def __init__(self, app: QCoreApplication, intervalo_ms: int = 1000) -> None:
+        super().__init__(app)
+        gc.disable()
+        self._ciclos = 0
+        self._timer = QTimer(self)
+        self._timer.setInterval(intervalo_ms)
+        self._timer.timeout.connect(self._recolectar)
+        self._timer.start()
+
+    @Slot()
+    def _recolectar(self) -> None:
+        self._ciclos += 1
+        gc.collect(2 if self._ciclos % 10 == 0 else 1)
 
 def esperar_hilos(ms: int = 8000) -> bool:
     """Espera como máximo ``ms`` y reporta si todos los Workers terminaron."""

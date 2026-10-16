@@ -507,7 +507,9 @@ class PaginaCobros(QWidget):
         if getattr(self.servicio, "es_local_first", False):
             from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
             dlg = DialogoActualizarBaseDatos(self)
-            if dlg.exec() != QDialog.DialogCode.Accepted:
+            acceptado = dlg.exec() == QDialog.DialogCode.Accepted
+            dlg.deleteLater()
+            if not acceptado:
                 return
 
             ventana = self.window()

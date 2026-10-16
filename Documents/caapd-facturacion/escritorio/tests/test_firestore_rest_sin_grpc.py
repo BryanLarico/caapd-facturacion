@@ -41,6 +41,32 @@ def test_ruta_credenciales_respeta_variable_de_entorno(tmp_path, monkeypatch):
     assert firestore_rest.ruta_credenciales() == clave
 
 
+def test_worker_descarga_usa_firestore_rest(monkeypatch):
+    from servicios import descarga_lecturas_proc, firestore_rest
+
+    eventos = []
+    llamadas = []
+
+    def descargar(periodo, campos, timeout, callback_progreso):
+        llamadas.append((periodo, campos, timeout))
+        callback_progreso(1, "documento recibido")
+        return {"30771152": {"nombre": "Usuario", "medidores": []}}
+
+    monkeypatch.setattr(firestore_rest, "descargar_documentos_mes", descargar)
+    monkeypatch.setattr(descarga_lecturas_proc, "_emitir", eventos.append)
+
+    resultado = descarga_lecturas_proc.descargar("2026-09", timeout_stream=30)
+
+    assert resultado == {
+        "docs": {"30771152": {"nombre": "Usuario", "medidores": []}},
+        "recibidos": 1,
+    }
+    assert llamadas == [
+        ("2026-09", ("medidores", "nombre"), (firestore_rest.TIMEOUT_CONEXION_S, 30))
+    ]
+    assert any(evento.get("t") == "prog" for evento in eventos)
+
+
 def test_worker_registra_inicio_y_fin_en_log():
     """ui/hilos.py debe dejar rastro de cada hilo para diagnosticar cierres sin traceback."""
     fuente = (DIR_ESCRITORIO / "ui" / "hilos.py").read_text(encoding="utf-8")

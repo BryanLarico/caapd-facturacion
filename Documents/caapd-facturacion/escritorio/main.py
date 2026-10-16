@@ -14,10 +14,24 @@ warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
 # Configuración inicial de rutas
 import rutas
 
+if "--worker-descarga-lecturas" in sys.argv:
+    sys.argv.remove("--worker-descarga-lecturas")
+    import os
+    from servicios.descarga_lecturas_proc import main as main_descarga_lecturas
+
+    os._exit(main_descarga_lecturas())
+
+from PySide6.QtCore import QThreadPool
 from PySide6.QtGui import QFont, QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication
 
-from ui.hilos import esperar_hilos, instalar_diagnostico_cierre, precargar_firebase_en_hilo_principal
+from servicios.cancelacion import marcar_cierre
+from ui.hilos import (
+    RecolectorBasuraGUI,
+    esperar_hilos,
+    instalar_diagnostico_cierre,
+    precargar_firebase_en_hilo_principal,
+)
 from ui.ventana_principal import VentanaPrincipal
 
 # Importar firebase_admin/gRPC desde el hilo principal poco después de abrir la
@@ -79,6 +93,8 @@ def main() -> None:
     # aboutToQuit, excepciones no capturadas) para diagnosticar cierres sin traceback.
     instalar_diagnostico_cierre(app)
 
+    app._recolector_gc = RecolectorBasuraGUI(app)
+
     # Configuración de estilos y tipografía
     configurar_fuentes(app)
     cargar_estilos(app)
@@ -113,9 +129,17 @@ def main() -> None:
         QTimer.singleShot(RETARDO_PRECARGA_MS, precargar_firebase_en_hilo_principal)
 
     # Antes de destruir QApplication, esperar a los Workers del pool (cierre limpio).
+    app.aboutToQuit.connect(marcar_cierre)
     app.aboutToQuit.connect(lambda: esperar_hilos(5000))
 
-    sys.exit(app.exec())
+    codigo = app.exec()
+    pool = QThreadPool.globalInstance()
+    pool.clear()
+    pool.waitForDone(5000)
+    ventana.deleteLater()
+    app.processEvents()
+    del ventana
+    sys.exit(codigo)
 
 
 if __name__ == "__main__":

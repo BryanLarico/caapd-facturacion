@@ -55,11 +55,6 @@ def servicio_prueba(tmp_path):
     s.ops = {"lecturas": 0, "escrituras": 0}
     s.base_dir = dir_bd
     s._archivos_mtime = {}
-    # Simula la descarga aislada usando el cliente Firestore simulado en este proceso.
-    s._puede_descargar_en_subproceso = lambda: True
-    s._descargar_docs_en_subproceso = (
-        lambda periodo, progreso: s._descargar_docs_en_proceso(periodo, progreso)
-    )
     s.periodo = "2026-09"
     s.config = {
         "mes_actual": {
@@ -237,6 +232,28 @@ def test_guardar_en_respaldo_local_solo_genera_padron_en_base_de_datos(
     assert str(ruta_padron) in servicio._archivos_mtime
 
 
+def test_cargar_padron_desde_excel_no_sobrescribe_archivo_origen(servicio_prueba):
+    datos_excel = {
+        "usuarios": servicio_prueba.usuarios,
+        "mes_docs": servicio_prueba.mes,
+        "periodo": "2026-09",
+        "config": {},
+    }
+    with patch.object(
+        servicio_prueba, "_extraer_datos_archivo_excel", return_value=datos_excel
+    ), patch.object(
+        servicio_prueba,
+        "guardar_en_respaldo_local",
+        side_effect=AssertionError("La carga no debe sobrescribir el Excel"),
+    ) as guardar_excel:
+        resultado = servicio_prueba.cargar_desde_carpeta_base_datos(
+            dir_bd=servicio_prueba.base_dir
+        )
+
+    assert resultado["exito"] is True
+    guardar_excel.assert_not_called()
+
+
 def test_accion_a_enviar_mes_sin_dinero_y_con_batch(servicio_prueba, tmp_path):
     """Acción A: Verifica que el payload subido no contenga campos monetarios y use WriteBatch."""
     mock_db = MagicMock()
@@ -395,6 +412,16 @@ def test_publicar_mes_actual_solo_crea_mes_nuevo_y_preserva_periodos(servicio_pr
     assert resultado["periodo"] == "2026-09"
     assert resultado["usuarios_subidos"] == len(servicio_prueba.mes)
     assert batch.create.call_count == len(servicio_prueba.mes)
+    payload = batch.create.call_args_list[0].args[1]
+    medidor = payload["medidores"][0]
+    assert payload["id_usuario"] == "30771152"
+    assert payload["codigo_categoria"] == "A"
+    assert payload["direccion"] == "AYACUCHO S/N"
+    assert payload["consumo_total_m3"] == 9
+    assert payload["historial_m3"] == [10, 11, 9]
+    assert medidor["lectura_actual"] == 118
+    assert medidor["lectura_anterior"] == 109
+    assert medidor["nro_medidor"] == "2001887"
     assert batch.set.call_args.args[0] is config_ref
     datos_config = batch.set.call_args.args[1]
     assert datos_config["mes_actual"]["periodo"] == "2026-09"
@@ -420,14 +447,9 @@ def test_publicar_mes_actual_se_detiene_si_ya_hay_documentos(servicio_prueba):
 
 def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
     """Acción B: Descarga lecturas de lectores móviles y recalcula consumo."""
-    mock_db = MagicMock()
-    col_mes = MagicMock()
-    mock_db.collection.return_value = col_mes
-
-    # Simular lectura tomada por lector para usuario 30770229
-    doc_cloud = MagicMock()
-    doc_cloud.id = "30770229"
-    doc_cloud.to_dict.return_value = {
+    servicio_prueba.mes["30771152"]["medidores"][0]["lectura_actual"] = None
+    docs_nube = {
+        "30770229": {
         "id_usuario": "30770229",
         "medidores": [
             {
@@ -440,16 +462,19 @@ def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
                 "registrado_por": "lector@ispacas.pe",
             }
         ],
+        }
     }
-    def stream_documentos(timeout):
-        assert timeout == servicio_prueba.TIMEOUT_DESCARGA_TOTAL
-        yield doc_cloud
-
-    consulta = col_mes.select.return_value
-    consulta.stream.side_effect = stream_documentos
 
     progresos = []
-    with patch("firebase_client.db", return_value=mock_db), \
+    def descargar_falso(periodo, callback_progreso=None):
+        if callback_progreso:
+            callback_progreso(1, "1 documento(s) recibidos")
+        return {"docs": docs_nube, "recibidos": 1}
+
+    with patch.object(servicio_prueba, "_descargar_docs_en_subproceso", side_effect=descargar_falso), \
+         patch.object(servicio_prueba, "_extraer_datos_archivo_excel", return_value={
+             "periodo": "2026-09", "mes_docs": servicio_prueba.mes,
+         }), \
          patch.object(servicio_prueba, "guardar_en_respaldo_local", return_value=None), \
          patch.object(servicio_prueba, "guardar_config", return_value=None):
 
@@ -469,25 +494,17 @@ def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
     assert servicio_prueba.mes["30770229"]["consumo_total_m3"] == 21
     assert m_local["registrado_por"] == "lector@ispacas.pe"
     assert servicio_prueba.config.get("ultima_descarga_lectores") is not None
-    col_mes.select.assert_called_once_with(["medidores", "nombre"])
-    consulta.stream.assert_called_once_with(
-        timeout=servicio_prueba.TIMEOUT_DESCARGA_TOTAL
-    )
     assert any("1 documento(s)" in texto for _, texto in progresos)
     assert progresos[-1][0] == 100
 
 
 def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
     """Acción B: Si el usuario ya tiene lectura registrada por ADMIN y la nube difiere, no se sobreescribe."""
-    mock_db = MagicMock()
-    col_mes = MagicMock()
-    mock_db.collection.return_value = col_mes
-
+    servicio_prueba.mes["30770229"]["medidores"][0]["lectura_actual"] = None
     # Usuario 30771152 tiene registrado_por == "ADMIN" con lectura 118
     # En la nube el lector subió lectura 115 (conflicto)
-    doc_cloud = MagicMock()
-    doc_cloud.id = "30771152"
-    doc_cloud.to_dict.return_value = {
+    docs_nube = {
+        "30771152": {
         "id_usuario": "30771152",
         "medidores": [
             {
@@ -497,10 +514,17 @@ def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
                 "registrado_por": "lector@ispacas.pe",
             }
         ],
+        }
     }
-    col_mes.select.return_value.stream.return_value = [doc_cloud]
 
-    with patch("firebase_client.db", return_value=mock_db), \
+    with patch.object(
+        servicio_prueba,
+        "_descargar_docs_en_subproceso",
+        return_value={"docs": docs_nube, "recibidos": 1},
+    ), \
+         patch.object(servicio_prueba, "_extraer_datos_archivo_excel", return_value={
+             "periodo": "2026-09", "mes_docs": servicio_prueba.mes,
+         }), \
          patch.object(servicio_prueba, "guardar_en_respaldo_local", return_value=None), \
          patch.object(servicio_prueba, "guardar_config", return_value=None):
 
@@ -518,6 +542,31 @@ def test_accion_b_protege_lecturas_admin_con_conflicto(servicio_prueba):
     m_local = servicio_prueba.mes["30771152"]["medidores"][0]
     assert m_local["lectura_actual"] == 118
     assert m_local["registrado_por"] == "ADMIN"
+
+
+def test_accion_b_no_descarga_si_todas_las_lecturas_actuales_estan_completas(
+    servicio_prueba,
+):
+    ruta_ultimo_padron = servicio_prueba.ruta_excel.with_name("PADRON_MES_2026-10.xlsx")
+    ruta_ultimo_padron.write_bytes(b"PK000fake_excel")
+    with patch.object(
+        servicio_prueba,
+        "_descargar_docs_en_subproceso",
+        side_effect=AssertionError("No debe consultar Firebase"),
+    ), patch.object(
+        servicio_prueba,
+        "_extraer_datos_archivo_excel",
+        return_value={"periodo": "2026-10", "mes_docs": servicio_prueba.mes},
+    ) as leer_excel, patch.object(
+        servicio_prueba, "guardar_en_respaldo_local"
+    ) as guardar_excel:
+        resultado = servicio_prueba.traer_lecturas_de_lectores()
+
+    leer_excel.assert_called_once_with(ruta_ultimo_padron)
+    assert resultado["periodo"] == "2026-10"
+    assert resultado["omitida"] is True
+    assert resultado["actualizados"] == 0
+    guardar_excel.assert_not_called()
 
 
 def test_descarga_en_subproceso_procesa_eventos_y_limpia_temporal(
@@ -664,6 +713,34 @@ def test_descarga_en_subproceso_no_confunde_heartbeat_con_avance(
 
     assert rutas_temporales
     assert all(not ruta.exists() for ruta in rutas_temporales)
+
+
+def test_descarga_en_subproceso_cancela_hijo_al_cerrar_aplicacion(
+    servicio_prueba, monkeypatch
+):
+    procesos = []
+
+    class ProcesoCancelado:
+        def __init__(self, _comando, **_kwargs):
+            self.stdout = io.StringIO("")
+            self.terminado = False
+            procesos.append(self)
+
+        def kill(self):
+            self.terminado = True
+
+        def wait(self, timeout):
+            return -9
+
+    monkeypatch.setattr(subprocess, "Popen", ProcesoCancelado)
+    monkeypatch.setattr("servicios.cancelacion.cierre_solicitado", lambda: True)
+
+    with pytest.raises(InterruptedError, match="aplicación se está cerrando"):
+        ServicioDatosPadron._descargar_docs_en_subproceso(
+            servicio_prueba, "2026-09", lambda *_: None
+        )
+
+    assert procesos and procesos[0].terminado
 
 
 def test_dialogo_confirmacion_requiere_escribir_confirmar(qapp, tmp_path):

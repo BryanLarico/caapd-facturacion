@@ -17,6 +17,7 @@ import calculos
 import codigos
 import respaldo_excel
 import rutas
+from servicios.cola_offline import encolar_cambio
 from servicios.datos import (
     ServicioDatos,
     construir_documentos_mes,
@@ -71,6 +72,22 @@ def validar_archivos_sin_duplicados(archivos: List[Path]) -> Tuple[List[Path], L
             seleccionados.append(lista[0])
     seleccionados.sort(key=lambda p: p.name)
     return seleccionados, advertencias
+
+
+def _todas_lecturas_actuales_completas(mes: Dict[str, Dict[str, Any]]) -> bool:
+    medidores = [
+        medidor
+        for usuario in (mes or {}).values()
+        if isinstance(usuario, dict)
+        for medidor in (usuario.get("medidores") or [])
+        if isinstance(medidor, dict)
+    ]
+    return bool(medidores) and all(
+        medidor.get("lectura_actual") is not None
+        and (not isinstance(medidor.get("lectura_actual"), str)
+             or bool(medidor["lectura_actual"].strip()))
+        for medidor in medidores
+    )
 
 
 def buscar_archivo_respaldo() -> Optional[Path]:
@@ -924,8 +941,6 @@ class ServicioDatosPadron(ServicioDatos):
             if estado_reciente:
                 self.config["mes_actual"]["estado"] = estado_reciente
 
-        self.guardar_en_respaldo_local()
-
         for a in archivos:
             if a.exists():
                 self._archivos_mtime[str(a)] = a.stat().st_mtime
@@ -1241,9 +1256,8 @@ class ServicioDatosPadron(ServicioDatos):
         col_ref = db.collection(f"mes_{periodo}")
         if next(iter(col_ref.list_documents()), None) is not None:
             raise ValueError(
-                f"Firebase ya contiene documentos para el periodo {periodo}. "
-                "No se modificó la nube; usa «Traer lecturas de los lectores» "
-                "o revisa el periodo antes de publicar."
+                f"El periodo {periodo} ya fue publicado en Firebase (ya contiene documentos). "
+                "No se modificó la nube; revisa el periodo antes de publicar."
             )
 
         if callback_progreso:
@@ -1295,6 +1309,147 @@ class ServicioDatosPadron(ServicioDatos):
         """Compatibilidad con versiones previas: invoca enviar_mes_a_lectores."""
         return self.enviar_mes_a_lectores(callback_progreso=callback_progreso)
 
+    TIMEOUT_DESCARGA_TOTAL = 180.0
+    TIMEOUT_DESCARGA_SIN_SENAL = 60.0
+
+    def _descargar_docs_en_subproceso(
+        self, periodo: str, callback_progreso: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Aísla la descarga y la limpieza de sockets SSL fuera del proceso Qt."""
+        import json
+        import queue
+        import subprocess
+        import sys
+        import tempfile
+        import threading
+        import time
+        from servicios.cancelacion import cierre_solicitado
+
+        with tempfile.TemporaryDirectory(prefix="caapd_lecturas_") as carpeta:
+            ruta_salida = Path(carpeta) / "resultado.json"
+            argumentos_worker = [
+                "--periodo", str(periodo),
+                "--salida", str(ruta_salida),
+                "--timeout", str(self.TIMEOUT_DESCARGA_SIN_SENAL),
+            ]
+            if getattr(sys, "frozen", False):
+                comando = [sys.executable, "--worker-descarga-lecturas", *argumentos_worker]
+            else:
+                comando = [
+                    sys.executable, "-u", "-m", "servicios.descarga_lecturas_proc",
+                    *argumentos_worker,
+                ]
+
+            proceso = subprocess.Popen(
+                comando,
+                cwd=str(rutas.DIR_BASE),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+            eventos: queue.Queue[Optional[str]] = queue.Queue()
+
+            def _leer_salida() -> None:
+                try:
+                    for linea in proceso.stdout or []:
+                        eventos.put(linea)
+                finally:
+                    eventos.put(None)
+
+            lector = threading.Thread(target=_leer_salida, daemon=True)
+            lector.start()
+            inicio = time.monotonic()
+            ultimo_avance = inicio
+            error_worker: Optional[str] = None
+            total_local = max(1, len(self.mes))
+
+            try:
+                while True:
+                    if cierre_solicitado():
+                        raise InterruptedError("Descarga cancelada porque la aplicación se está cerrando.")
+                    ahora = time.monotonic()
+                    restante_total = self.TIMEOUT_DESCARGA_TOTAL - (ahora - inicio)
+                    restante_senal = self.TIMEOUT_DESCARGA_SIN_SENAL - (ahora - ultimo_avance)
+                    if restante_total <= 0:
+                        raise TimeoutError(
+                            f"La descarga superó el tiempo máximo de {self.TIMEOUT_DESCARGA_TOTAL:g} segundos."
+                        )
+                    if restante_senal <= 0:
+                        raise TimeoutError(
+                            "La descarga de Firebase no recibió avances dentro del tiempo esperado."
+                        )
+
+                    try:
+                        linea = eventos.get(timeout=min(0.25, restante_total, restante_senal))
+                    except queue.Empty:
+                        continue
+                    if linea is None:
+                        break
+
+                    try:
+                        evento = json.loads(linea)
+                    except (TypeError, ValueError):
+                        continue
+
+                    tipo = evento.get("t")
+                    if tipo == "hb":
+                        continue
+                    if tipo == "fase":
+                        if callback_progreso:
+                            callback_progreso(0, str(evento.get("msg") or "Descargando lecturas..."))
+                    elif tipo == "prog":
+                        recibidos = int(evento.get("n") or 0)
+                        ultimo_avance = time.monotonic()
+                        if callback_progreso:
+                            callback_progreso(
+                                recibidos,
+                                f"Descargando lecturas de Firebase ({recibidos} documento(s) recibidos; {total_local} locales)...",
+                            )
+                    elif tipo == "fin":
+                        ultimo_avance = time.monotonic()
+                        if callback_progreso:
+                            callback_progreso(
+                                int(evento.get("n") or 0),
+                                f"Descarga terminada ({int(evento.get('n') or 0)} documentos).",
+                            )
+                    elif tipo == "error":
+                        error_worker = str(evento.get("msg") or "Error desconocido en la descarga.")
+
+                codigo = proceso.wait(timeout=5)
+            except BaseException:
+                try:
+                    proceso.kill()
+                except Exception:
+                    pass
+                try:
+                    proceso.wait(timeout=5)
+                except Exception:
+                    pass
+                salida = getattr(proceso, "stdout", None)
+                if salida is not None:
+                    try:
+                        salida.close()
+                    except Exception:
+                        pass
+                raise
+            finally:
+                lector.join(timeout=1)
+
+            if not ruta_salida.exists():
+                raise RuntimeError(error_worker or "El proceso de descarga no produjo un resultado.")
+            resultado = json.loads(ruta_salida.read_text(encoding="utf-8"))
+            if codigo != 0 or not resultado.get("exito"):
+                raise RuntimeError(
+                    error_worker or resultado.get("error") or "La descarga de lecturas falló."
+                )
+            return {
+                "docs": resultado.get("docs") or {},
+                "recibidos": int(resultado.get("recibidos") or 0),
+            }
+
     def traer_lecturas_de_lectores(
         self,
         periodo: Optional[str] = None,
@@ -1309,10 +1464,38 @@ class ServicioDatosPadron(ServicioDatos):
         La fusión con el Excel local la hace `fusionar_lecturas_nube`.
         """
         import time
-        from servicios import firestore_rest
 
         t_inicio = time.perf_counter()
         p = periodo or self.periodo
+        mes_local = self.mes
+        if periodo is None:
+            directorio = self.base_dir or rutas.ruta_base_de_datos()
+            archivos, _ = validar_archivos_sin_duplicados(
+                buscar_archivos_base_datos(directorio)
+            )
+            if archivos:
+                datos_excel = self._extraer_datos_archivo_excel(archivos[-1])
+                p = str(datos_excel.get("periodo") or p)
+                mes_local = datos_excel.get("mes_docs") or {}
+
+        if (periodo is None or p == self.periodo) and _todas_lecturas_actuales_completas(mes_local):
+            return {
+                "periodo": p,
+                "documentos_descargados": 0,
+                "actualizados": 0,
+                "conflictos_admin": [],
+                "tiempo_segundos": round(time.perf_counter() - t_inicio, 2),
+                "metodo": "LOCAL",
+                "exito": True,
+                "omitida": True,
+            }
+
+        if periodo is None and mes_local is not self.mes:
+            self.periodo = p
+            self.mes = mes_local
+            self.meses_encontrados[p] = mes_local
+
+        from servicios import firestore_rest
 
         if callback_progreso:
             callback_progreso(10, "Autenticando con Firebase (API REST, sin gRPC)...")
@@ -1333,11 +1516,10 @@ class ServicioDatosPadron(ServicioDatos):
             )
 
         # 1. Descarga completa (paginada) por REST. Lanza excepción clara si falla.
-        docs_nube = firestore_rest.descargar_documentos_mes(
-            p,
-            campos=("medidores", "nombre"),
-            callback_progreso=_progreso_descarga,
+        resultado_descarga = self._descargar_docs_en_subproceso(
+            p, callback_progreso=_progreso_descarga
         )
+        docs_nube = resultado_descarga["docs"]
         docs_recibidos = len(docs_nube)
         self.ops["lecturas"] += docs_recibidos
 

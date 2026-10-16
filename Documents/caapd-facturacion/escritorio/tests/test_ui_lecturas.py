@@ -10,6 +10,7 @@ Cubre:
 6. Diálogo de registro/corrección de lecturas y validación de alertas.
 """
 import datetime
+import threading
 
 import pytest
 from PySide6.QtCore import Qt
@@ -663,6 +664,47 @@ def test_abrir_mes_refresca_lecturas_sin_abrir_dialogo_actualizar(
     pagina._abrir_modal_mes()
 
     assert refrescos == [{"forzar": True}]
+
+
+def test_recarga_forzada_lecturas_actualiza_padron_en_worker(
+    qtbot, servicio_mock, monkeypatch
+):
+    servicio_mock.es_local_first = True
+    servicio_mock.config["mes_actual"]["periodo"] = "2026-10"
+    hilos_recarga = []
+
+    def recargar_excel(limpiar_config=True):
+        hilos_recarga.append(threading.get_ident())
+        servicio_mock.mes = {
+            "nuevo": {
+                "nro_conexion": "000099",
+                "nombre": "USUARIO NUEVO",
+                "sector": "BARRIO DE CHAUPI",
+                "medidores": [{"nro_medidor": "009999", "lectura_actual": None}],
+            }
+        }
+
+    monkeypatch.setattr(
+        servicio_mock,
+        "limpiar_cache",
+        recargar_excel,
+    )
+    pagina = PaginaLecturas(servicio_mock)
+    qtbot.addWidget(pagina)
+    hilo_gui = threading.get_ident()
+
+    pagina.cargar_datos_asincrono(forzar=True)
+    qtbot.waitUntil(
+        lambda: (
+            bool(hilos_recarga)
+            and pagina.btn_actualizar.isEnabled()
+            and any(fila["id_usuario"] == "nuevo" for fila in pagina.lista_items_completa)
+        ),
+        timeout=5000,
+    )
+
+    assert len(hilos_recarga) == 1
+    assert hilos_recarga[0] != hilo_gui
 
 
 def test_dialogo_sugiere_mes_actual_si_la_ultima_base_es_antigua(

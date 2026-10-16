@@ -5,6 +5,7 @@ Verifica la apertura de la ventana principal, la navegación entre las 6 página
 la barra de estado y los diferentes estados del panel de Inicio.
 """
 import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtCore import QThread, Qt
@@ -88,6 +89,38 @@ def test_barra_estado_muestra_contadores(qtbot, servicio_memoria):
 
     assert "12" in ventana.lbl_lecturas.text()
     assert "4" in ventana.lbl_escrituras.text()
+
+
+def test_inicio_lanza_publicacion_solo_del_mes_actual(qtbot, servicio_memoria):
+    ventana = VentanaPrincipal(servicio_memoria)
+    qtbot.addWidget(ventana)
+    pagina = ventana.pagina_inicio
+    servicio_memoria.es_local_first = True
+    servicio_memoria.publicar_mes_actual_a_lectores = MagicMock()
+
+    class DialogoPublicar:
+        ACCION_LOCAL = "local"
+        ACCION_SUBIR_FIREBASE = "subir_firebase"
+        ACCION_PUBLICAR_MES_ACTUAL = "publicar_mes_actual"
+        ACCION_DESCARGAR_FIREBASE = "descargar_firebase"
+
+        def __init__(self, *_args, **_kwargs):
+            self.resultado_accion = self.ACCION_PUBLICAR_MES_ACTUAL
+
+        def exec(self):
+            return 1
+
+    with patch(
+        "ui.componentes.dialogo_actualizar.DialogoActualizarBaseDatos",
+        DialogoPublicar,
+    ), patch.object(pagina, "_lanzar_sincronizacion") as lanzar:
+        pagina.actualizar_datos()
+
+    lanzar.assert_called_once_with(
+        "Publicando solo el mes actual...",
+        servicio_memoria.publicar_mes_actual_a_lectores,
+        pagina._al_terminar_publicacion_mes_actual,
+    )
     assert not hasattr(ventana, "lbl_ultimo_respaldo")
     textos = [boton.text() for boton in ventana.findChildren(QPushButton)]
     assert any("Base de datos" in texto for texto in textos)

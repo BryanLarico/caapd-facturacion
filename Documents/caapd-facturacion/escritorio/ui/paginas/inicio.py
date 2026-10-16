@@ -26,6 +26,7 @@ from ui.componentes.alerta import AlertaWidget
 from ui.componentes.barra_progreso_sector import BarraProgresoSector
 from ui.componentes.indicador_carga import IndicadorCarga
 from ui.componentes.tarjeta_stat import TarjetaStat
+from servicios.cancelacion import cierre_solicitado
 from ui.hilos import Worker, mostrar_dialogo_error, mostrar_dialogo_info
 
 
@@ -180,7 +181,9 @@ class PaginaInicio(QWidget):
 
         from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
         dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
+        acceptado = dlg.exec() == QDialog.DialogCode.Accepted
+        dlg.deleteLater()
+        if not acceptado:
             return
 
         accion = dlg.resultado_accion
@@ -192,6 +195,12 @@ class PaginaInicio(QWidget):
                 "Enviando mes a lectores...",
                 self.servicio.enviar_mes_a_lectores,
                 self._al_terminar_subida,
+            )
+        elif accion == DialogoActualizarBaseDatos.ACCION_PUBLICAR_MES_ACTUAL:
+            self._lanzar_sincronizacion(
+                "Publicando solo el mes actual...",
+                self.servicio.publicar_mes_actual_a_lectores,
+                self._al_terminar_publicacion_mes_actual,
             )
         elif accion == DialogoActualizarBaseDatos.ACCION_DESCARGAR_FIREBASE:
             self._lanzar_sincronizacion(
@@ -211,7 +220,8 @@ class PaginaInicio(QWidget):
             ventana.set_sincronizando(True)  # pausa la vigilancia de archivos externos
 
         def progreso_callback(pct: int, txt: str) -> None:
-            self._senal_progreso_sincronizacion.emit(int(pct), str(txt or ""))
+            if not cierre_solicitado():
+                self._senal_progreso_sincronizacion.emit(int(pct), str(txt or ""))
 
         worker = Worker(funcion_servicio, callback_progreso=progreso_callback)
         # Conexiones EN COLA explícitas a métodos de este QWidget: siempre corren en el hilo GUI.
@@ -258,7 +268,30 @@ class PaginaInicio(QWidget):
         self.cargar_datos_asincrono(limpiar_cache=False)
 
     @Slot(object)
+    def _al_terminar_publicacion_mes_actual(self, res: Any) -> None:
+        self._terminar_sincronizacion("¡Mes actual publicado para los lectores!")
+        res = res or {}
+        mostrar_dialogo_info(
+            self,
+            "Mes actual publicado",
+            f"El periodo {res.get('periodo', '')} quedó disponible para los lectores.\n\n"
+            f"• {res.get('usuarios_subidos', 0)} documentos creados en Firebase.\n"
+            f"• No se reemplazaron ni eliminaron documentos de otros meses.\n"
+            f"• ⏱️ Tiempo total: {res.get('tiempo_segundos', 0)} s.",
+        )
+        self.cargar_datos_asincrono(limpiar_cache=False)
+
+    @Slot(object)
     def _al_terminar_descarga(self, res: Any) -> None:
+        if (res or {}).get("omitida"):
+            self._terminar_sincronizacion("El padrón ya está actualizado.")
+            mostrar_dialogo_info(
+                self,
+                "No se trajeron lecturas",
+                "El padrón local más reciente ya tiene lectura actual para todos los usuarios.",
+            )
+            return
+
         self._terminar_sincronizacion("¡Lecturas descargadas!")
         res = res or {}
         conflictos = res.get("conflictos_admin") or []

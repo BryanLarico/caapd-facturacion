@@ -232,6 +232,8 @@ class PaginaLecturas(QWidget):
         self.btn_actualizar.setEnabled(False)
 
         def tarea() -> Any:
+            if forzar and getattr(self.servicio, "es_local_first", False):
+                self.servicio.limpiar_cache(limpiar_config=True)
             cfg = self.servicio.cargar_config()
             mes_actual = cfg.get("mes_actual") or {}
             periodo = mes_actual.get("periodo")
@@ -251,7 +253,9 @@ class PaginaLecturas(QWidget):
         if getattr(self.servicio, "es_local_first", False):
             from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
             dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
-            if dlg.exec() != QDialog.DialogCode.Accepted:
+            aceptado = dlg.exec() == QDialog.DialogCode.Accepted
+            dlg.deleteLater()
+            if not aceptado:
                 return
 
             ventana = self.window()

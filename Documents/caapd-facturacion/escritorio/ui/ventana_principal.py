@@ -427,6 +427,14 @@ class VentanaPrincipal(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Cierre seguro: detiene temporizadores y espera a los hilos de trabajo."""
+        if self.sincronizando:
+            QMessageBox.information(
+                self,
+                "Sincronización en curso",
+                "Espera a que termine la sincronización antes de cerrar la aplicación.",
+            )
+            event.ignore()
+            return
         if not esperar_hilos(1000):
             QMessageBox.information(
                 self,
