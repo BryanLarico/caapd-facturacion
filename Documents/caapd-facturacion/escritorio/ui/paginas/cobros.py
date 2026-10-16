@@ -157,7 +157,7 @@ class PaginaCobros(QWidget):
         self.btn_filtro_pagados = self._crear_boton_filtro(
             "Pagados (0)", "pagados")
         self.btn_filtro_alertas = self._crear_boton_filtro(
-            "⚠️ Con Alertas (0)", "con_alertas")
+            "⚠️ Con Alertas (0)", "alertas")
 
         for chip in (
             self.btn_filtro_todos,
@@ -303,18 +303,11 @@ class PaginaCobros(QWidget):
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setProperty("filtro_clave", clave)
         btn.setProperty("activo", "true" if clave == "todos" else "false")
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f1f5f9; color: #475569;
-                border: 1px solid #cbd5e1; border-radius: 6px;
-                padding: 6px 12px; font-size: 12px; font-weight: 500;
-            }
-            QPushButton:hover { background-color: #e2e8f0; }
-            QPushButton[activo="true"] {
-                background-color: #0284c7; color: #ffffff;
-                border-color: #0284c7; font-weight: bold;
-            }
-        """)
+        # El filtro "Con Alertas" usa el estilo ámbar de advertencia, igual que "Pendientes de DNI"
+        if clave == "alertas":
+            btn.setProperty("class", "filtro_btn filtro_btn_aviso")
+        else:
+            btn.setProperty("class", "filtro_btn")
         btn.clicked.connect(lambda: self._al_clic_filtro(clave))
         return btn
 
@@ -645,7 +638,8 @@ class PaginaCobros(QWidget):
             ):
                 self._actualizar_ficha(self.item_seleccionado)
             self._actualizar_kpis_y_chips()
-            self.toast.mostrar("Deuda actualizada y guardada en el padrón.", "exito")
+            self.toast.mostrar(
+                "Deuda actualizada y guardada en el padrón.", "exito")
         except Exception as exc:
             mostrar_dialogo_error(
                 self,

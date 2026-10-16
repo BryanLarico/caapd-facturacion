@@ -40,7 +40,8 @@ if not _log.handlers:
         _ruta_log = rutas.ruta_aplicacion("logs", "hilos.log")
         _ruta_log.parent.mkdir(parents=True, exist_ok=True)
         _handler = logging.FileHandler(str(_ruta_log), encoding="utf-8")
-        _handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        _handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s"))
         _log.addHandler(_handler)
         _log.setLevel(logging.INFO)
     except Exception:
@@ -75,7 +76,8 @@ class WorkerSignals(QObject):
         self._timer_liberar.timeout.connect(self._liberar_worker)
 
         # Conexión EN COLA explícita: este slot corre en el hilo GUI, nunca en el del pool.
-        self.finalizado.connect(self._programar_liberacion, Qt.ConnectionType.QueuedConnection)
+        self.finalizado.connect(
+            self._programar_liberacion, Qt.ConnectionType.QueuedConnection)
 
     @Slot()
     def _programar_liberacion(self) -> None:
@@ -122,14 +124,17 @@ class Worker(QRunnable):
             pass
 
     def run(self) -> None:
-        nombre = getattr(self.fn, "__qualname__", None) or getattr(self.fn, "__name__", "tarea")
+        nombre = getattr(self.fn, "__qualname__", None) or getattr(
+            self.fn, "__name__", "tarea")
         if not cierre_solicitado():
-            _log.info("Hilo '%s' iniciado (thread=%s).", nombre, hex(id(QThread.currentThread())))
+            _log.info("Hilo '%s' iniciado (thread=%s).",
+                      nombre, hex(id(QThread.currentThread())))
         try:
             res = self.fn(*self.args, **self.kwargs)
         except Exception as e:
             if not cierre_solicitado():
-                _log.error("Error en hilo '%s': %s\n%s", nombre, e, traceback.format_exc())
+                _log.error("Error en hilo '%s': %s\n%s",
+                           nombre, e, traceback.format_exc())
             self._emitir(self.signals.error, str(e) or e.__class__.__name__)
         else:
             self._emitir(self.signals.resultado, res)
@@ -152,8 +157,10 @@ def slot_seguro(fn: Callable[..., Any]) -> Callable[..., Any]:
         try:
             return fn(*args, **kwargs)
         except Exception as e:
-            nombre = getattr(fn, "__qualname__", None) or getattr(fn, "__name__", "slot")
-            _log.error("Error en slot '%s': %s\n%s", nombre, e, traceback.format_exc())
+            nombre = getattr(fn, "__qualname__", None) or getattr(
+                fn, "__name__", "slot")
+            _log.error("Error en slot '%s': %s\n%s",
+                       nombre, e, traceback.format_exc())
             padre = args[0] if args and isinstance(args[0], QWidget) else None
             try:
                 mostrar_dialogo_error(
@@ -169,9 +176,11 @@ def slot_seguro(fn: Callable[..., Any]) -> Callable[..., Any]:
 
     return envoltura
 
+
 class RecolectorBasuraGUI(QObject):
     """Ejecuta el GC de Python SOLO en el hilo GUI: así ningún QWidget/QObject
     se destruye desde un hilo del QThreadPool (causa del cierre nativo)."""
+
     def __init__(self, app: QCoreApplication, intervalo_ms: int = 1000) -> None:
         super().__init__(app)
         gc.disable()
@@ -185,6 +194,7 @@ class RecolectorBasuraGUI(QObject):
     def _recolectar(self) -> None:
         self._ciclos += 1
         gc.collect(2 if self._ciclos % 10 == 0 else 1)
+
 
 def esperar_hilos(ms: int = 8000) -> bool:
     """Espera como máximo ``ms`` y reporta si todos los Workers terminaron."""
@@ -210,7 +220,8 @@ def precargar_firebase_en_hilo_principal() -> bool:
     """
     app = QCoreApplication.instance()
     if app is not None and QThread.currentThread() is not app.thread():
-        _log.warning("precargar_firebase_en_hilo_principal() llamado fuera del hilo GUI; se omite.")
+        _log.warning(
+            "precargar_firebase_en_hilo_principal() llamado fuera del hilo GUI; se omite.")
         return False
     ok = True
     try:
@@ -227,7 +238,8 @@ def precargar_firebase_en_hilo_principal() -> bool:
         # necesiten mostrarán su propio error en español.
         _log.warning("No se pudo precargar firebase_client: %s", e)
         ok = False
-    _log.info("Precarga de Firebase/gRPC en hilo principal: %s", "completa" if ok else "parcial")
+    _log.info("Precarga de Firebase/gRPC en hilo principal: %s",
+              "completa" if ok else "parcial")
     return ok
 
 
@@ -249,7 +261,8 @@ def instalar_diagnostico_cierre(app: QCoreApplication) -> None:
 
     def _al_salir() -> None:
         activos = QThreadPool.globalInstance().activeThreadCount()
-        _log.warning("Qt emitió aboutToQuit (workers activos: %d). Pila:\n%s", activos, _pila())
+        _log.warning(
+            "Qt emitió aboutToQuit (workers activos: %d). Pila:\n%s", activos, _pila())
 
     try:
         app.lastWindowClosed.connect(_al_cerrar_ultima_ventana)
@@ -286,7 +299,8 @@ def _crear_caja(padre: Optional[QWidget], icono: Any, titulo: str, mensaje: str,
     box.setText(mensaje)
     box.setStandardButtons(QMessageBox.StandardButton.Ok)
     # Ancho mínimo del texto: evita que la primera línea se corte.
-    box.setStyleSheet(f"QLabel#qt_msgbox_label {{ min-width: {int(ancho_min)}px; }}")
+    box.setStyleSheet(
+        f"QLabel#qt_msgbox_label {{ min-width: {int(ancho_min)}px; }}")
     lbl = box.findChild(QLabel, "qt_msgbox_label")
     if lbl is not None:
         lbl.setWordWrap(True)
@@ -295,9 +309,27 @@ def _crear_caja(padre: Optional[QWidget], icono: Any, titulo: str, mensaje: str,
 
 def mostrar_dialogo_info(padre: Optional[QWidget], titulo: str, mensaje: str, ancho_min: int = 560) -> None:
     """Diálogo informativo ancho: el texto largo se ve completo y con salto de línea."""
-    _crear_caja(padre, QMessageBox.Icon.Information, titulo or "Información", mensaje, ancho_min).exec()
+    _crear_caja(padre, QMessageBox.Icon.Information,
+                titulo or "Información", mensaje, ancho_min).exec()
 
 
 def mostrar_dialogo_error(padre: Optional[QWidget], titulo: str, mensaje: str, ancho_min: int = 480) -> None:
     """Muestra un diálogo nativo de error claro en español."""
-    _crear_caja(padre, QMessageBox.Icon.Critical, titulo or "Error del sistema", mensaje, ancho_min).exec()
+    _crear_caja(padre, QMessageBox.Icon.Critical,
+                titulo or "Error del sistema", mensaje, ancho_min).exec()
+
+
+def mostrar_dialogo_aviso(
+    padre: Optional[QWidget],
+    titulo: str,
+    mensaje: str,
+    detalle: Optional[str] = None,
+    ancho_min: int = 560,
+) -> None:
+    """Diálogo de advertencia ancho con salto de línea. El detalle técnico va en
+    una sección plegable ('Mostrar detalles...') con scroll, así nunca deforma la caja."""
+    box = _crear_caja(padre, QMessageBox.Icon.Warning,
+                      titulo or "Aviso", mensaje, ancho_min)
+    if detalle:
+        box.setDetailedText(str(detalle))
+    box.exec()

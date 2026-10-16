@@ -160,7 +160,8 @@ def fusionar_lecturas_nube(
             if not isinstance(mc, dict):
                 continue
             nro = str(mc.get("nro_medidor") or "")
-            ml = next((m for m in meds_local if str(m.get("nro_medidor") or "") == nro), None)
+            ml = next((m for m in meds_local if str(
+                m.get("nro_medidor") or "") == nro), None)
             if not ml and len(meds_local) == 1:
                 ml = meds_local[0]
             if not ml:
@@ -196,7 +197,8 @@ def fusionar_lecturas_nube(
             ml["estado_lectura"] = mc.get("estado_lectura", "LEIDO")
             ml["novedad"] = mc.get("novedad", "NORMAL")
             ml["nota"] = mc.get("nota", "")
-            ml["fecha_lectura"] = mc.get("fecha_lectura") or datetime.date.today().isoformat()
+            ml["fecha_lectura"] = mc.get(
+                "fecha_lectura") or datetime.date.today().isoformat()
             ml["registrado_por"] = mc.get("registrado_por") or "LECTOR"
             actualizados += 1
             modificado_usuario = True
@@ -584,20 +586,25 @@ class ServicioDatosPadron(ServicioDatos):
             raise ValueError(f"Campo de deuda inválido: {campo}")
         importe = round(float(valor), 2)
         if not math.isfinite(importe) or importe < 0:
-            raise ValueError("La deuda debe ser un importe finito no negativo.")
+            raise ValueError(
+                "La deuda debe ser un importe finito no negativo.")
         if self.periodo and periodo != self.periodo:
-            raise ValueError(f"El periodo activo es {self.periodo}, no {periodo}.")
+            raise ValueError(
+                f"El periodo activo es {self.periodo}, no {periodo}.")
 
         doc = self.mes.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
 
         valores_anteriores = {
             clave: doc.get(clave)
             for clave in ("deuda_anterior", "deuda_actual", "total_a_pagar")
         }
-        deuda_anterior = importe if campo == "deuda_anterior" else float(doc.get("deuda_anterior") or 0.0)
-        deuda_actual = importe if campo == "deuda_actual" else doc.get("deuda_actual")
+        deuda_anterior = importe if campo == "deuda_anterior" else float(
+            doc.get("deuda_anterior") or 0.0)
+        deuda_actual = importe if campo == "deuda_actual" else doc.get(
+            "deuda_actual")
         if deuda_actual is None:
             deuda_actual = max(
                 0.0,
@@ -1003,7 +1010,8 @@ class ServicioDatosPadron(ServicioDatos):
         que existan localmente, ordenados del más reciente al más antiguo."""
         activo = self.periodo
         meses_locales = dict(getattr(self, "meses_encontrados", {}) or {})
-        anteriores = sorted((per for per in meses_locales if per < activo), reverse=True)
+        anteriores = sorted(
+            (per for per in meses_locales if per < activo), reverse=True)
         return [activo] + anteriores[: max(0, self.MESES_EN_NUBE - 1)]
 
     @staticmethod
@@ -1013,6 +1021,8 @@ class ServicioDatosPadron(ServicioDatos):
         for uid, doc in (docs_mes or {}).items():
             meds_limpios = []
             for m in (doc.get("medidores") or []):
+                if not isinstance(m, dict):
+                    m = {"nro_medidor": str(m)}
                 meds_limpios.append({
                     "nro_medidor": str(m.get("nro_medidor") or ""),
                     "lectura_anterior": m.get("lectura_anterior"),
@@ -1072,7 +1082,8 @@ class ServicioDatosPadron(ServicioDatos):
         for f in dir_bd.glob("*.xlsx"):
             if not f.name.startswith("~$") and f.is_file():
                 try:
-                    shutil.copy2(f, dir_historial / f"{f.stem}_{ts_backup}.xlsx")
+                    shutil.copy2(f, dir_historial /
+                                 f"{f.stem}_{ts_backup}.xlsx")
                 except Exception:
                     pass
 
@@ -1082,12 +1093,14 @@ class ServicioDatosPadron(ServicioDatos):
 
         # 2. Preparar documentos de cada periodo (el activo siempre desde self.mes, que tiene los cambios en memoria)
         if callback_progreso:
-            callback_progreso(15, f"Preparando {len(periodos)} mes(es) para envío a lectores ({', '.join(periodos)})...")
+            callback_progreso(
+                15, f"Preparando {len(periodos)} mes(es) para envío a lectores ({', '.join(periodos)})...")
 
         meses_locales = dict(getattr(self, "meses_encontrados", {}) or {})
         docs_por_periodo: Dict[str, Dict[str, Dict[str, Any]]] = {}
         for per in periodos:
-            fuente = self.mes if per == periodo_activo else meses_locales.get(per, {})
+            fuente = self.mes if per == periodo_activo else meses_locales.get(per, {
+            })
             docs_por_periodo[per] = self._preparar_docs_para_nube(fuente)
 
         # 3. Subir documentos a Firestore con WriteBatch de 500 (sin .get() previo)
@@ -1100,7 +1113,8 @@ class ServicioDatosPadron(ServicioDatos):
         for per in periodos:
             col_ref = db.collection(f"mes_{per}")
             items_subir = list(docs_por_periodo[per].items())
-            chunks_subir = [items_subir[i:i + batch_size] for i in range(0, len(items_subir), batch_size)]
+            chunks_subir = [items_subir[i:i + batch_size]
+                            for i in range(0, len(items_subir), batch_size)]
             for chunk in chunks_subir:
                 batch = db.batch()
                 for uid, data in chunk:
@@ -1110,12 +1124,14 @@ class ServicioDatosPadron(ServicioDatos):
                 subidos_acum += len(chunk)
                 if callback_progreso:
                     pct = 20 + int((subidos_acum / max(1, total_items)) * 40)
-                    callback_progreso(pct, f"Subiendo mes {per} ({subidos_acum}/{total_items} documentos)...")
+                    callback_progreso(
+                        pct, f"Subiendo mes {per} ({subidos_acum}/{total_items} documentos)...")
             subidos_por_periodo[per] = len(items_subir)
 
         # 4. Actualizar config/general
         if callback_progreso:
-            callback_progreso(65, "Actualizando configuración general en Firestore...")
+            callback_progreso(
+                65, "Actualizando configuración general en Firestore...")
         mes_actual_cfg = self.config.get("mes_actual") or {}
         datos_cfg_nube = {
             "mes_actual": {
@@ -1128,12 +1144,14 @@ class ServicioDatosPadron(ServicioDatos):
             "sectores": self.config.get("sectores") or [],
             "observaciones": self.config.get("observaciones") or [],
         }
-        db.collection("config").document("general").set(datos_cfg_nube, merge=True)
+        db.collection("config").document(
+            "general").set(datos_cfg_nube, merge=True)
         self.ops["escrituras"] += 1
 
         # 5. Detectar sobrantes usando list_documents() (SOLO IDs, NUNCA stream())
         if callback_progreso:
-            callback_progreso(70, "Buscando documentos obsoletos en Firebase (list_documents)...")
+            callback_progreso(
+                70, "Buscando documentos obsoletos en Firebase (list_documents)...")
 
         colecciones_a_revisar = []
 
@@ -1185,8 +1203,10 @@ class ServicioDatosPadron(ServicioDatos):
         # 6. Borrar sobrantes en paralelo (ThreadPoolExecutor, 4-6 hilos, lotes de 500)
         if total_sobrantes > 0:
             if callback_progreso:
-                callback_progreso(75, f"Borrando {total_sobrantes} documentos obsoletos en paralelo...")
-            chunks_borrar = [refs_sobrantes[i:i + batch_size] for i in range(0, total_sobrantes, batch_size)]
+                callback_progreso(
+                    75, f"Borrando {total_sobrantes} documentos obsoletos en paralelo...")
+            chunks_borrar = [refs_sobrantes[i:i + batch_size]
+                             for i in range(0, total_sobrantes, batch_size)]
 
             def _borrar_lote(refs):
                 b = db.batch()
@@ -1197,14 +1217,16 @@ class ServicioDatosPadron(ServicioDatos):
 
             borrados_acum = 0
             with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                futures = [executor.submit(_borrar_lote, ch) for ch in chunks_borrar]
+                futures = [executor.submit(_borrar_lote, ch)
+                           for ch in chunks_borrar]
                 for fut in concurrent.futures.as_completed(futures):
                     cnt = fut.result()
                     borrados_acum += cnt
                     self.ops["escrituras"] += cnt
                     if callback_progreso:
                         pct = 75 + int((borrados_acum / total_sobrantes) * 20)
-                        callback_progreso(pct, f"Borrando sobrantes ({borrados_acum}/{total_sobrantes})...")
+                        callback_progreso(
+                            pct, f"Borrando sobrantes ({borrados_acum}/{total_sobrantes})...")
 
         # 7. Registrar timestamp y guardar config local
         duracion = time.perf_counter() - t_inicio
@@ -1242,7 +1264,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         documentos = self._preparar_docs_para_nube(self.mes)
         if not documentos:
-            raise ValueError(f"El padrón local del periodo {periodo} no contiene usuarios.")
+            raise ValueError(
+                f"El padrón local del periodo {periodo} no contiene usuarios.")
         if len(documentos) > 499:
             raise ValueError(
                 "El mes tiene más de 499 usuarios y no se puede publicar de forma "
@@ -1261,7 +1284,8 @@ class ServicioDatosPadron(ServicioDatos):
             )
 
         if callback_progreso:
-            callback_progreso(35, "Verificando configuración de la app móvil...")
+            callback_progreso(
+                35, "Verificando configuración de la app móvil...")
 
         config_ref = db.collection("config").document("general")
         config_snapshot = config_ref.get()
@@ -1283,7 +1307,8 @@ class ServicioDatosPadron(ServicioDatos):
         }
 
         if callback_progreso:
-            callback_progreso(55, f"Publicando {len(documentos)} usuarios del mes {periodo}...")
+            callback_progreso(
+                55, f"Publicando {len(documentos)} usuarios del mes {periodo}...")
 
         batch = db.batch()
         for uid, datos in documentos.items():
@@ -1294,7 +1319,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         duracion = time.perf_counter() - t_inicio
         if callback_progreso:
-            callback_progreso(100, f"¡Mes {periodo} publicado en {duracion:.2f} s!")
+            callback_progreso(
+                100, f"¡Mes {periodo} publicado en {duracion:.2f} s!")
 
         return {
             "periodo": periodo,
@@ -1333,7 +1359,8 @@ class ServicioDatosPadron(ServicioDatos):
                 "--timeout", str(self.TIMEOUT_DESCARGA_SIN_SENAL),
             ]
             if getattr(sys, "frozen", False):
-                comando = [sys.executable, "--worker-descarga-lecturas", *argumentos_worker]
+                comando = [sys.executable,
+                           "--worker-descarga-lecturas", *argumentos_worker]
             else:
                 comando = [
                     sys.executable, "-u", "-m", "servicios.descarga_lecturas_proc",
@@ -1369,10 +1396,13 @@ class ServicioDatosPadron(ServicioDatos):
             try:
                 while True:
                     if cierre_solicitado():
-                        raise InterruptedError("Descarga cancelada porque la aplicación se está cerrando.")
+                        raise InterruptedError(
+                            "Descarga cancelada porque la aplicación se está cerrando.")
                     ahora = time.monotonic()
-                    restante_total = self.TIMEOUT_DESCARGA_TOTAL - (ahora - inicio)
-                    restante_senal = self.TIMEOUT_DESCARGA_SIN_SENAL - (ahora - ultimo_avance)
+                    restante_total = self.TIMEOUT_DESCARGA_TOTAL - \
+                        (ahora - inicio)
+                    restante_senal = self.TIMEOUT_DESCARGA_SIN_SENAL - \
+                        (ahora - ultimo_avance)
                     if restante_total <= 0:
                         raise TimeoutError(
                             f"La descarga superó el tiempo máximo de {self.TIMEOUT_DESCARGA_TOTAL:g} segundos."
@@ -1383,7 +1413,8 @@ class ServicioDatosPadron(ServicioDatos):
                         )
 
                     try:
-                        linea = eventos.get(timeout=min(0.25, restante_total, restante_senal))
+                        linea = eventos.get(timeout=min(
+                            0.25, restante_total, restante_senal))
                     except queue.Empty:
                         continue
                     if linea is None:
@@ -1399,7 +1430,8 @@ class ServicioDatosPadron(ServicioDatos):
                         continue
                     if tipo == "fase":
                         if callback_progreso:
-                            callback_progreso(0, str(evento.get("msg") or "Descargando lecturas..."))
+                            callback_progreso(
+                                0, str(evento.get("msg") or "Descargando lecturas..."))
                     elif tipo == "prog":
                         recibidos = int(evento.get("n") or 0)
                         ultimo_avance = time.monotonic()
@@ -1416,7 +1448,8 @@ class ServicioDatosPadron(ServicioDatos):
                                 f"Descarga terminada ({int(evento.get('n') or 0)} documentos).",
                             )
                     elif tipo == "error":
-                        error_worker = str(evento.get("msg") or "Error desconocido en la descarga.")
+                        error_worker = str(evento.get(
+                            "msg") or "Error desconocido en la descarga.")
 
                 codigo = proceso.wait(timeout=5)
             except BaseException:
@@ -1439,11 +1472,13 @@ class ServicioDatosPadron(ServicioDatos):
                 lector.join(timeout=1)
 
             if not ruta_salida.exists():
-                raise RuntimeError(error_worker or "El proceso de descarga no produjo un resultado.")
+                raise RuntimeError(
+                    error_worker or "El proceso de descarga no produjo un resultado.")
             resultado = json.loads(ruta_salida.read_text(encoding="utf-8"))
             if codigo != 0 or not resultado.get("exito"):
                 raise RuntimeError(
-                    error_worker or resultado.get("error") or "La descarga de lecturas falló."
+                    error_worker or resultado.get(
+                        "error") or "La descarga de lecturas falló."
                 )
             return {
                 "docs": resultado.get("docs") or {},
@@ -1498,14 +1533,16 @@ class ServicioDatosPadron(ServicioDatos):
         from servicios import firestore_rest
 
         if callback_progreso:
-            callback_progreso(10, "Autenticando con Firebase (API REST, sin gRPC)...")
+            callback_progreso(
+                10, "Autenticando con Firebase (API REST, sin gRPC)...")
 
         total_docs_locales = max(1, len(self.mes))
 
         def _progreso_descarga(n_recibidos: int, texto: str) -> None:
             if not callback_progreso:
                 return
-            pct = 20 + int(min(n_recibidos, total_docs_locales) / total_docs_locales * 50)
+            pct = 20 + int(min(n_recibidos, total_docs_locales) /
+                           total_docs_locales * 50)
             callback_progreso(min(pct, 70), texto)
 
         if callback_progreso:
@@ -1525,8 +1562,10 @@ class ServicioDatosPadron(ServicioDatos):
 
         # 2. Fusión en memoria con protección ADMIN y recálculo de consumos.
         if callback_progreso:
-            callback_progreso(75, f"Consolidando {docs_recibidos} documento(s) con el padrón local...")
-        actualizados, conflictos_admin = fusionar_lecturas_nube(docs_nube, self.mes)
+            callback_progreso(
+                75, f"Consolidando {docs_recibidos} documento(s) con el padrón local...")
+        actualizados, conflictos_admin = fusionar_lecturas_nube(
+            docs_nube, self.mes)
 
         # 3. Guardar en Excel local
         if callback_progreso:
@@ -1540,7 +1579,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         duracion = time.perf_counter() - t_inicio
         if callback_progreso:
-            callback_progreso(100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
+            callback_progreso(
+                100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
 
         return {
             "periodo": p,
@@ -1551,7 +1591,7 @@ class ServicioDatosPadron(ServicioDatos):
             "metodo": "REST",
             "exito": True,
         }
-    
+
     def sincronizar_desde_firebase(self, periodo: Optional[str] = None) -> Dict[str, Any]:
         """Compatibilidad con versiones previas: invoca traer_lecturas_de_lectores."""
         return self.traer_lecturas_de_lectores(periodo=periodo)
@@ -1655,49 +1695,129 @@ class ServicioDatosPadron(ServicioDatos):
         except Exception as e:
             return False, str(e)
 
+    @staticmethod
+    def _normalizar_medidores_para_mes(
+        medidores_nuevos: List[Any],
+        medidores_previos: Optional[List[Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Convierte medidores (str o dict) a dicts completos de documento de mes,
+        preservando lecturas ya registradas en medidores_previos."""
+        previos: Dict[str, Dict[str, Any]] = {}
+        for m in medidores_previos or []:
+            if isinstance(m, dict) and m.get("nro_medidor"):
+                previos[str(m["nro_medidor"]).strip()] = m
+
+        resultado: List[Dict[str, Any]] = []
+        for m in medidores_nuevos or []:
+            nro = str(m.get("nro_medidor") if isinstance(
+                m, dict) else m or "").strip()
+            if not nro:
+                continue
+            if nro in previos:
+                # conserva lecturas existentes
+                resultado.append(dict(previos[nro]))
+            elif isinstance(m, dict):
+                base = {
+                    "nro_medidor": nro, "lectura_anterior": 0, "fecha_anterior": None,
+                    "consumo_anterior": None, "lectura_actual": None, "fecha_lectura": None,
+                    "estado_lectura": "PENDIENTE", "novedad": "NORMAL", "nota": "",
+                    "registrado_por": None,
+                }
+                base.update(m)
+                resultado.append(base)
+            else:
+                resultado.append({
+                    "nro_medidor": nro, "lectura_anterior": 0, "fecha_anterior": None,
+                    "consumo_anterior": None, "lectura_actual": None, "fecha_lectura": None,
+                    "estado_lectura": "PENDIENTE", "novedad": "NORMAL", "nota": "",
+                    "registrado_por": None,
+                })
+        return resultado
+
     def guardar_usuario(
         self, id_usuario: str, datos: Dict[str, Any], agregar_al_mes: bool = True
     ) -> Tuple[bool, Optional[str]]:
         d = dict(datos)
         d["_id"] = id_usuario
         d["id_usuario"] = id_usuario
-        self.usuarios[id_usuario] = d
 
-        # Si el mes actual está ABIERTO, se agrega automáticamente al mes activo
         mes_actual = self.config.get("mes_actual", {})
         esta_abierto = str(mes_actual.get("estado") or "").upper() == "ABIERTO"
-        if (agregar_al_mes or esta_abierto) and self.mes is not None:
-            if id_usuario not in self.mes:
-                self.mes[id_usuario] = dict(d)
 
-        # 1. Guardar en Excel local (fuente de verdad indiscutible)
-        self.guardar_en_respaldo_local()
+        # Documento del mes con medidores como DICTS (no strings)
+        doc_mes = None
+        if (agregar_al_mes or esta_abierto) and self.mes is not None and id_usuario not in self.mes:
+            doc_mes = dict(d)
+            doc_mes["medidores"] = self._normalizar_medidores_para_mes(
+                d.get("medidores"))
 
-        # 2. Sincronizar un único documento a Firebase si el mes está ABIERTO
-        exito_sync, err_sync = self._sincronizar_usuario_unitario_a_firebase(
+        # Snapshot para rollback
+        usuario_previo = self.usuarios.get(id_usuario)
+        mes_previo = self.mes.get(id_usuario) if self.mes is not None else None
+
+        self.usuarios[id_usuario] = d
+        if doc_mes is not None:
+            self.mes[id_usuario] = doc_mes
+
+        # 1. Persistir en Excel. Si falla, REVERTIR memoria y relanzar.
+        try:
+            self.guardar_en_respaldo_local()
+        except Exception:
+            if usuario_previo is None:
+                self.usuarios.pop(id_usuario, None)
+            else:
+                self.usuarios[id_usuario] = usuario_previo
+            if doc_mes is not None:
+                if mes_previo is None:
+                    self.mes.pop(id_usuario, None)
+                else:
+                    self.mes[id_usuario] = mes_previo
+            raise
+
+        # 2. Espejo a Firebase (no bloqueante)
+        return self._sincronizar_usuario_unitario_a_firebase(
             id_usuario, self.mes.get(id_usuario, d)
         )
-        return exito_sync, err_sync
 
     def actualizar_usuario(
         self, id_usuario: str, cambios: Dict[str, Any]
     ) -> Tuple[bool, Optional[str]]:
-        if id_usuario in self.usuarios:
-            self.usuarios[id_usuario].update(cambios)
-            if id_usuario in self.mes:
-                self.mes[id_usuario].update(cambios)
+        if id_usuario not in self.usuarios:
+            return True, None
+
+        import copy
+        usuario_previo = copy.deepcopy(self.usuarios[id_usuario])
+        mes_previo = copy.deepcopy(
+            self.mes[id_usuario]) if id_usuario in self.mes else None
+
+        self.usuarios[id_usuario].update(cambios)
+        if id_usuario in self.mes:
+            cambios_mes = dict(cambios)
+            if "medidores" in cambios_mes:
+                cambios_mes["medidores"] = self._normalizar_medidores_para_mes(
+                    cambios_mes["medidores"],
+                    medidores_previos=self.mes[id_usuario].get("medidores"),
+                )
+            self.mes[id_usuario].update(cambios_mes)
+
+        try:
             self.guardar_en_respaldo_local()
-            exito_sync, err_sync = self._sincronizar_usuario_unitario_a_firebase(
-                id_usuario, self.mes.get(id_usuario, self.usuarios[id_usuario])
-            )
-            return exito_sync, err_sync
-        return True, None
+        except Exception:
+            self.usuarios[id_usuario] = usuario_previo
+            if mes_previo is not None:
+                self.mes[id_usuario] = mes_previo
+            raise
+
+        return self._sincronizar_usuario_unitario_a_firebase(
+            id_usuario, self.mes.get(id_usuario, self.usuarios[id_usuario])
+        )
 
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
         if id_viejo == id_nuevo:
             raise ValueError("El nuevo ID es igual al ID actual.")
         if id_nuevo in self.usuarios:
-            raise ValueError(f"Ya existe un usuario con el ID/DNI '{id_nuevo}'.")
+            raise ValueError(
+                f"Ya existe un usuario con el ID/DNI '{id_nuevo}'.")
         if id_viejo not in self.usuarios:
             raise ValueError(f"Usuario {id_viejo} no existe.")
 
@@ -1771,7 +1891,8 @@ class ServicioDatosPadron(ServicioDatos):
         estado_actual = mes_act.get("estado") or "FACTURADO"
 
         periodo_calendario = obtener_periodo_actual()
-        siguiente = siguiente_periodo(periodo_actual) if periodo_actual else periodo_calendario
+        siguiente = siguiente_periodo(
+            periodo_actual) if periodo_actual else periodo_calendario
 
         if estado_actual == "ABIERTO":
             return (

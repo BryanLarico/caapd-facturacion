@@ -733,20 +733,49 @@ QPushButton.filtro_btn {
 }
 
 QPushButton.filtro_btn:hover {
-    background-color: #f0f9ff;
-    color: #0369a1;
+    background-color: #f0fdfa;
+    color: #0f766e;
+    border-color: #5eead4;
 }
 
+/* Filtro seleccionado: fondo turquesa, letra blanca, borde turquesa claro */
 QPushButton.filtro_btn[activo="true"] {
-    background-color: #0369a1;
-QMessageBox QLabel#qt_msgbox_label {
-    color: #0f172a;
-    font-size: 14px;
-    font-weight: 500;
-    min-width: 520px;
+    background-color: #0d9488;
+    color: #ffffff;
+    border: 1.5px solid #5eead4;
+    font-weight: 600;
 }
-    border-color: #f59e0b;
+
+QPushButton.filtro_btn[activo="true"]:hover {
+    background-color: #0f766e;
+    color: #ffffff;
+    border-color: #99f6e4;
+}
+
+/* Filtro de advertencia (Pendientes de DNI) sin seleccionar: tono ámbar suave */
+QPushButton.filtro_btn_aviso {
+    background-color: #fffbeb;
     color: #b45309;
+    border: 1.5px solid #fcd34d;
+}
+
+QPushButton.filtro_btn_aviso:hover {
+    background-color: #fef3c7;
+    color: #92400e;
+    border-color: #f59e0b;
+}
+
+/* Filtro de advertencia seleccionado: ámbar sólido con letra blanca */
+QPushButton.filtro_btn_aviso[activo="true"] {
+    background-color: #d97706;
+    color: #ffffff;
+    border: 1.5px solid #fcd34d;
+    font-weight: 600;
+}
+
+QPushButton.filtro_btn_aviso[activo="true"]:hover {
+    background-color: #b45309;
+    color: #ffffff;
 }
 
 /* --- Chips de Medidores --- */
@@ -779,7 +808,7 @@ QMessageBox QLabel#qt_msgbox_label {
     color: #0f172a;
     font-size: 14px;
     font-weight: 500;
-    min-width: 320px;
+    min-width: 520px;
 }
 
 QMessageBox QPushButton {

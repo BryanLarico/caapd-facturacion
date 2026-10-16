@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 import codigos
 from servicios.datos import ServicioDatos
+from ui.hilos import mostrar_dialogo_aviso, mostrar_dialogo_error
 
 
 class DialogoUsuario(QDialog):
@@ -43,11 +44,13 @@ class DialogoUsuario(QDialog):
         self.config = config
         self.usuario = usuario
         self.es_edicion = usuario is not None
-        self.id_original = str(self.usuario.get("id_usuario") or self.usuario.get("_id") or "") if self.es_edicion else ""
+        self.id_original = str(self.usuario.get("id_usuario") or self.usuario.get(
+            "_id") or "") if self.es_edicion else ""
 
         self.medidores_lista: List[str] = []
 
-        self.setWindowTitle("Editar Usuario" if self.es_edicion else "Nuevo Usuario")
+        self.setWindowTitle(
+            "Editar Usuario" if self.es_edicion else "Nuevo Usuario")
         self.resize(540, 560)
         self.setModal(True)
 
@@ -79,8 +82,10 @@ class DialogoUsuario(QDialog):
         layout_id.addWidget(self.campo_id)
 
         if not self.es_edicion:
-            self.chk_sin_dni = QCheckBox("Persona sin DNI (asignar ID provisional correlativo)")
-            self.chk_sin_dni.setStyleSheet("color: #1e293b; font-size: 13px; font-weight: 500;")
+            self.chk_sin_dni = QCheckBox(
+                "Persona sin DNI (asignar ID provisional correlativo)")
+            self.chk_sin_dni.setStyleSheet(
+                "color: #1e293b; font-size: 13px; font-weight: 500;")
             self.chk_sin_dni.toggled.connect(self._toggle_sin_dni)
             layout_id.addWidget(self.chk_sin_dni)
 
@@ -109,7 +114,8 @@ class DialogoUsuario(QDialog):
         col_nombre.addWidget(lbl_nom)
 
         self.campo_nombre = QLineEdit()
-        self.campo_nombre.setPlaceholderText("Ej. CONDORI MAMANI, CARLOS ALBERTO")
+        self.campo_nombre.setPlaceholderText(
+            "Ej. CONDORI MAMANI, CARLOS ALBERTO")
         col_nombre.addWidget(self.campo_nombre)
         layout_principal.addLayout(col_nombre)
 
@@ -122,7 +128,8 @@ class DialogoUsuario(QDialog):
         col_sec.addWidget(lbl_sec)
 
         self.combo_sector = QComboBox()
-        self.combo_sector.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.combo_sector.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
         sec_view = QListView()
         sec_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.combo_sector.setView(sec_view)
@@ -142,7 +149,8 @@ class DialogoUsuario(QDialog):
 
         self.combo_categoria = QComboBox()
         self.combo_categoria.setMinimumWidth(180)
-        self.combo_categoria.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.combo_categoria.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
         cat_view = QListView()
         cat_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         cat_view.setMinimumWidth(260)
@@ -154,7 +162,8 @@ class DialogoUsuario(QDialog):
             "C": "Estatal / Social",
         }
         categorias_raw = self.config.get("categorias") or {}
-        categorias = dict(categorias_raw) if isinstance(categorias_raw, dict) else {}
+        categorias = dict(categorias_raw) if isinstance(
+            categorias_raw, dict) else {}
 
         # Garantizar que las 3 categorías estándar siempre existan con nombre
         for cod, nom_def in nombres_defecto.items():
@@ -164,7 +173,8 @@ class DialogoUsuario(QDialog):
                 categorias[cod]["nombre"] = nom_def
 
         for cod, datos in sorted(categorias.items()):
-            nom = datos.get("nombre") if isinstance(datos, dict) else str(datos)
+            nom = datos.get("nombre") if isinstance(
+                datos, dict) else str(datos)
             if not nom:
                 nom = nombres_defecto.get(cod, f"Categoría {cod}")
             self.combo_categoria.addItem(f"{cod} — {nom}", cod)
@@ -195,7 +205,8 @@ class DialogoUsuario(QDialog):
 
         fila_add_med = QHBoxLayout()
         self.campo_nuevo_medidor = QLineEdit()
-        self.campo_nuevo_medidor.setPlaceholderText("N° de medidor (ej. 22392996)")
+        self.campo_nuevo_medidor.setPlaceholderText(
+            "N° de medidor (ej. 22392996)")
         self.campo_nuevo_medidor.returnPressed.connect(self._agregar_medidor)
         fila_add_med.addWidget(self.campo_nuevo_medidor, stretch=1)
 
@@ -234,10 +245,13 @@ class DialogoUsuario(QDialog):
 
     def _cargar_datos_iniciales(self) -> None:
         if self.es_edicion and self.usuario:
-            self.campo_id.setText(str(self.usuario.get("id_usuario") or self.usuario.get("_id") or ""))
-            self.campo_conexion.setText(str(self.usuario.get("nro_conexion") or ""))
+            self.campo_id.setText(str(self.usuario.get(
+                "id_usuario") or self.usuario.get("_id") or ""))
+            self.campo_conexion.setText(
+                str(self.usuario.get("nro_conexion") or ""))
             self.campo_nombre.setText(str(self.usuario.get("nombre") or ""))
-            self.campo_direccion.setText(str(self.usuario.get("direccion") or ""))
+            self.campo_direccion.setText(
+                str(self.usuario.get("direccion") or ""))
 
             # Sector
             sec = str(self.usuario.get("sector") or "")
@@ -301,7 +315,8 @@ class DialogoUsuario(QDialog):
 
         if not self.medidores_lista:
             lbl_vacio = QLabel("(Sin medidores asignados)")
-            lbl_vacio.setStyleSheet("color: #64748b; font-style: italic; font-size: 12px;")
+            lbl_vacio.setStyleSheet(
+                "color: #64748b; font-style: italic; font-size: 12px;")
             self.layout_chips.addWidget(lbl_vacio)
         else:
             for m in self.medidores_lista:
@@ -317,8 +332,10 @@ class DialogoUsuario(QDialog):
 
                 btn_del = QPushButton("✕")
                 btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_del.setStyleSheet("border: none; background: transparent; color: #dc2626; font-weight: bold;")
-                btn_del.clicked.connect(lambda ch=False, val=m: self._quitar_medidor(val))
+                btn_del.setStyleSheet(
+                    "border: none; background: transparent; color: #dc2626; font-weight: bold;")
+                btn_del.clicked.connect(
+                    lambda ch=False, val=m: self._quitar_medidor(val))
                 l_chip.addWidget(btn_del)
 
                 self.layout_chips.addWidget(chip)
@@ -335,14 +352,16 @@ class DialogoUsuario(QDialog):
 
         # Validaciones
         if not nombre:
-            QMessageBox.warning(self, "Campo requerido", "Debe ingresar los apellidos y nombres completos.")
+            QMessageBox.warning(
+                self, "Campo requerido", "Debe ingresar los apellidos y nombres completos.")
             self.campo_nombre.setFocus()
             return
 
         # 1. Determinar y validar ID
         id_final = ""
         if not self.es_edicion:
-            sin_dni = getattr(self, "chk_sin_dni", None) and self.chk_sin_dni.isChecked()
+            sin_dni = getattr(self, "chk_sin_dni",
+                              None) and self.chk_sin_dni.isChecked()
             if sin_dni or not nuevo_id:
                 id_final = self.servicio.obtener_siguiente_id_sd()
             else:
@@ -351,7 +370,8 @@ class DialogoUsuario(QDialog):
                 elif nuevo_id.startswith("SD-") or nuevo_id.isdigit():
                     id_final = nuevo_id
                 else:
-                    QMessageBox.warning(self, "DNI inválido", "El DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
+                    QMessageBox.warning(
+                        self, "DNI inválido", "El DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
                     self.campo_id.setFocus()
                     return
 
@@ -370,7 +390,8 @@ class DialogoUsuario(QDialog):
                 elif nuevo_id.startswith("SD-") or nuevo_id.isdigit():
                     norm_id = nuevo_id
                 else:
-                    QMessageBox.warning(self, "DNI inválido", "El nuevo DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
+                    QMessageBox.warning(
+                        self, "DNI inválido", "El nuevo DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
                     self.campo_id.setFocus()
                     return
 
@@ -383,10 +404,12 @@ class DialogoUsuario(QDialog):
 
                 # Reasignar DNI en el padrón, mes y espejo Firebase
                 try:
-                    self.servicio.corregir_dni_usuario(self.id_original, norm_id)
+                    self.servicio.corregir_dni_usuario(
+                        self.id_original, norm_id)
                     id_final = norm_id
                 except Exception as e:
-                    QMessageBox.critical(self, "Error al cambiar DNI", f"No se pudo reasignar el DNI:\n{e}")
+                    mostrar_dialogo_error(
+                        self, "Error al cambiar DNI", f"No se pudo reasignar el DNI:\n{e}")
                     return
 
         # 2. Validar medidores únicos entre distintas personas
@@ -394,11 +417,14 @@ class DialogoUsuario(QDialog):
             self.medidores_lista, id_usuario_actual=id_final
         )
         if not valido:
-            QMessageBox.critical(self, "Medidor duplicado", err_msg or "Medidor ya asignado a otra persona.")
+            QMessageBox.critical(self, "Medidor duplicado",
+                                 err_msg or "Medidor ya asignado a otra persona.")
             return
 
-        con_norm = codigos.normalizar_conexion(conexion) if conexion else self.servicio.obtener_siguiente_conexion_libre()
-        activo_final = self.usuario.get("activo", True) if self.es_edicion else True
+        con_norm = codigos.normalizar_conexion(
+            conexion) if conexion else self.servicio.obtener_siguiente_conexion_libre()
+        activo_final = self.usuario.get(
+            "activo", True) if self.es_edicion else True
 
         datos_guardar = {
             "nro_conexion": con_norm,
@@ -414,7 +440,8 @@ class DialogoUsuario(QDialog):
             exito_sync = True
             err_sync = None
             if not self.es_edicion:
-                res = self.servicio.guardar_usuario(id_final, datos_guardar, agregar_al_mes=True)
+                res = self.servicio.guardar_usuario(
+                    id_final, datos_guardar, agregar_al_mes=True)
             else:
                 res = self.servicio.actualizar_usuario(id_final, datos_guardar)
 
@@ -425,14 +452,19 @@ class DialogoUsuario(QDialog):
                 err_sync = res.get("_sync_error")
 
             if not exito_sync and err_sync:
-                QMessageBox.warning(
+                mostrar_dialogo_aviso(
                     self,
                     "Aviso de sincronización",
-                    "Guardado en el padrón. No se pudo enviar a Firebase; se enviará con el próximo 'Enviar mes'."
+                    "El usuario se guardó correctamente en el padrón local.\n\n"
+                    "No se pudo enviar a Firebase ahora; se enviará con el próximo "
+                    "'Enviar mes a los lectores'.\n\n"
+                    "Pulse 'Mostrar detalles...' para ver el motivo técnico.",
+                    detalle=err_sync,
                 )
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el usuario:\n{e}")
+            mostrar_dialogo_error(self, "Error al guardar",
+                                  f"No se pudo guardar el usuario:\n{e}")
 
 
 class DialogoCorregirDni(QDialog):
@@ -465,14 +497,16 @@ class DialogoCorregirDni(QDialog):
 
         # Panel de aviso informativo
         alerta_frame = QFrame()
-        alerta_frame.setStyleSheet("background-color: #fef3c7; border-left: 4px solid #d97706; border-radius: 6px; padding: 10px;")
+        alerta_frame.setStyleSheet(
+            "background-color: #fef3c7; border-left: 4px solid #d97706; border-radius: 6px; padding: 10px;")
         l_alerta = QVBoxLayout(alerta_frame)
         l_alerta.setSpacing(4)
 
         nom = self.usuario.get("nombre", "")
         uid = self.usuario.get("id_usuario") or self.usuario.get("_id", "")
         l_alerta.addWidget(QLabel(f"Usuario: <strong>{nom}</strong>"))
-        l_alerta.addWidget(QLabel(f"ID Provisional Actual: <code style='color: #b45309; font-weight: bold;'>{uid}</code>"))
+        l_alerta.addWidget(QLabel(
+            f"ID Provisional Actual: <code style='color: #b45309; font-weight: bold;'>{uid}</code>"))
         layout.addWidget(alerta_frame)
 
         # Campo para ingresar nuevo DNI
@@ -485,7 +519,8 @@ class DialogoCorregirDni(QDialog):
         self.campo_nuevo_dni.setMaxLength(8)
         layout.addWidget(self.campo_nuevo_dni)
 
-        lbl_nota = QLabel("Esta acción transferirá sus medidores e historial en todas las colecciones de meses.")
+        lbl_nota = QLabel(
+            "Esta acción transferirá sus medidores e historial en todas las colecciones de meses.")
         lbl_nota.setStyleSheet("color: #64748b; font-size: 11px;")
         lbl_nota.setWordWrap(True)
         layout.addWidget(lbl_nota)
@@ -510,12 +545,14 @@ class DialogoCorregirDni(QDialog):
     def _confirmar(self) -> None:
         dni_nuevo_raw = self.campo_nuevo_dni.text().strip()
         if not dni_nuevo_raw.isdigit() or len(dni_nuevo_raw) not in (7, 8):
-            QMessageBox.warning(self, "DNI Inválido", "El DNI debe contener 7 u 8 dígitos numéricos.")
+            QMessageBox.warning(self, "DNI Inválido",
+                                "El DNI debe contener 7 u 8 dígitos numéricos.")
             self.campo_nuevo_dni.setFocus()
             return
 
         dni_nuevo = codigos.normalizar_dni(dni_nuevo_raw)
-        id_viejo = str(self.usuario.get("id_usuario") or self.usuario.get("_id", ""))
+        id_viejo = str(self.usuario.get("id_usuario")
+                       or self.usuario.get("_id", ""))
 
         try:
             res = self.servicio.corregir_dni_usuario(id_viejo, dni_nuevo)
@@ -530,4 +567,5 @@ class DialogoCorregirDni(QDialog):
         except ValueError as ve:
             QMessageBox.warning(self, "No permitido", str(ve))
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Ocurrió un error al renombrar el ID:\n{e}")
+            QMessageBox.critical(
+                self, "Error", f"Ocurrió un error al renombrar el ID:\n{e}")
