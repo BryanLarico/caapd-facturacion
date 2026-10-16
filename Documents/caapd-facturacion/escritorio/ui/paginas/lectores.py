@@ -87,14 +87,17 @@ class PaginaLectores(QWidget):
         self.btn_actualizar = QPushButton("🔄 Actualizar")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_actualizar.setToolTip("Recargar lista de lectores desde Firebase Auth")
-        self.btn_actualizar.clicked.connect(lambda: self.cargar_datos_asincrono(forzar=True))
+        self.btn_actualizar.setToolTip(
+            "Recargar lista de lectores desde Firebase Auth")
+        self.btn_actualizar.clicked.connect(
+            lambda: self.cargar_datos_asincrono(forzar=True))
         fila_encabezado.addWidget(self.btn_actualizar)
 
         layout_principal.addLayout(fila_encabezado)
 
         # 2. Alerta flash
-        self.alerta_flash = AlertaWidget(mensaje="", tipo="info", cerrable=True)
+        self.alerta_flash = AlertaWidget(
+            mensaje="", tipo="info", cerrable=True)
         self.alerta_flash.hide()
         layout_principal.addWidget(self.alerta_flash)
 
@@ -111,12 +114,15 @@ class PaginaLectores(QWidget):
 
         self.campo_busqueda = QLineEdit()
         self.campo_busqueda.setObjectName("campo_busqueda")
-        self.campo_busqueda.setPlaceholderText("Buscar lector por correo, nombre o UID...")
-        self.campo_busqueda.textChanged.connect(self._al_cambiar_texto_busqueda)
+        self.campo_busqueda.setPlaceholderText(
+            "Buscar lector por correo, nombre o UID...")
+        self.campo_busqueda.textChanged.connect(
+            self._al_cambiar_texto_busqueda)
         fila_busqueda.addWidget(self.campo_busqueda, stretch=1)
 
         self.btn_limpiar_busqueda = QPushButton("✖ Limpiar")
-        self.btn_limpiar_busqueda.setProperty("class", "boton boton_secundario")
+        self.btn_limpiar_busqueda.setProperty(
+            "class", "boton boton_secundario")
         self.btn_limpiar_busqueda.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_limpiar_busqueda.clicked.connect(self.limpiar_busqueda)
         self.btn_limpiar_busqueda.hide()
@@ -129,8 +135,10 @@ class PaginaLectores(QWidget):
         fila_botones_filtro.setSpacing(8)
 
         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
-        self.btn_filtro_activos = self._crear_boton_filtro("Activos (0)", "activos")
-        self.btn_filtro_deshabilitados = self._crear_boton_filtro("Deshabilitados (0)", "deshabilitados")
+        self.btn_filtro_activos = self._crear_boton_filtro(
+            "Activos (0)", "activos")
+        self.btn_filtro_deshabilitados = self._crear_boton_filtro(
+            "Deshabilitados (0)", "deshabilitados")
 
         fila_botones_filtro.addWidget(self.btn_filtro_todos)
         fila_botones_filtro.addWidget(self.btn_filtro_activos)
@@ -138,7 +146,8 @@ class PaginaLectores(QWidget):
         fila_botones_filtro.addStretch(1)
 
         self.lbl_conteo_registros = QLabel("Mostrando 0 de 0 lectores")
-        self.lbl_conteo_registros.setStyleSheet("color: #64748b; font-size: 13px;")
+        self.lbl_conteo_registros.setStyleSheet(
+            "color: #64748b; font-size: 13px;")
         fila_botones_filtro.addWidget(self.lbl_conteo_registros)
 
         l_filtros.addLayout(fila_botones_filtro)
@@ -147,7 +156,8 @@ class PaginaLectores(QWidget):
         # 4. Tabla de Lectores
         self.tabla = QTableView()
         self.tabla.setObjectName("tabla_lectores")
-        self.tabla.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.tabla.setSelectionBehavior(
+            QTableView.SelectionBehavior.SelectRows)
         self.tabla.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.tabla.setAlternatingRowColors(True)
         self.tabla.setSortingEnabled(True)
@@ -167,14 +177,15 @@ class PaginaLectores(QWidget):
         # Anchos de columna
         h_header = self.tabla.horizontalHeader()
         h_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(0, 260)  # Correo
-        h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(1, 230)  # Nombre
+        h_header.resizeSection(0, 280)  # Correo
+        h_header.setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch)  # Nombre (se estira)
         h_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         h_header.resizeSection(2, 120)  # Estado
         h_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(3, 140)  # Último acceso
-        h_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)  # UID
+        h_header.resizeSection(3, 150)  # Último acceso
+        h_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        h_header.resizeSection(4, 300)  # UID
 
         layout_principal.addWidget(self.tabla, stretch=1)
 
@@ -189,9 +200,11 @@ class PaginaLectores(QWidget):
         fila_inferior.addWidget(self.btn_accion_editar)
 
         self.btn_accion_cambiar_estado = QPushButton("⏸️ Desactivar")
-        self.btn_accion_cambiar_estado.setProperty("class", "boton boton_secundario")
+        self.btn_accion_cambiar_estado.setProperty(
+            "class", "boton boton_secundario")
         self.btn_accion_cambiar_estado.setEnabled(False)
-        self.btn_accion_cambiar_estado.clicked.connect(self._accion_cambiar_estado)
+        self.btn_accion_cambiar_estado.clicked.connect(
+            self._accion_cambiar_estado)
         fila_inferior.addWidget(self.btn_accion_cambiar_estado)
 
         # Indicador de carga integrado inline en la misma barra inferior
@@ -217,7 +230,8 @@ class PaginaLectores(QWidget):
         btn.setProperty("class", "filtro_btn")
         btn.setProperty("clave", clave)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.clicked.connect(lambda checked=False, c=clave: self._seleccionar_filtro(c))
+        btn.clicked.connect(lambda checked=False,
+                            c=clave: self._seleccionar_filtro(c))
         return btn
 
     def cargar_datos_asincrono(self, forzar: bool = False) -> None:
@@ -272,7 +286,8 @@ class PaginaLectores(QWidget):
         return bool(usuario and dominio)
 
     def _al_fallar_carga(self, err: str) -> None:
-        self.alerta_flash.set_mensaje(f"Error al cargar lectores: {err}", "peligro")
+        self.alerta_flash.set_mensaje(
+            f"Error al cargar lectores: {err}", "peligro")
         mostrar_dialogo_error(self, "Error al cargar lectores", str(err))
 
     def _al_finalizar_carga(self) -> None:
@@ -313,19 +328,22 @@ class PaginaLectores(QWidget):
 
     def _actualizar_contadores_y_etiqueta(self) -> None:
         total = len(self.lista_lectores_completa)
-        deshabilitados = sum(1 for l in self.lista_lectores_completa if l.get("disabled"))
+        deshabilitados = sum(
+            1 for l in self.lista_lectores_completa if l.get("disabled"))
         activos = total - deshabilitados
 
         self.btn_filtro_todos.setText(f"Todos ({total})")
         self.btn_filtro_activos.setText(f"Activos ({activos})")
-        self.btn_filtro_deshabilitados.setText(f"Deshabilitados ({deshabilitados})")
+        self.btn_filtro_deshabilitados.setText(
+            f"Deshabilitados ({deshabilitados})")
 
         self._actualizar_etiqueta_conteo()
 
     def _actualizar_etiqueta_conteo(self) -> None:
         visibles = self.proxy_model.rowCount()
         total = len(self.lista_lectores_completa)
-        self.lbl_conteo_registros.setText(f"Mostrando {visibles} de {total} lectores")
+        self.lbl_conteo_registros.setText(
+            f"Mostrando {visibles} de {total} lectores")
 
     def _al_cambiar_seleccion(self) -> None:
         indexes = self.tabla.selectionModel().selectedRows()
@@ -339,7 +357,8 @@ class PaginaLectores(QWidget):
             lector = self._obtener_lector_seleccionado()
             if lector:
                 esta_deshabilitado = bool(lector.get("disabled", False))
-                self.btn_accion_cambiar_estado.setText("▶️ Activar" if esta_deshabilitado else "⏸️ Desactivar")
+                self.btn_accion_cambiar_estado.setText(
+                    "▶️ Activar" if esta_deshabilitado else "⏸️ Desactivar")
         else:
             self.btn_accion_cambiar_estado.setText("⏸️ Desactivar")
 
@@ -359,7 +378,8 @@ class PaginaLectores(QWidget):
     def abrir_modal_nuevo(self) -> None:
         diag = DialogoLector(self.servicio, lector=None, parent=self)
         if diag.exec() == QMessageBox.DialogCode.Accepted:
-            self.alerta_flash.set_mensaje("Lector creado exitosamente en Firebase Auth.", "exito")
+            self.alerta_flash.set_mensaje(
+                "Lector creado exitosamente en Firebase Auth.", "exito")
             self.cargar_datos_asincrono(forzar=True)
 
     def _abrir_modal_editar(self, lector: Dict[str, Any]) -> None:
@@ -386,7 +406,8 @@ class PaginaLectores(QWidget):
 
         # 1. Actualización optimista inmediata en memoria (0 ms, sin bloqueos)
         l["disabled"] = nuevo_disabled
-        self.modelo_base.actualizar_lector_en_fila(uid, {"disabled": nuevo_disabled})
+        self.modelo_base.actualizar_lector_en_fila(
+            uid, {"disabled": nuevo_disabled})
         self._actualizar_contadores_y_etiqueta()
         self._al_cambiar_seleccion()
 
@@ -406,7 +427,8 @@ class PaginaLectores(QWidget):
         def al_error(err: str) -> None:
             # Revertir el estado optimista ante cualquier fallo de conexión
             l["disabled"] = estado_actual
-            self.modelo_base.actualizar_lector_en_fila(uid, {"disabled": estado_actual})
+            self.modelo_base.actualizar_lector_en_fila(
+                uid, {"disabled": estado_actual})
             self._actualizar_contadores_y_etiqueta()
             self._al_cambiar_seleccion()
             self.alerta_flash.set_mensaje(
@@ -444,7 +466,8 @@ class PaginaLectores(QWidget):
 
         # 1. Actualización optimista inmediata en interfaz (0 ms)
         lector_respaldo = dict(l)
-        self.lista_lectores_completa = [x for x in self.lista_lectores_completa if x.get("uid") != uid]
+        self.lista_lectores_completa = [
+            x for x in self.lista_lectores_completa if x.get("uid") != uid]
         self.modelo_base.eliminar_lector_por_uid(uid)
         self._actualizar_contadores_y_etiqueta()
         self._al_cambiar_seleccion()
@@ -464,7 +487,8 @@ class PaginaLectores(QWidget):
             self.modelo_base.actualizar_datos(self.lista_lectores_completa)
             self._actualizar_contadores_y_etiqueta()
             self._al_cambiar_seleccion()
-            self.alerta_flash.set_mensaje(f"Error al eliminar en Firebase: {err}", "peligro")
+            self.alerta_flash.set_mensaje(
+                f"Error al eliminar en Firebase: {err}", "peligro")
             mostrar_dialogo_error(self, "Error al eliminar lector", str(err))
 
         worker = Worker(tarea)

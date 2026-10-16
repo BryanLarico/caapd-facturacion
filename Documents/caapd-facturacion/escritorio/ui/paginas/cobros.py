@@ -233,27 +233,29 @@ class PaginaCobros(QWidget):
         self.tabla.customContextMenuRequested.connect(
             self._menu_contextual_tabla)
 
-        # Anchos de 9 columnas
+        # Anchos de 9 columnas: todas fijas salvo "Titular", que se estira para
+        # ocupar el espacio sobrante en cualquier tamaño de pantalla.
         header = self.tabla.horizontalHeader()
         header.setMinimumSectionSize(60)
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(0, 95)   # Conexión
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(1, 100)  # N° Recibo
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(2, 180)  # Titular
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(3, 105)  # Sector
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(4, 70)   # m³
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(5, 120)  # Deuda anterior
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(6, 120)  # Deuda actual
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(7, 105)  # Total S/.
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(8, 115)  # Estado
+        header.setStretchLastSection(False)
+
+        anchos_fijos = {
+            0: 95,    # Conexión
+            1: 100,   # N° Recibo
+            3: 110,   # Sector
+            4: 70,    # m³
+            5: 125,   # Deuda anterior
+            6: 125,   # Deuda actual
+            7: 110,   # Total S/.
+            8: 120,   # Estado
+        }
+        for col, ancho in anchos_fijos.items():
+            header.setSectionResizeMode(
+                col, QHeaderView.ResizeMode.Interactive)
+            header.resizeSection(col, ancho)
+
+        header.setSectionResizeMode(
+            2, QHeaderView.ResizeMode.Stretch)  # Titular
 
         col_izquierda.addWidget(self.tabla, stretch=1)
         self.splitter.addWidget(self.panel_izquierdo)
@@ -315,8 +317,8 @@ class PaginaCobros(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setMinimumWidth(300)
-        scroll.setMaximumWidth(400)
+        scroll.setMinimumWidth(320)
+        scroll.setMaximumWidth(480)
 
         contenedor = QFrame()
         contenedor.setProperty("class", "tarjeta")
@@ -481,8 +483,8 @@ class PaginaCobros(QWidget):
         else:
             self.splitter.setOrientation(Qt.Orientation.Horizontal)
             self.ficha.setMaximumHeight(16777215)
-            self.ficha.setMinimumWidth(300)
-            self.ficha.setMaximumWidth(400)
+            self.ficha.setMinimumWidth(320)
+            self.ficha.setMaximumWidth(480)
             self.splitter.setStretchFactor(0, 7)
             self.splitter.setStretchFactor(1, 3)
 
