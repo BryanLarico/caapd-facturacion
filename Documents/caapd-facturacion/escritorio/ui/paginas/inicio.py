@@ -60,21 +60,19 @@ class PaginaInicio(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-        # Envoltorio para centrar el contenido hasta 1260px (proporcionado y elegante)
+        # Contenedor a ancho completo, con los mismos márgenes laterales que las
+        # demás pestañas (Usuarios, Cobros, etc.) para que se vea igual en 15" y 24".
         scroll_wrapper = QWidget()
         scroll_wrapper_layout = QHBoxLayout(scroll_wrapper)
         scroll_wrapper_layout.setContentsMargins(0, 0, 0, 0)
         scroll_wrapper_layout.setSpacing(0)
 
         contenedor = QWidget()
-        contenedor.setMaximumWidth(1260)
         self.layout_contenido = QVBoxLayout(contenedor)
-        self.layout_contenido.setContentsMargins(24, 12, 24, 12)
-        self.layout_contenido.setSpacing(10)
+        self.layout_contenido.setContentsMargins(32, 16, 32, 16)
+        self.layout_contenido.setSpacing(12)
 
-        scroll_wrapper_layout.addStretch(1)
-        scroll_wrapper_layout.addWidget(contenedor, stretch=10)
-        scroll_wrapper_layout.addStretch(1)
+        scroll_wrapper_layout.addWidget(contenedor, stretch=1)
 
         # --- 1. Encabezado ---
         fila_encabezado = QHBoxLayout()
@@ -99,14 +97,16 @@ class PaginaInicio(QWidget):
         self.btn_actualizar = QPushButton("🔄 Actualizar")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_actualizar.setToolTip("Limpiar caché y recargar datos desde Firebase")
+        self.btn_actualizar.setToolTip(
+            "Limpiar caché y recargar datos desde Firebase")
         self.btn_actualizar.clicked.connect(self.actualizar_datos)
         fila_encabezado.addWidget(self.btn_actualizar)
 
         self.layout_contenido.addLayout(fila_encabezado)
 
         # --- 2. Alerta de Mensaje Flash (si hay) ---
-        self.alerta_flash = AlertaWidget(mensaje="", tipo="info", cerrable=True)
+        self.alerta_flash = AlertaWidget(
+            mensaje="", tipo="info", cerrable=True)
         self.alerta_flash.hide()
         self.layout_contenido.addWidget(self.alerta_flash)
 
@@ -121,9 +121,12 @@ class PaginaInicio(QWidget):
         self.fila_stats = QHBoxLayout()
         self.fila_stats.setSpacing(12)
 
-        self.card_generados = TarjetaStat(numero=0, label="Recibos generados", variante="azul")
-        self.card_pagados = TarjetaStat(numero=0, label="Pagados", variante="verde")
-        self.card_pendientes = TarjetaStat(numero=0, label="Pendientes de pago", variante="naranja")
+        self.card_generados = TarjetaStat(
+            numero=0, label="Recibos generados", variante="azul")
+        self.card_pagados = TarjetaStat(
+            numero=0, label="Pagados", variante="verde")
+        self.card_pendientes = TarjetaStat(
+            numero=0, label="Pendientes de pago", variante="naranja")
 
         self.fila_stats.addWidget(self.card_generados)
         self.fila_stats.addWidget(self.card_pagados)
@@ -143,7 +146,8 @@ class PaginaInicio(QWidget):
         self.layout_card_sectores.addWidget(lbl_titulo_sectores)
 
         self.contenedor_filas_sectores = QWidget()
-        self.layout_filas_sectores = QGridLayout(self.contenedor_filas_sectores)
+        self.layout_filas_sectores = QGridLayout(
+            self.contenedor_filas_sectores)
         self.layout_filas_sectores.setContentsMargins(0, 0, 0, 0)
         self.layout_filas_sectores.setHorizontalSpacing(20)
         self.layout_filas_sectores.setVerticalSpacing(2)
@@ -217,16 +221,20 @@ class PaginaInicio(QWidget):
         self.indicador_carga.iniciar(texto)
         self.btn_actualizar.setEnabled(False)
         if hasattr(ventana, "set_sincronizando"):
-            ventana.set_sincronizando(True)  # pausa la vigilancia de archivos externos
+            # pausa la vigilancia de archivos externos
+            ventana.set_sincronizando(True)
 
         def progreso_callback(pct: int, txt: str) -> None:
             if not cierre_solicitado():
-                self._senal_progreso_sincronizacion.emit(int(pct), str(txt or ""))
+                self._senal_progreso_sincronizacion.emit(
+                    int(pct), str(txt or ""))
 
         worker = Worker(funcion_servicio, callback_progreso=progreso_callback)
         # Conexiones EN COLA explícitas a métodos de este QWidget: siempre corren en el hilo GUI.
-        worker.signals.resultado.connect(slot_exito, Qt.ConnectionType.QueuedConnection)
-        worker.signals.error.connect(self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
+        worker.signals.resultado.connect(
+            slot_exito, Qt.ConnectionType.QueuedConnection)
+        worker.signals.error.connect(
+            self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
         self.thread_pool.start(worker)
 
     @Slot(int, str)
@@ -269,7 +277,8 @@ class PaginaInicio(QWidget):
 
     @Slot(object)
     def _al_terminar_publicacion_mes_actual(self, res: Any) -> None:
-        self._terminar_sincronizacion("¡Mes actual publicado para los lectores!")
+        self._terminar_sincronizacion(
+            "¡Mes actual publicado para los lectores!")
         res = res or {}
         mostrar_dialogo_info(
             self,
@@ -396,7 +405,8 @@ class PaginaInicio(QWidget):
                 btn1 = QPushButton("📊 Ir a Lecturas")
                 btn1.setProperty("class", "boton boton_primario boton_grande")
                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn1.clicked.connect(lambda: self.solicitar_navegacion.emit("lecturas"))
+                btn1.clicked.connect(
+                    lambda: self.solicitar_navegacion.emit("lecturas"))
                 botones_layout.addWidget(btn1)
 
                 btn2 = QPushButton("🔒 Cerrar lecturas")
@@ -409,7 +419,8 @@ class PaginaInicio(QWidget):
                 btn1 = QPushButton("🧾 Generar recibos")
                 btn1.setProperty("class", "boton boton_primario boton_grande")
                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn1.clicked.connect(lambda: self.solicitar_navegacion.emit("cobros:emitir"))
+                btn1.clicked.connect(
+                    lambda: self.solicitar_navegacion.emit("cobros:emitir"))
                 botones_layout.addWidget(btn1)
 
                 btn2 = QPushButton("🔓 Reabrir lecturas")
@@ -422,7 +433,8 @@ class PaginaInicio(QWidget):
                 btn1 = QPushButton("💰 Ir a Cobros")
                 btn1.setProperty("class", "boton boton_primario boton_grande")
                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn1.clicked.connect(lambda: self.solicitar_navegacion.emit("cobros"))
+                btn1.clicked.connect(
+                    lambda: self.solicitar_navegacion.emit("cobros"))
                 botones_layout.addWidget(btn1)
 
                 btn2 = QPushButton("📅 Abrir mes nuevo")
@@ -445,10 +457,12 @@ class PaginaInicio(QWidget):
             alerta_layout.setSpacing(14)
 
             lbl_icono = QLabel("⚠️")
-            lbl_icono.setStyleSheet("font-size: 20px; background: transparent;")
+            lbl_icono.setStyleSheet(
+                "font-size: 20px; background: transparent;")
             alerta_layout.addWidget(lbl_icono)
 
-            lbl_txt = QLabel("No hay un mes activo. Haz clic en 'Abrir mes nuevo' para iniciar.")
+            lbl_txt = QLabel(
+                "No hay un mes activo. Haz clic en 'Abrir mes nuevo' para iniciar.")
             lbl_txt.setProperty("class", "alerta_texto_aviso")
             lbl_txt.setStyleSheet("background: transparent;")
             alerta_layout.addWidget(lbl_txt, stretch=1)
@@ -480,12 +494,15 @@ class PaginaInicio(QWidget):
                 if columnas == 2:
                     fila = idx // 2
                     col = idx % 2
-                    self.layout_filas_sectores.addWidget(fila_sector, fila, col)
+                    self.layout_filas_sectores.addWidget(
+                        fila_sector, fila, col)
                 else:
                     self.layout_filas_sectores.addWidget(fila_sector, idx, 0)
         else:
-            lbl_vacio = QLabel("Sin datos — Abre un mes para ver el avance de lecturas.")
-            lbl_vacio.setStyleSheet("color: #64748b; font-style: italic; padding: 12px 0;")
+            lbl_vacio = QLabel(
+                "Sin datos — Abre un mes para ver el avance de lecturas.")
+            lbl_vacio.setStyleSheet(
+                "color: #64748b; font-style: italic; padding: 12px 0;")
             lbl_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.layout_filas_sectores.addWidget(lbl_vacio, 0, 0, 1, 2)
 
@@ -535,7 +552,8 @@ class PaginaInicio(QWidget):
 
         worker = Worker(tarea)
         worker.signals.resultado.connect(lambda r: self.actualizar_datos())
-        worker.signals.error.connect(lambda err: mostrar_dialogo_error(self, "Error", err))
+        worker.signals.error.connect(
+            lambda err: mostrar_dialogo_error(self, "Error", err))
         worker.signals.finalizado.connect(self._al_finalizar_carga)
         self.thread_pool.start(worker)
 
@@ -563,6 +581,7 @@ class PaginaInicio(QWidget):
 
         worker = Worker(tarea)
         worker.signals.resultado.connect(lambda r: self.actualizar_datos())
-        worker.signals.error.connect(lambda err: mostrar_dialogo_error(self, "Error", err))
+        worker.signals.error.connect(
+            lambda err: mostrar_dialogo_error(self, "Error", err))
         worker.signals.finalizado.connect(self._al_finalizar_carga)
         self.thread_pool.start(worker)
