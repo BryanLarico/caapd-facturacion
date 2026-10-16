@@ -3,16 +3,28 @@ main.py — Punto de entrada del programa de escritorio CAAPD Ispacas.
 
 Inicia la aplicación PySide6, aplica fuentes y tema QSS, y abre la ventana principal.
 """
+from ui.ventana_principal import VentanaPrincipal
+from ui.hilos import (
+    RecolectorBasuraGUI,
+    esperar_hilos,
+    instalar_diagnostico_cierre,
+    precargar_firebase_en_hilo_principal,
+)
+from servicios.cancelacion import marcar_cierre
+from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPalette
+from PySide6.QtCore import QThreadPool
+import rutas
 from pathlib import Path
 import faulthandler
 import sys
+import os
 import warnings
 
 # Silenciar el aviso de Google sobre Python 3.10 (no es un error; solo ruido en consola)
 warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
 
 # Configuración inicial de rutas
-import rutas
 
 if "--worker-descarga-lecturas" in sys.argv:
     sys.argv.remove("--worker-descarga-lecturas")
@@ -21,18 +33,6 @@ if "--worker-descarga-lecturas" in sys.argv:
 
     os._exit(main_descarga_lecturas())
 
-from PySide6.QtCore import QThreadPool
-from PySide6.QtGui import QFont, QFontDatabase, QIcon
-from PySide6.QtWidgets import QApplication
-
-from servicios.cancelacion import marcar_cierre
-from ui.hilos import (
-    RecolectorBasuraGUI,
-    esperar_hilos,
-    instalar_diagnostico_cierre,
-    precargar_firebase_en_hilo_principal,
-)
-from ui.ventana_principal import VentanaPrincipal
 
 # Importar firebase_admin/gRPC desde el hilo principal poco después de abrir la
 # ventana. Evita que la PRIMERA importación del código nativo de gRPC ocurra dentro
@@ -40,6 +40,31 @@ from ui.ventana_principal import VentanaPrincipal
 # «Traer lecturas de los lectores» / «Enviar mes a los lectores»).
 PRECARGAR_FIREBASE_AL_INICIO = True
 RETARDO_PRECARGA_MS = 1500
+
+
+def aplicar_paleta_clara(app: QApplication) -> None:
+    """Fuerza una paleta clara. Evita que Windows en modo oscuro tiña de negro
+    los widgets que el QSS no cubre (contenedor de desplegables, menús, etc.)."""
+    pal = QPalette()
+    pal.setColor(QPalette.ColorRole.Window, QColor("#f0f9ff"))
+    pal.setColor(QPalette.ColorRole.WindowText, QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.Base, QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#f8fafc"))
+    pal.setColor(QPalette.ColorRole.Text, QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.Button, QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.ButtonText, QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.ToolTipBase, QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.ToolTipText, QColor("#0f172a"))
+    pal.setColor(QPalette.ColorRole.PlaceholderText, QColor("#94a3b8"))
+    pal.setColor(QPalette.ColorRole.Highlight, QColor("#0369a1"))
+    pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.Link, QColor("#0369a1"))
+    pal.setColor(QPalette.ColorRole.Light, QColor("#ffffff"))
+    pal.setColor(QPalette.ColorRole.Midlight, QColor("#e2e8f0"))
+    pal.setColor(QPalette.ColorRole.Mid, QColor("#cbd5e1"))
+    pal.setColor(QPalette.ColorRole.Dark, QColor("#94a3b8"))
+    pal.setColor(QPalette.ColorRole.Shadow, QColor("#64748b"))
+    app.setPalette(pal)
 
 
 def configurar_fuentes(app: QApplication) -> None:
@@ -80,8 +105,11 @@ def main() -> None:
     except Exception:
         pass
 
+    if sys.platform == "win32":
+        os.environ.setdefault("QT_QPA_PLATFORM", "windows:darkmode=0")
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    aplicar_paleta_clara(app)
     app.setApplicationName("CAAPD Ispacas Facturación")
 
     # El programa SOLO termina cuando el usuario cierra la ventana principal
@@ -126,7 +154,8 @@ def main() -> None:
     # Precarga de Firebase/gRPC en el hilo principal (solo importación, 0 lecturas).
     if PRECARGAR_FIREBASE_AL_INICIO:
         from PySide6.QtCore import QTimer
-        QTimer.singleShot(RETARDO_PRECARGA_MS, precargar_firebase_en_hilo_principal)
+        QTimer.singleShot(RETARDO_PRECARGA_MS,
+                          precargar_firebase_en_hilo_principal)
 
     # Antes de destruir QApplication, esperar a los Workers del pool (cierre limpio).
     app.aboutToQuit.connect(marcar_cierre)

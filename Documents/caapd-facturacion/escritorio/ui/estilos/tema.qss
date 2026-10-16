@@ -543,14 +543,24 @@ QComboBox::down-arrow {
     height: 12px;
 }
 
-/* Lista desplegable emergente de QComboBox */
+/* Contenedor flotante del desplegable: sin marco oscuro por defecto */
+QComboBoxPrivateContainer {
+    background-color: #ffffff;
+    border: none;
+}
+QComboBox QFrame {
+    background-color: #ffffff;
+    border: none;
+}
+/* Lista desplegable emergente de QComboBox (sin border-radius: la ventana
+   emergente es opaca y las esquinas redondeadas dejan ver el fondo negro) */
 QComboBox QAbstractItemView {
     background-color: #ffffff;
     color: #000000;
     selection-background-color: #e0f2fe;
     selection-color: #000000;
     border: 1.5px solid #0369a1;
-    border-radius: 8px;
+    border-radius: 0px;
     padding: 4px;
     outline: none;
 }
@@ -739,20 +749,22 @@ QPushButton.filtro_btn:hover {
 }
 
 /* Filtro seleccionado: fondo turquesa, letra blanca, borde turquesa claro */
-QPushButton.filtro_btn[activo="true"] {
+QPushButton.filtro_btn[activo="true"],
+QPushButton.filtro_btn_activo {
     background-color: #0d9488;
     color: #ffffff;
     border: 1.5px solid #5eead4;
     font-weight: 600;
 }
 
-QPushButton.filtro_btn[activo="true"]:hover {
+QPushButton.filtro_btn[activo="true"]:hover,
+QPushButton.filtro_btn_activo:hover {
     background-color: #0f766e;
     color: #ffffff;
     border-color: #99f6e4;
 }
 
-/* Filtro de advertencia (Pendientes de DNI) sin seleccionar: tono ámbar suave */
+/* Filtro de advertencia (Pendientes de DNI / Con observación) sin seleccionar: tono ámbar suave */
 QPushButton.filtro_btn_aviso {
     background-color: #fffbeb;
     color: #b45309;
@@ -763,6 +775,21 @@ QPushButton.filtro_btn_aviso:hover {
     background-color: #fef3c7;
     color: #92400e;
     border-color: #f59e0b;
+}
+
+/* Filtro de advertencia seleccionado: ámbar sólido con letra blanca */
+QPushButton.filtro_btn_aviso[activo="true"],
+QPushButton.filtro_btn_aviso.filtro_btn_activo {
+    background-color: #d97706;
+    color: #ffffff;
+    border: 1.5px solid #fcd34d;
+    font-weight: 600;
+}
+
+QPushButton.filtro_btn_aviso[activo="true"]:hover,
+QPushButton.filtro_btn_aviso.filtro_btn_activo:hover {
+    background-color: #b45309;
+    color: #ffffff;
 }
 
 /* Filtro de advertencia seleccionado: ámbar sólido con letra blanca */

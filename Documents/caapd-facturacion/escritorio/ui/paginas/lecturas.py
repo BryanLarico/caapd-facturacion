@@ -78,7 +78,8 @@ class PaginaLecturas(QWidget):
         self.lbl_titulo.setObjectName("encabezado_titulo")
         col_titulos.addWidget(self.lbl_titulo)
 
-        self.lbl_subtitulo = QLabel("Registro y validación de consumos de agua potable")
+        self.lbl_subtitulo = QLabel(
+            "Registro y validación de consumos de agua potable")
         self.lbl_subtitulo.setObjectName("encabezado_subtitulo")
         col_titulos.addWidget(self.lbl_subtitulo)
         fila_encabezado.addLayout(col_titulos, stretch=1)
@@ -111,7 +112,8 @@ class PaginaLecturas(QWidget):
         layout_principal.addLayout(fila_encabezado)
 
         # 2. Alerta flash
-        self.alerta_flash = AlertaWidget(mensaje="", tipo="info", cerrable=True)
+        self.alerta_flash = AlertaWidget(
+            mensaje="", tipo="info", cerrable=True)
         self.alerta_flash.hide()
         layout_principal.addWidget(self.alerta_flash)
 
@@ -147,7 +149,8 @@ class PaginaLecturas(QWidget):
         # Buscador inteligente
         self.campo_busqueda = QLineEdit()
         self.campo_busqueda.setObjectName("campo_busqueda")
-        self.campo_busqueda.setPlaceholderText("🔍 Buscar por medidor, conexión, DNI o nombre...")
+        self.campo_busqueda.setPlaceholderText(
+            "🔍 Buscar por medidor, conexión, DNI o nombre...")
         self.campo_busqueda.setClearButtonEnabled(True)
         self.campo_busqueda.setMinimumWidth(320)
         self.campo_busqueda.textChanged.connect(self._al_cambiar_busqueda)
@@ -155,8 +158,10 @@ class PaginaLecturas(QWidget):
 
         # Filtros rápidos por estado
         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
-        self.btn_filtro_faltan = self._crear_boton_filtro("⏳ Faltan (0)", "faltan")
-        self.btn_filtro_observados = self._crear_boton_filtro("⚠️ Con observación (0)", "con_observacion")
+        self.btn_filtro_faltan = self._crear_boton_filtro(
+            "⏳ Faltan (0)", "faltan")
+        self.btn_filtro_observados = self._crear_boton_filtro(
+            "⚠️ Con observación (0)", "con_observacion")
 
         fila_filtros.addWidget(self.btn_filtro_todos)
         fila_filtros.addWidget(self.btn_filtro_faltan)
@@ -173,7 +178,8 @@ class PaginaLecturas(QWidget):
         self.tabla = QTableView()
         self.tabla.setObjectName("tabla_lecturas")
         self.tabla.setModel(self.proxy_model)
-        self.tabla.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.tabla.setSelectionBehavior(
+            QTableView.SelectionBehavior.SelectRows)
         self.tabla.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.tabla.setAlternatingRowColors(True)
         self.tabla.setSortingEnabled(True)
@@ -223,7 +229,8 @@ class PaginaLecturas(QWidget):
         btn.setProperty("class", "filtro_btn")
         btn.setProperty("clave", clave)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.clicked.connect(lambda checked=False, c=clave: self._seleccionar_filtro_estado(c))
+        btn.clicked.connect(lambda checked=False,
+                            c=clave: self._seleccionar_filtro_estado(c))
         return btn
 
     def cargar_datos_asincrono(self, forzar: bool = False) -> None:
@@ -309,8 +316,10 @@ class PaginaLecturas(QWidget):
             self._senal_progreso_sincronizacion.emit(int(pct), str(txt or ""))
 
         worker = Worker(funcion_servicio, callback_progreso=progreso_callback)
-        worker.signals.resultado.connect(slot_exito, Qt.ConnectionType.QueuedConnection)
-        worker.signals.error.connect(self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
+        worker.signals.resultado.connect(
+            slot_exito, Qt.ConnectionType.QueuedConnection)
+        worker.signals.error.connect(
+            self._al_fallar_sincronizacion, Qt.ConnectionType.QueuedConnection)
         self.thread_pool.start(worker)
 
     @Slot(int, str)
@@ -347,7 +356,8 @@ class PaginaLecturas(QWidget):
 
     @Slot(object)
     def _al_terminar_publicacion_mes_actual(self, res: Any) -> None:
-        self._terminar_sincronizacion("¡Mes actual publicado para los lectores!")
+        self._terminar_sincronizacion(
+            "¡Mes actual publicado para los lectores!")
         res = res or {}
         mostrar_dialogo_info(
             self,
@@ -404,7 +414,8 @@ class PaginaLecturas(QWidget):
         if not periodo or not mes_dict:
             # No hay mes activo o está vacío
             self._establecer_estado_banner("sin_mes")
-            self.lbl_info_mes.setText("⚠️ <b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
+            self.lbl_info_mes.setText(
+                "⚠️ <b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
             self.lbl_avance_total.setText("")
             self.btn_estado_mes.setEnabled(False)
             puede_abrir, motivo, _ = self.servicio.verificar_puede_abrir_mes()
@@ -487,7 +498,8 @@ class PaginaLecturas(QWidget):
             widget.update()
 
     def _al_fallar_carga(self, err_msg: str) -> None:
-        self.alerta_flash.set_mensaje(f"Error al cargar lecturas: {err_msg}", "peligro")
+        self.alerta_flash.set_mensaje(
+            f"Error al cargar lecturas: {err_msg}", "peligro")
         mostrar_dialogo_error(self, "Error al cargar lecturas", err_msg)
 
     def _al_finalizar_carga(self) -> None:
@@ -512,24 +524,29 @@ class PaginaLecturas(QWidget):
         btn_todos = QPushButton(f"Todos los sectores ({leidos_m}/{total_m})")
         btn_todos.setProperty("class", "filtro_btn filtro_btn_activo")
         btn_todos.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_todos.clicked.connect(lambda: self._seleccionar_sector("todos", btn_todos))
+        btn_todos.clicked.connect(
+            lambda: self._seleccionar_sector("todos", btn_todos))
         self.layout_sectores.addWidget(btn_todos)
         self.btn_sector_activo = btn_todos
 
         for s in sectores_cfg:
-            tot_s = sum(1 for f in filas if str(f.get("sector")).upper() == s.upper())
-            lei_s = sum(1 for f in filas if str(f.get("sector")).upper() == s.upper() and f.get("estado_lectura") == "LEIDO")
+            tot_s = sum(1 for f in filas if str(
+                f.get("sector")).upper() == s.upper())
+            lei_s = sum(1 for f in filas if str(f.get("sector")).upper()
+                        == s.upper() and f.get("estado_lectura") == "LEIDO")
             btn_s = QPushButton(f"{s} ({lei_s}/{tot_s})")
             btn_s.setProperty("class", "filtro_btn")
             btn_s.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_s.clicked.connect(lambda checked=False, sec=s, b=btn_s: self._seleccionar_sector(sec, b))
+            btn_s.clicked.connect(
+                lambda checked=False, sec=s, b=btn_s: self._seleccionar_sector(sec, b))
             self.layout_sectores.addWidget(btn_s)
 
         self.layout_sectores.addStretch(1)
 
         # Actualizar banner de avance
         pct = (leidos_m / total_m * 100) if total_m > 0 else 0
-        self.lbl_avance_total.setText(f"Avance general: {leidos_m} de {total_m} ({pct:.1f}%)")
+        self.lbl_avance_total.setText(
+            f"Avance general: {leidos_m} de {total_m} ({pct:.1f}%)")
 
     def _seleccionar_sector(self, sector: str, btn: QPushButton) -> None:
         for i in range(self.layout_sectores.count()):
@@ -553,10 +570,11 @@ class PaginaLecturas(QWidget):
             ("con_observacion", self.btn_filtro_observados),
         ]
         for c, btn in botones:
+            base = "filtro_btn filtro_btn_aviso" if c == "con_observacion" else "filtro_btn"
             if c == clave:
-                btn.setProperty("class", "filtro_btn filtro_btn_activo")
+                btn.setProperty("class", f"{base} filtro_btn_activo")
             else:
-                btn.setProperty("class", "filtro_btn")
+                btn.setProperty("class", base)
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
@@ -595,7 +613,8 @@ class PaginaLecturas(QWidget):
     def _actualizar_conteo_visibles(self) -> None:
         visibles = self.proxy_model.rowCount()
         total = len(self.lista_items_completa)
-        self.lbl_conteo_registros.setText(f"Mostrando {visibles} de {total} medidores")
+        self.lbl_conteo_registros.setText(
+            f"Mostrando {visibles} de {total} medidores")
 
     def _al_cambiar_seleccion(self) -> None:
         hay_sel = len(self.tabla.selectionModel().selectedRows()) > 0
@@ -631,7 +650,8 @@ class PaginaLecturas(QWidget):
 
         if self.estado_mes == "ABIERTO":
             # Verificar cuántos quedan pendientes
-            faltan = sum(1 for f in self.lista_items_completa if f.get("estado_lectura") != "LEIDO")
+            faltan = sum(1 for f in self.lista_items_completa if f.get(
+                "estado_lectura") != "LEIDO")
             msg = (
                 f"¿Deseas cerrar el periodo de lecturas para {self.periodo_actual}?\n\n"
                 f"• Medidores sin lectura completa: {faltan}\n\n"
@@ -646,7 +666,8 @@ class PaginaLecturas(QWidget):
             )
             if resp == QMessageBox.StandardButton.Yes:
                 self.indicador_carga.iniciar("Cerrando lecturas...")
-                self.thread_pool.start(Worker(lambda: self.servicio.cerrar_lecturas(self.periodo_actual)))
+                self.thread_pool.start(
+                    Worker(lambda: self.servicio.cerrar_lecturas(self.periodo_actual)))
                 QTimer.singleShot(1000, self.actualizar_datos)
 
         elif self.estado_mes == "CERRADO":
@@ -660,7 +681,8 @@ class PaginaLecturas(QWidget):
             )
             if resp == QMessageBox.StandardButton.Yes:
                 self.indicador_carga.iniciar("Reabriendo lecturas...")
-                self.thread_pool.start(Worker(lambda: self.servicio.reabrir_lecturas(self.periodo_actual)))
+                self.thread_pool.start(
+                    Worker(lambda: self.servicio.reabrir_lecturas(self.periodo_actual)))
                 QTimer.singleShot(1000, self.actualizar_datos)
 
     def _abrir_modal_mes(self) -> None:
