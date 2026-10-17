@@ -419,3 +419,29 @@ def test_dialogo_asistente_recibos(qtbot, servicio_memoria_cobros):
     # Estimar faltante automáticamente
     diag._estimar_faltantes_automatico()
     assert diag.tabla_faltantes.isHidden()
+
+
+def test_btn_actualizar_excel_flujo(qtbot, servicio_memoria_cobros):
+    pagina = PaginaCobros(servicio_memoria_cobros)
+    qtbot.addWidget(pagina)
+    pagina.cargar_datos_asincrono()
+    qtbot.waitUntil(lambda: pagina.modelo.rowCount() == 4, timeout=2000)
+
+    # Verificar existencia y propiedades iniciales del botón
+    assert hasattr(pagina, "btn_actualizar_excel")
+    assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
+    assert pagina.btn_actualizar_excel.property("activo") == "false"
+    assert pagina.btn_actualizar_excel.property("class") == "filtro_btn_excel"
+
+    # Simular clic en Actualizar Excel
+    pagina.btn_actualizar_excel.click()
+    assert pagina.btn_actualizar_excel.property("activo") == "true"
+
+    # Esperar a que culmine la recarga asíncrona
+    qtbot.waitUntil(lambda: pagina.btn_actualizar_excel.isEnabled() is True, timeout=2000)
+    assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
+
+    # Desactivar estado activo al seleccionar otro filtro (por ej. 'alertas')
+    pagina._al_clic_filtro("alertas")
+    assert pagina.btn_actualizar_excel.property("activo") == "false"
+

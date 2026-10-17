@@ -805,6 +805,47 @@ QPushButton.filtro_btn_aviso[activo="true"]:hover {
     color: #ffffff;
 }
 
+/* --- Botón Actualizar Excel (filtro_btn_excel) --- */
+/* Sin seleccionar: fondo blanco, bordes verdes color Excel, texto verde */
+QPushButton.filtro_btn_excel {
+    background-color: #ffffff;
+    color: #107c41;
+    border: 1.5px solid #107c41;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+QPushButton.filtro_btn_excel:hover {
+    background-color: #f0fdf4;
+    color: #0d5f32;
+    border-color: #0d5f32;
+}
+
+/* Seleccionado / Presionado / Activo: verde logo Excel con letra blanca y borde claro sutil */
+QPushButton.filtro_btn_excel:pressed,
+QPushButton.filtro_btn_excel[activo="true"],
+QPushButton.filtro_btn_excel.filtro_btn_activo {
+    background-color: #107c41;
+    color: #ffffff;
+    border: 1.5px solid #86efac;
+    font-weight: 600;
+}
+
+QPushButton.filtro_btn_excel[activo="true"]:hover,
+QPushButton.filtro_btn_excel.filtro_btn_activo:hover {
+    background-color: #0d5f32;
+    color: #ffffff;
+    border-color: #86efac;
+}
+
+QPushButton.filtro_btn_excel:disabled {
+    background-color: #f8fafc;
+    color: #94a3b8;
+    border-color: #cbd5e1;
+}
+
 /* --- Chips de Medidores --- */
 QFrame.chip_medidor {
     background-color: #e0f2fe;

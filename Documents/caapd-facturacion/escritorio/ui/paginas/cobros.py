@@ -159,6 +159,16 @@ class PaginaCobros(QWidget):
         self.btn_filtro_alertas = self._crear_boton_filtro(
             "⚠️ Con Alertas (0)", "alertas")
 
+        # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
+        self.btn_actualizar_excel = QPushButton("Actualizar Excel")
+        self.btn_actualizar_excel.setProperty("class", "filtro_btn_excel")
+        self.btn_actualizar_excel.setProperty("activo", "false")
+        self.btn_actualizar_excel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_actualizar_excel.setToolTip(
+            "Recarga las modificaciones del archivo Excel del padrón sin reiniciar el programa"
+        )
+        self.btn_actualizar_excel.clicked.connect(self.accion_recargar_excel)
+
         for chip in (
             self.btn_filtro_todos,
             self.btn_filtro_pendientes,
@@ -166,6 +176,7 @@ class PaginaCobros(QWidget):
             self.btn_filtro_corte,
             self.btn_filtro_pagados,
             self.btn_filtro_alertas,
+            self.btn_actualizar_excel,
         ):
             fila_chips.addWidget(chip)
         fila_chips.addStretch(1)
@@ -566,6 +577,55 @@ class PaginaCobros(QWidget):
 
         self.cargar_datos_asincrono(forzar=True)
 
+    def accion_recargar_excel(self) -> None:
+        """Recarga los datos directamente desde el Excel del padrón sin reiniciar el programa."""
+        self.btn_actualizar_excel.setProperty("activo", "true")
+        self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+        self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+        self.btn_actualizar_excel.setEnabled(False)
+        self.btn_actualizar_excel.setText("⏳ Actualizando…")
+
+        ventana = self.window()
+        if hasattr(ventana, "mostrar_progreso"):
+            ventana.mostrar_progreso(50, "Recargando datos desde el Excel...")
+
+        def tarea():
+            self.servicio.limpiar_cache()
+            cfg = self.servicio.cargar_config()
+            mes_act = cfg.get("mes_actual") or {}
+            periodo = mes_act.get("periodo") or self.periodo_actual or "2026-10"
+            docs = self.servicio.cargar_mes(periodo)
+            return cfg, periodo, docs
+
+        def al_terminar(resultado):
+            self._al_recibir_datos(resultado)
+            self.btn_actualizar_excel.setEnabled(True)
+            self.btn_actualizar_excel.setText("Actualizar Excel")
+            if hasattr(ventana, "ocultar_progreso"):
+                ventana.ocultar_progreso("¡Padrón Excel recargado!")
+            self.toast.mostrar(
+                "¡Excel recargado con éxito! Se sincronizaron los cambios.", "exito"
+            )
+            QTimer.singleShot(2000, self._desactivar_estado_btn_excel)
+
+        def al_fallar(err_msg):
+            self.btn_actualizar_excel.setEnabled(True)
+            self.btn_actualizar_excel.setText("Actualizar Excel")
+            self._desactivar_estado_btn_excel()
+            self._al_fallar_carga(err_msg)
+
+        worker = Worker(tarea)
+        worker.signals.resultado.connect(al_terminar)
+        worker.signals.error.connect(al_fallar)
+        self.thread_pool.start(worker)
+
+    def _desactivar_estado_btn_excel(self) -> None:
+        """Restaura el botón Actualizar Excel a su estado de reposo (fondo blanco, borde verde)."""
+        if hasattr(self, "btn_actualizar_excel"):
+            self.btn_actualizar_excel.setProperty("activo", "false")
+            self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+            self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+
     def cargar_datos_asincrono(self, forzar: bool = False) -> None:
         self._set_cargando(True)
 
@@ -704,6 +764,7 @@ class PaginaCobros(QWidget):
     def _al_clic_filtro(self, clave: str) -> None:
         self._filtro_estado = clave
         self.proxy.set_filtro_estado(clave)
+        self._desactivar_estado_btn_excel()
 
         # Actualizar estilo de chips
         chips = [

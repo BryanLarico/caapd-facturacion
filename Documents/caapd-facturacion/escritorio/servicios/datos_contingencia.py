@@ -51,6 +51,19 @@ class ServicioDatosContingencia(ServicioDatos):
         self.es_contingencia: bool = True
         self.ops = {"lecturas": 0, "escrituras": 0}
 
+    def limpiar_cache(self, limpiar_config: bool = True) -> None:
+        """Recarga los datos directamente desde el archivo de respaldo Excel en contingencia."""
+        if self.ruta_excel and self.ruta_excel.exists():
+            datos = respaldo_excel.leer_respaldo_excel(self.ruta_excel)
+            if limpiar_config and datos.get("config"):
+                self.config = datos.get("config") or {}
+            if datos.get("usuarios"):
+                self.usuarios = datos.get("usuarios") or {}
+            if datos.get("mes_docs"):
+                self.mes = datos.get("mes_docs") or {}
+            if datos.get("periodo"):
+                self.periodo = datos.get("periodo") or "2026-10"
+
     def cargar_config(self) -> Dict[str, Any]:
         return self.config
 

@@ -2334,9 +2334,9 @@ class ServicioDatosPadron(ServicioDatos):
 
     def limpiar_cache(self, limpiar_config: bool = True) -> None:
         """Recarga los datos únicamente desde la carpeta 'Base de datos/' o Padrón Excel local. Cero lecturas a Firestore."""
-        archivos_bd = buscar_archivos_base_datos()
+        archivos_bd = buscar_archivos_base_datos(self.base_dir)
         if archivos_bd:
-            self.cargar_desde_carpeta_base_datos()
+            self.cargar_desde_carpeta_base_datos(dir_bd=self.base_dir)
             return
 
         cargado = False
@@ -2655,18 +2655,3 @@ class ServicioDatosPadron(ServicioDatos):
 
     def hay_aviso_ops(self) -> Dict[str, Optional[str]]:
         return {"lecturas": None, "escrituras": None}
-
-    def limpiar_cache(self, limpiar_config: bool = True) -> None:
-        """Recarga los datos únicamente desde la carpeta 'Base de datos/' o Padrón Excel local. Cero lecturas a Firestore."""
-        archivos_bd = buscar_archivos_base_datos()
-        if archivos_bd:
-            self.cargar_desde_carpeta_base_datos()
-            return
-
-        cargado = False
-        if self.ruta_excel and self.ruta_excel.exists():
-            cargado = self._cargar_desde_excel(self.ruta_excel)
-        if not cargado:
-            p_mes = buscar_archivo_padron_mes()
-            if p_mes and p_mes.exists():
-                self._cargar_desde_padron_excel(p_mes)
