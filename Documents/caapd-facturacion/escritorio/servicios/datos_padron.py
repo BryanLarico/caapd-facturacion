@@ -1491,7 +1491,7 @@ class ServicioDatosPadron(ServicioDatos):
         callback_progreso: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Acción B: Traer lecturas de los lectores (Nube -> Excel).
+        Acción B: ExExtraer lecturas de los lectores (Nube -> Excel).
         Descarga por la API REST de Firestore (servicios/firestore_rest.py), NO por gRPC.
         La versión anterior usaba `col.select([...]).stream()`, que en Windows podía
         colgarse dentro de gRPC, congelar la ventana ("No responde") y cerrar el

@@ -1,7 +1,7 @@
 """
 servicios/firestore_rest.py — Descarga de lecturas desde Firestore por la API REST (sin gRPC).
 
-MOTIVO: la acción «Traer lecturas de los lectores» usaba `col.select([...]).stream()` del SDK
+MOTIVO: la acción «Extraer lecturas de los lectores» usaba `col.select([...]).stream()` del SDK
 de Firestore, que viaja por gRPC. En Windows, la pila nativa de gRPC (cygrpc) puede quedarse
 colgada dentro de la llamada de streaming y luego cerrar el proceso con un «access violation»
 sin traceback. Este módulo reemplaza esa llamada por peticiones HTTP normales a la API REST
@@ -33,7 +33,8 @@ SCOPES_FIRESTORE = [
 ]
 
 _lock_credenciales = threading.Lock()
-_credenciales_cache: Dict[str, Any] = {"ruta": None, "creds": None, "project_id": None}
+_credenciales_cache: Dict[str, Any] = {
+    "ruta": None, "creds": None, "project_id": None}
 
 
 def precargar_dependencias() -> bool:
@@ -60,7 +61,7 @@ def _ruta_clave_configurada() -> Optional[str]:
     IMPORTANTE (cierre silencioso en Windows): `import firebase_client` arrastra
     firebase_admin -> google.cloud.firestore -> gRPC (cygrpc, código nativo). Si esa
     primera importación ocurre dentro de un hilo del QThreadPool (como pasaba en
-    «Traer lecturas de los lectores»), la pila nativa de gRPC se inicializa fuera del
+    «Extraer lecturas de los lectores»), la pila nativa de gRPC se inicializa fuera del
     hilo principal y el programa puede cerrarse sin traceback (solo se ve
     «QThreadStorage: entry N destroyed before end of thread»). Esta ruta REST debe
     permanecer 100 % libre de gRPC, por eso aquí solo se lee la configuración.
@@ -74,7 +75,8 @@ def _ruta_clave_configurada() -> Optional[str]:
         return str(rutas.ruta_aplicacion("serviceAccountKey.json"))
     try:
         import importlib
-        cfg = importlib.import_module("config_local")   # módulo local, puro Python
+        # módulo local, puro Python
+        cfg = importlib.import_module("config_local")
         ruta = getattr(cfg, "FIREBASE_KEY_PATH", None)
         if ruta:
             return str(ruta)
@@ -126,9 +128,12 @@ def _cargar_credenciales(ruta: Path):
             datos = json.load(f)
         project_id = str(datos.get("project_id") or "").strip()
         if not project_id:
-            raise ValueError(f"El archivo de credenciales no contiene 'project_id':\n  {ruta}")
-        creds = service_account.Credentials.from_service_account_file(str(ruta), scopes=SCOPES_FIRESTORE)
-        _credenciales_cache.update({"ruta": str(ruta), "creds": creds, "project_id": project_id})
+            raise ValueError(
+                f"El archivo de credenciales no contiene 'project_id':\n  {ruta}")
+        creds = service_account.Credentials.from_service_account_file(
+            str(ruta), scopes=SCOPES_FIRESTORE)
+        _credenciales_cache.update(
+            {"ruta": str(ruta), "creds": creds, "project_id": project_id})
         return creds, project_id
 
 
@@ -225,7 +230,8 @@ def descargar_documentos_mes(
 
     periodo = str(periodo or "").strip()
     if not periodo:
-        raise ValueError("Periodo vacío: no se puede determinar la colección mes_aaaa-mm.")
+        raise ValueError(
+            "Periodo vacío: no se puede determinar la colección mes_aaaa-mm.")
     coleccion = f"mes_{periodo}"
 
     if sesion is None or not project_id:
@@ -253,7 +259,8 @@ def descargar_documentos_mes(
         datos: Optional[Dict[str, Any]] = None
         for intento in range(1, REINTENTOS_POR_PAGINA + 1):
             try:
-                resp = sesion.get(base_url, params=params, timeout=tiempo_espera)
+                resp = sesion.get(base_url, params=params,
+                                  timeout=tiempo_espera)
             except requests.exceptions.Timeout as e:
                 ultimo_error = TimeoutError(
                     "Firebase tardó demasiado en responder (más de "
@@ -261,20 +268,24 @@ def descargar_documentos_mes(
                 )
                 ultimo_error.__cause__ = e
             except requests.exceptions.ConnectionError as e:
-                ultimo_error = ConnectionError("No hay conexión con Firebase. Verifica que el equipo tenga Internet.")
+                ultimo_error = ConnectionError(
+                    "No hay conexión con Firebase. Verifica que el equipo tenga Internet.")
                 ultimo_error.__cause__ = e
             else:
                 if resp.status_code == 200:
                     try:
                         datos = resp.json() or {}
                     except ValueError as e:
-                        ultimo_error = ValueError(f"Respuesta de Firebase ilegible: {e}")
+                        ultimo_error = ValueError(
+                            f"Respuesta de Firebase ilegible: {e}")
                     else:
                         break
                 elif resp.status_code in (429, 500, 502, 503, 504):
-                    ultimo_error = RuntimeError(_mensaje_http(resp.status_code, resp.text, coleccion))
+                    ultimo_error = RuntimeError(_mensaje_http(
+                        resp.status_code, resp.text, coleccion))
                 else:
-                    raise RuntimeError(_mensaje_http(resp.status_code, resp.text, coleccion))
+                    raise RuntimeError(_mensaje_http(
+                        resp.status_code, resp.text, coleccion))
 
             if intento < REINTENTOS_POR_PAGINA:
                 espera = ESPERA_BASE_REINTENTO_S * (2 ** (intento - 1))
@@ -286,7 +297,8 @@ def descargar_documentos_mes(
                 time.sleep(espera)
 
         if datos is None:
-            raise ultimo_error or RuntimeError("Fallo desconocido al leer Firebase.")
+            raise ultimo_error or RuntimeError(
+                "Fallo desconocido al leer Firebase.")
 
         for doc in datos.get("documents", []) or []:
             if not isinstance(doc, dict):
@@ -294,7 +306,8 @@ def descargar_documentos_mes(
             doc_id = id_desde_nombre(doc.get("name", ""))
             if not doc_id:
                 continue
-            documentos[doc_id] = campos_desde_firestore(doc.get("fields", {}) or {})
+            documentos[doc_id] = campos_desde_firestore(
+                doc.get("fields", {}) or {})
 
         if callback_progreso:
             callback_progreso(

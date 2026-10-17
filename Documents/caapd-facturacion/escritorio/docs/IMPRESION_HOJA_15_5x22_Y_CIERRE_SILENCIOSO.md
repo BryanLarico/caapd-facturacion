@@ -34,7 +34,7 @@ extendiendo la zona plana del centro, no estirando.
 
 Pruebas: `tests/test_generador_pdf_hoja.py`.
 
-## 2. Cierre del programa en «Traer lecturas de los lectores»
+## 2. Cierre del programa en «Extraer lecturas de los lectores»
 
 **Síntoma.** Al confirmar «Sí, traer lecturas» el programa se cierra y la consola solo
 muestra `QThreadStorage: entry N destroyed before end of thread 0x...`. Ese mensaje

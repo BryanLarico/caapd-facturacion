@@ -1,5 +1,5 @@
 """
-tests/test_firestore_rest_sin_grpc.py — La ruta REST de «Traer lecturas de los lectores»
+tests/test_firestore_rest_sin_grpc.py — La ruta REST de «Extraer lecturas de los lectores»
 NO debe importar firebase_client / firebase_admin / gRPC (código nativo) dentro del
 hilo de trabajo. Esa importación tardía era la causa del cierre silencioso en Windows
 («QThreadStorage: entry N destroyed before end of thread»).
@@ -29,7 +29,8 @@ def test_ruta_rest_no_importa_grpc_ni_firebase_admin():
     )
     assert res.returncode == 0, res.stderr
     modulos = json.loads(res.stdout.strip().splitlines()[-1])
-    assert modulos == [], f"La ruta REST importó código de gRPC/firebase_admin: {modulos}"
+    assert modulos == [
+    ], f"La ruta REST importó código de gRPC/firebase_admin: {modulos}"
 
 
 def test_ruta_credenciales_respeta_variable_de_entorno(tmp_path, monkeypatch):
@@ -62,7 +63,8 @@ def test_worker_descarga_usa_firestore_rest(monkeypatch):
         "recibidos": 1,
     }
     assert llamadas == [
-        ("2026-09", ("medidores", "nombre"), (firestore_rest.TIMEOUT_CONEXION_S, 30))
+        ("2026-09", ("medidores", "nombre"),
+         (firestore_rest.TIMEOUT_CONEXION_S, 30))
     ]
     assert any(evento.get("t") == "prog" for evento in eventos)
 
@@ -80,5 +82,6 @@ def test_main_desactiva_quit_on_last_window_closed():
     fuente = (DIR_ESCRITORIO / "main.py").read_text(encoding="utf-8")
     assert "setQuitOnLastWindowClosed(False)" in fuente
     assert "precargar_firebase_en_hilo_principal" in fuente
-    ventana = (DIR_ESCRITORIO / "ui" / "ventana_principal.py").read_text(encoding="utf-8")
+    ventana = (DIR_ESCRITORIO / "ui" /
+               "ventana_principal.py").read_text(encoding="utf-8")
     assert "app.quit" in ventana
