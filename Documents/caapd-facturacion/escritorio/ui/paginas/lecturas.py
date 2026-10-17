@@ -31,6 +31,7 @@ import codigos
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
+from ui.componentes.toast import Toast
 from ui.hilos import Worker, mostrar_dialogo_error, mostrar_dialogo_info
 from ui.paginas.lecturas_dialogo import DialogoLectura
 from ui.paginas.lecturas_modelo import ModeloLecturas, ProxyLecturas
@@ -163,9 +164,20 @@ class PaginaLecturas(QWidget):
         self.btn_filtro_observados = self._crear_boton_filtro(
             "⚠️ Con observación (0)", "con_observacion")
 
+        # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
+        self.btn_actualizar_excel = QPushButton("Actualizar Excel")
+        self.btn_actualizar_excel.setProperty("class", "filtro_btn_excel")
+        self.btn_actualizar_excel.setProperty("activo", "false")
+        self.btn_actualizar_excel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_actualizar_excel.setToolTip(
+            "Recarga las modificaciones del archivo Excel del padrón sin reiniciar el programa"
+        )
+        self.btn_actualizar_excel.clicked.connect(self.accion_recargar_excel)
+
         fila_filtros.addWidget(self.btn_filtro_todos)
         fila_filtros.addWidget(self.btn_filtro_faltan)
         fila_filtros.addWidget(self.btn_filtro_observados)
+        fila_filtros.addWidget(self.btn_actualizar_excel)
         fila_filtros.addStretch(1)
 
         layout_principal.addLayout(fila_filtros)
@@ -220,6 +232,9 @@ class PaginaLecturas(QWidget):
 
         # Conectar selección de tabla
         self.tabla.selectionModel().selectionChanged.connect(self._al_cambiar_seleccion)
+
+        # Toast flotante para avisos de sincronización y recarga
+        self.toast = Toast(self)
 
         # Activar filtro "todos"
         self._seleccionar_filtro_estado("todos")
@@ -301,6 +316,58 @@ class PaginaLecturas(QWidget):
 
         self.servicio.limpiar_cache(limpiar_config=True)
         self.cargar_datos_asincrono(forzar=True)
+
+    def accion_recargar_excel(self) -> None:
+        """Recarga los datos directamente desde el Excel del padrón sin reiniciar el programa."""
+        self.btn_actualizar_excel.setProperty("activo", "true")
+        self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+        self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+        self.btn_actualizar_excel.setEnabled(False)
+        self.btn_actualizar_excel.setText("⏳ Actualizando…")
+
+        ventana = self.window()
+        if hasattr(ventana, "mostrar_progreso"):
+            ventana.mostrar_progreso(50, "Recargando datos desde el Excel...")
+
+        def tarea() -> Any:
+            self.servicio.limpiar_cache(limpiar_config=True)
+            cfg = self.servicio.cargar_config()
+            mes_actual = cfg.get("mes_actual") or {}
+            periodo = mes_actual.get("periodo")
+            mes_dict = {}
+            if periodo:
+                mes_dict = self.servicio.cargar_mes(periodo)
+            return cfg, periodo, mes_dict
+
+        def al_terminar(resultado):
+            self._al_recibir_datos(resultado)
+            self.btn_actualizar_excel.setEnabled(True)
+            self.btn_actualizar_excel.setText("Actualizar Excel")
+            if hasattr(ventana, "ocultar_progreso"):
+                ventana.ocultar_progreso("¡Padrón Excel recargado!")
+            if hasattr(self, "toast"):
+                self.toast.mostrar(
+                    "¡Excel recargado con éxito! Se sincronizaron los cambios.", "exito"
+                )
+            QTimer.singleShot(2000, self._desactivar_estado_btn_excel)
+
+        def al_fallar(err_msg):
+            self.btn_actualizar_excel.setEnabled(True)
+            self.btn_actualizar_excel.setText("Actualizar Excel")
+            self._desactivar_estado_btn_excel()
+            self._al_fallar_carga(err_msg)
+
+        worker = Worker(tarea)
+        worker.signals.resultado.connect(al_terminar)
+        worker.signals.error.connect(al_fallar)
+        self.thread_pool.start(worker)
+
+    def _desactivar_estado_btn_excel(self) -> None:
+        """Restaura el botón Actualizar Excel a su estado de reposo (fondo blanco, borde verde)."""
+        if hasattr(self, "btn_actualizar_excel"):
+            self.btn_actualizar_excel.setProperty("activo", "false")
+            self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+            self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
 
     # ------------------------------------------------------------------
     # Sincronización con Firebase (un solo Worker, slots reales de QObject)
@@ -549,6 +616,7 @@ class PaginaLecturas(QWidget):
             f"Avance general: {leidos_m} de {total_m} ({pct:.1f}%)")
 
     def _seleccionar_sector(self, sector: str, btn: QPushButton) -> None:
+        self._desactivar_estado_btn_excel()
         for i in range(self.layout_sectores.count()):
             w = self.layout_sectores.itemAt(i).widget()
             if isinstance(w, QPushButton):
@@ -578,6 +646,7 @@ class PaginaLecturas(QWidget):
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
+        self._desactivar_estado_btn_excel()
         self.proxy_model.set_filtro_estado(clave)
         self._actualizar_conteo_visibles()
 

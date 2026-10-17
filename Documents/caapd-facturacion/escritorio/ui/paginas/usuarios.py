@@ -27,6 +27,7 @@ import codigos
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
+from ui.componentes.toast import Toast
 from ui.hilos import Worker, mostrar_dialogo_error
 from ui.paginas.usuarios_dialogos import DialogoCorregirDni, DialogoUsuario
 from ui.paginas.usuarios_modelo import ModeloUsuarios, ProxyUsuarios
@@ -127,10 +128,21 @@ class PaginaUsuarios(QWidget):
         self.btn_filtro_inactivos = self._crear_boton_filtro("Inactivos (0)", "inactivos")
         self.btn_filtro_pendientes = self._crear_boton_filtro("⚠️ Pendientes de DNI (0)", "pendientes")
 
+        # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
+        self.btn_actualizar_excel = QPushButton("Actualizar Excel")
+        self.btn_actualizar_excel.setProperty("class", "filtro_btn_excel")
+        self.btn_actualizar_excel.setProperty("activo", "false")
+        self.btn_actualizar_excel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_actualizar_excel.setToolTip(
+            "Recarga las modificaciones del archivo Excel del padrón sin reiniciar el programa"
+        )
+        self.btn_actualizar_excel.clicked.connect(self.accion_recargar_excel)
+
         fila_botones_filtro.addWidget(self.btn_filtro_todos)
         fila_botones_filtro.addWidget(self.btn_filtro_activos)
         fila_botones_filtro.addWidget(self.btn_filtro_inactivos)
         fila_botones_filtro.addWidget(self.btn_filtro_pendientes)
+        fila_botones_filtro.addWidget(self.btn_actualizar_excel)
         fila_botones_filtro.addStretch(1)
 
         self.lbl_conteo_registros = QLabel("Mostrando 0 de 0 registros")
@@ -194,6 +206,9 @@ class PaginaUsuarios(QWidget):
         fila_acciones.addStretch(1)
         layout_principal.addLayout(fila_acciones)
 
+        # Toast flotante para avisos de recarga
+        self.toast = Toast(self)
+
         # Activar filtro "todos" por defecto
         self._seleccionar_filtro("todos")
 
@@ -224,6 +239,54 @@ class PaginaUsuarios(QWidget):
         """Fuerza la recarga limpiando caché."""
         self.servicio.limpiar_cache(limpiar_config=False)
         self.cargar_datos_asincrono(forzar=True)
+
+    def accion_recargar_excel(self) -> None:
+        """Recarga los usuarios directamente desde el Excel del padrón sin reiniciar el programa."""
+        self.btn_actualizar_excel.setProperty("activo", "true")
+        self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+        self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+        self.btn_actualizar_excel.setEnabled(False)
+        self.btn_actualizar_excel.setText("⏳ Actualizando…")
+
+        ventana = self.window()
+        if hasattr(ventana, "mostrar_progreso"):
+            ventana.mostrar_progreso(50, "Recargando padrón desde el Excel...")
+
+        def tarea() -> Any:
+            self.servicio.limpiar_cache(limpiar_config=True)
+            cfg = self.servicio.cargar_config()
+            users = self.servicio.cargar_usuarios(forzar=True)
+            return cfg, users
+
+        def al_terminar(resultado):
+            self._al_recibir_datos(resultado)
+            self.btn_actualizar_excel.setEnabled(True)
+            self.btn_actualizar_excel.setText("Actualizar Excel")
+            if hasattr(ventana, "ocultar_progreso"):
+                ventana.ocultar_progreso("¡Padrón Excel recargado!")
+            if hasattr(self, "toast"):
+                self.toast.mostrar(
+                    "¡Excel recargado con éxito! Se sincronizaron los cambios.", "exito"
+                )
+            QTimer.singleShot(2000, self._desactivar_estado_btn_excel)
+
+        def al_fallar(err_msg):
+            self.btn_actualizar_excel.setEnabled(True)
+            self.btn_actualizar_excel.setText("Actualizar Excel")
+            self._desactivar_estado_btn_excel()
+            self._al_fallar_carga(err_msg)
+
+        worker = Worker(tarea)
+        worker.signals.resultado.connect(al_terminar)
+        worker.signals.error.connect(al_fallar)
+        self.thread_pool.start(worker)
+
+    def _desactivar_estado_btn_excel(self) -> None:
+        """Restaura el botón Actualizar Excel a su estado de reposo (fondo blanco, borde verde)."""
+        if hasattr(self, "btn_actualizar_excel"):
+            self.btn_actualizar_excel.setProperty("activo", "false")
+            self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+            self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
 
     def _al_recibir_datos(self, resultado: Any) -> None:
         cfg, users_dict = resultado
@@ -314,6 +377,7 @@ class PaginaUsuarios(QWidget):
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
+        self._desactivar_estado_btn_excel()
         self.proxy_model.set_filtro_estado(clave)
         self._actualizar_conteo_visibles()
 

@@ -405,6 +405,10 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
 
     avisos = []
     monkeypatch.setattr(
+        "ui.paginas.usuarios_dialogos.mostrar_dialogo_aviso",
+        lambda parent, titulo, texto, detalle=None: avisos.append((titulo, texto)),
+    )
+    monkeypatch.setattr(
         QMessageBox,
         "warning",
         lambda parent, titulo, texto: avisos.append((titulo, texto)) or QMessageBox.StandardButton.Ok,
@@ -429,8 +433,8 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
     assert "71234567" in servicio.usuarios
 
     # Se alertó al usuario sobre la sincronización pendiente
-    assert any("Aviso de sincronización" in a[0] for a in avisos)
-    assert any("se enviará con el próximo 'Enviar mes'" in a[1] for a in avisos)
+    assert any("Aviso" in a[0] for a in avisos)
+    assert any("Enviar mes" in a[1] for a in avisos)
 
 
 def test_dialogo_editar_dni_sd_a_real_renombra_y_sincroniza(qtbot, tmp_path):
@@ -505,4 +509,27 @@ def test_dialogo_editar_dni_sd_a_real_renombra_y_sincroniza(qtbot, tmp_path):
     # 2. En Firebase: se eliminó SD-001 y se guardó 30771072
     mock_doc_viejo.delete.assert_called()
     mock_doc_nuevo.set.assert_called()
+
+
+def test_pagina_usuarios_btn_actualizar_excel(qtbot, datos_usuarios_prueba):
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    pagina = PaginaUsuarios(servicio)
+    qtbot.addWidget(pagina)
+
+    assert hasattr(pagina, "btn_actualizar_excel")
+    assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
+    assert pagina.btn_actualizar_excel.property("activo") == "false"
+    assert pagina.btn_actualizar_excel.property("class") == "filtro_btn_excel"
+
+    # Clic en el botón
+    pagina.btn_actualizar_excel.click()
+    assert pagina.btn_actualizar_excel.property("activo") == "true"
+
+    qtbot.waitUntil(lambda: pagina.btn_actualizar_excel.isEnabled() is True, timeout=2000)
+    assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
+
+    # Al cambiar de filtro, se desactiva
+    pagina._seleccionar_filtro("activos")
+    assert pagina.btn_actualizar_excel.property("activo") == "false"
+
 

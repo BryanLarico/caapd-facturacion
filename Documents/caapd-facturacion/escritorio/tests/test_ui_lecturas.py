@@ -756,3 +756,25 @@ def test_pagina_lecturas_habilita_abrir_mes_si_cerrado_y_todo_leido(
         servicio_mock.mes,
     ))
     assert pagina.btn_abrir_mes.isEnabled() is False
+
+
+def test_pagina_lecturas_btn_actualizar_excel(qtbot, servicio_mock):
+    pagina = PaginaLecturas(servicio_mock)
+    qtbot.addWidget(pagina)
+
+    assert hasattr(pagina, "btn_actualizar_excel")
+    assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
+    assert pagina.btn_actualizar_excel.property("activo") == "false"
+    assert pagina.btn_actualizar_excel.property("class") == "filtro_btn_excel"
+
+    # Clic en el botón
+    pagina.btn_actualizar_excel.click()
+    assert pagina.btn_actualizar_excel.property("activo") == "true"
+
+    qtbot.waitUntil(lambda: pagina.btn_actualizar_excel.isEnabled() is True, timeout=2000)
+    assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
+
+    # Al cambiar de filtro, se desactiva
+    pagina._seleccionar_filtro_estado("faltan")
+    assert pagina.btn_actualizar_excel.property("activo") == "false"
+
