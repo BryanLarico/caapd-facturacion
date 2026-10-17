@@ -1817,7 +1817,7 @@ class ServicioDatosPadron(ServicioDatos):
             raise ValueError("El nuevo ID es igual al ID actual.")
         if id_nuevo in self.usuarios:
             raise ValueError(
-                f"Ya existe un usuario con el ID/DNI '{id_nuevo}'.")
+                f"Ya existe un usuario con el DNI '{id_nuevo}'.")
         if id_viejo not in self.usuarios:
             raise ValueError(f"Usuario {id_viejo} no existe.")
 

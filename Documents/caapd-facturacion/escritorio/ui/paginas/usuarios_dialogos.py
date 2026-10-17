@@ -377,7 +377,7 @@ class DialogoUsuario(QDialog):
 
             if self.servicio.obtener_usuario(id_final) is not None:
                 QMessageBox.warning(
-                    self, "ID ya registrado", f"Ya existe un usuario registrado con el ID/DNI '{id_final}'."
+                    self, "ID ya registrado", f"Ya existe un usuario registrado con el DNI '{id_final}'."
                 )
                 self.campo_id.setFocus()
                 return
