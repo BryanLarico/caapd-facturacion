@@ -1,0 +1,1716 @@
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/alert-octagon.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/alert-octagon.svg
+new file mode 100644
+index 0000000..33e95e6
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/alert-octagon.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [warning, error, info, danger, caution, attention, exclamation, notice, stop-sign, alert, octagon]
++category: System
++version: "1.19"
++unicode: "ecc6"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M12.802 2.165l5.575 2.389c.48 .206 .863 .589 1.07 1.07l2.388 5.574c.22 .512 .22 1.092 0 1.604l-2.389 5.575c-.206 .48 -.589 .863 -1.07 1.07l-5.574 2.388c-.512 .22 -1.092 .22 -1.604 0l-5.575 -2.389a2.036 2.036 0 0 1 -1.07 -1.07l-2.388 -5.574a2.036 2.036 0 0 1 0 -1.604l2.389 -5.575c.206 -.48 .589 -.863 1.07 -1.07l5.574 -2.388a2.036 2.036 0 0 1 1.604 0" />
++  <path d="M12 8v4" />
++  <path d="M12 16h.01" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/alert-triangle.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/alert-triangle.svg
+new file mode 100644
+index 0000000..3caf0c6
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/alert-triangle.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [warning, caution, danger, error, hazard, exclamation, attention, risk, notice, alert, triangle]
++category: System
++version: "1.0"
++unicode: "ea06"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M12 9v4" />
++  <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />
++  <path d="M12 16h.01" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/arrow-back-up.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/arrow-back-up.svg
+new file mode 100644
+index 0000000..8febf9b
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/arrow-back-up.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [undo, return, revert, previous, reply, history, pointer, navigation, arrow, back]
++category: Arrows
++version: "1.3"
++unicode: "eb77"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M9 14l-4 -4l4 -4" />
++  <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/calendar-plus.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/calendar-plus.svg
+new file mode 100644
+index 0000000..1cf424e
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/calendar-plus.svg
+@@ -0,0 +1,24 @@
++<!--
++tags: [calendar, date, schedule, event, day, planner, agenda, add, new, create, plus, add-event, new-event, appointment]
++category: System
++version: "1.5"
++unicode: "ebba"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5" />
++  <path d="M16 3v4" />
++  <path d="M8 3v4" />
++  <path d="M4 11h16" />
++  <path d="M16 19h6" />
++  <path d="M19 16v6" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/chart-bar.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/chart-bar.svg
+new file mode 100644
+index 0000000..df44d12
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/chart-bar.svg
+@@ -0,0 +1,22 @@
++<!--
++tags: [chart, graph, statistics, analytics, data, report, diagram, bar-chart, bars, histogram, column, visualization, bar]
++category: Charts
++version: "1.0"
++unicode: "ea59"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6" />
++  <path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10" />
++  <path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14" />
++  <path d="M4 20h14" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/check.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/check.svg
+new file mode 100644
+index 0000000..8457c55
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/check.svg
+@@ -0,0 +1,19 @@
++<!--
++tags: [check, checkmark, tick, done, yes, ok, confirm, success, approve, correct, complete]
++category: System
++version: "1.0"
++unicode: "ea5e"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 12l5 5l10 -10" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/circle-check.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/circle-check.svg
+new file mode 100644
+index 0000000..7b794b9
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/circle-check.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [check, done, success, confirmed, approved, tick, ok, verified, complete, correct, checkmark, circle]
++category: Shapes
++version: "1.0"
++unicode: "ea67"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
++  <path d="M9 12l2 2l4 -4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/circle-x.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/circle-x.svg
+new file mode 100644
+index 0000000..5e74ef3
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/circle-x.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [x, close, cancel, remove, delete, error, clear, dismiss, circle, round, button]
++category: Shapes
++version: "1.0"
++unicode: "ea6a"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
++  <path d="M10 10l4 4m0 -4l-4 4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/clock.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/clock.svg
+new file mode 100644
+index 0000000..9c31e87
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/clock.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [time, watch, hour, schedule, timer, clock-face, history, pending, wall-clock, minutes, clock]
++category: System
++version: "1.0"
++unicode: "ea70"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
++  <path d="M12 7v5l3 3" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/coins.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/coins.svg
+new file mode 100644
+index 0000000..c4beb7d
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/coins.svg
+@@ -0,0 +1,23 @@
++<!--
++tags: [coins, money, cash, currency, savings, payment, finance, stack, wealth, change]
++category: E-commerce
++version: "1.119"
++unicode: "f65d"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M9 14c0 1.657 2.686 3 6 3s6 -1.343 6 -3s-2.686 -3 -6 -3s-6 1.343 -6 3" />
++  <path d="M9 14v4c0 1.656 2.686 3 6 3s6 -1.344 6 -3v-4" />
++  <path d="M3 6c0 1.072 1.144 2.062 3 2.598s4.144 .536 6 0c1.856 -.536 3 -1.526 3 -2.598c0 -1.072 -1.144 -2.062 -3 -2.598s-4.144 -.536 -6 0c-1.856 .536 -3 1.526 -3 2.598" />
++  <path d="M3 6v10c0 .888 .772 1.45 2 2" />
++  <path d="M3 11c0 .888 .772 1.45 2 2" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/credit-card.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/credit-card.svg
+new file mode 100644
+index 0000000..2e03469
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/credit-card.svg
+@@ -0,0 +1,22 @@
++<!--
++tags: [credit-card, card, payment, pay, debit-card, bank-card, checkout, purchase, billing, money, visa, mastercard, credit]
++category: E-commerce
++version: "1.0"
++unicode: "ea84"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -8" />
++  <path d="M3 10l18 0" />
++  <path d="M7 15l.01 0" />
++  <path d="M11 15l2 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/database.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/database.svg
+new file mode 100644
+index 0000000..0f5f7d8
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/database.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [database, db, data, storage, sql, server, records, table, backend, disk]
++category: Database
++version: "1.0"
++unicode: "ea88"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0" />
++  <path d="M4 6v6a8 3 0 0 0 16 0v-6" />
++  <path d="M4 12v6a8 3 0 0 0 16 0v-6" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/device-floppy.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/device-floppy.svg
+new file mode 100644
+index 0000000..46cda83
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/device-floppy.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [floppy, floppy-disk, save, disk, diskette, storage, file, retro, device]
++category: Devices
++version: "1.2"
++unicode: "eb62"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" />
++  <path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
++  <path d="M14 4l0 4l-6 0l0 -4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/device-mobile.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/device-mobile.svg
+new file mode 100644
+index 0000000..2fc6f41
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/device-mobile.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [phone, smartphone, iphone, android, cellphone, cell-phone, mobile-phone, handset, device, app, mobile]
++category: Devices
++version: "1.0"
++unicode: "ea8a"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14" />
++  <path d="M11 4h2" />
++  <path d="M12 17v.01" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/download.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/download.svg
+new file mode 100644
+index 0000000..2d10858
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/download.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [download, save, arrow-down, import, get, receive, transfer, fetch, tray]
++category: Arrows
++version: "1.0"
++unicode: "ea96"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
++  <path d="M7 11l5 5l5 -5" />
++  <path d="M12 4l0 12" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/droplet.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/droplet.svg
+new file mode 100644
+index 0000000..ce5a9b9
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/droplet.svg
+@@ -0,0 +1,19 @@
++<!--
++tags: [droplet, drop, water, liquid, rain, blood, ink, color, fill, humidity]
++category: Design
++version: "1.0"
++unicode: "ea97"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M7.502 19.423c2.602 2.105 6.395 2.105 8.996 0c2.602 -2.105 3.262 -5.708 1.566 -8.546l-4.89 -7.26c-.42 -.625 -1.287 -.803 -1.936 -.397a1.376 1.376 0 0 0 -.41 .397l-4.893 7.26c-1.695 2.838 -1.035 6.441 1.567 8.546" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/edit.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/edit.svg
+new file mode 100644
+index 0000000..6086160
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/edit.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [edit, pencil, write, modify, change, update, rename, compose, pen, draw]
++category: Design
++version: "1.0"
++unicode: "ea98"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" />
++  <path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415" />
++  <path d="M16 5l3 3" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/eye.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/eye.svg
+new file mode 100644
+index 0000000..5a0a21d
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/eye.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [eye, view, visibility, show, see, preview, visible, watch, vision, password-show]
++category: System
++version: "1.0"
++unicode: "ea9a"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
++  <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/file-text.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/file-text.svg
+new file mode 100644
+index 0000000..e1d777f
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/file-text.svg
+@@ -0,0 +1,23 @@
++<!--
++tags: [text, document, txt, doc, article, page, notes, file, content, paper]
++category: Document
++version: "1.0"
++unicode: "eaa2"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M14 3v4a1 1 0 0 0 1 1h4" />
++  <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
++  <path d="M9 9l1 0" />
++  <path d="M9 13l6 0" />
++  <path d="M9 17l6 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/folder-open.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/folder-open.svg
+new file mode 100644
+index 0000000..e7255d0
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/folder-open.svg
+@@ -0,0 +1,19 @@
++<!--
++category: Document
++tags: [folder-open, open-folder, directory, open, browse, files, explore, expand, dir]
++version: "2.24"
++unicode: "faf7"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 19l2.757 -7.351a1 1 0 0 1 .936 -.649h12.307a1 1 0 0 1 .986 1.164l-.996 5.211a2 2 0 0 1 -1.964 1.625h-14.026a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v2" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/folder.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/folder.svg
+new file mode 100644
+index 0000000..354a3df
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/folder.svg
+@@ -0,0 +1,19 @@
++<!--
++tags: [folder, directory, dir, files, archive, project, category, organize, storage]
++category: Document
++version: "1.0"
++unicode: "eaad"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/home.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/home.svg
+new file mode 100644
+index 0000000..185788d
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/home.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [home, house, homepage, main, start, dashboard, building, residence, real-estate]
++category: Buildings
++version: "1.0"
++unicode: "eac1"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 12l-2 0l9 -9l9 9l-2 0" />
++  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
++  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/info-circle.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/info-circle.svg
+new file mode 100644
+index 0000000..bfa465e
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/info-circle.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [info, information, about, details, help, tip, i, circle, notice]
++category: System
++version: "1.0"
++unicode: "eac5"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
++  <path d="M12 9h.01" />
++  <path d="M11 12h1v4h1" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/lock-open.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/lock-open.svg
+new file mode 100644
+index 0000000..a730939
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/lock-open.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [unlock, unlocked, open, lock, padlock, security, access]
++category: System
++version: "1.0"
++unicode: "eae1"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -6" />
++  <path d="M11 16a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
++  <path d="M8 11v-5a4 4 0 0 1 8 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/lock.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/lock.svg
+new file mode 100644
+index 0000000..f66fe54
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/lock.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [lock, padlock, locked, security, secure, password, private, protected]
++category: System
++version: "1.0"
++unicode: "eae2"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6" />
++  <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" />
++  <path d="M8 11v-4a4 4 0 1 1 8 0v4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/plus.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/plus.svg
+new file mode 100644
+index 0000000..3885664
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/plus.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [add, new, create, insert, more, plus-sign, increase, positive, math, cross, plus]
++category: Math
++version: "1.0"
++unicode: "eb0b"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M12 5l0 14" />
++  <path d="M5 12l14 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/printer.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/printer.svg
+new file mode 100644
+index 0000000..bc5a04a
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/printer.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [print, printing, paper, office, fax, device, document, hardcopy, printer]
++category: Devices
++version: "1.0"
++unicode: "eb0e"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
++  <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
++  <path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/receipt.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/receipt.svg
+new file mode 100644
+index 0000000..e36bc80
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/receipt.svg
+@@ -0,0 +1,19 @@
++<!--
++tags: [bill, invoice, payment, purchase, transaction, money, shopping, paper, total, tax, receipt]
++category: Document
++version: "1.38"
++unicode: "edfd"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2m4 -14h6m-6 4h6m-2 4h2" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/refresh.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/refresh.svg
+new file mode 100644
+index 0000000..1760df7
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/refresh.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [reload, sync, update, reset, arrows, loader, spinner, restart, refresh]
++category: Arrows
++version: "1.0"
++unicode: "eb13"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
++  <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/search.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/search.svg
+new file mode 100644
+index 0000000..e894f96
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/search.svg
+@@ -0,0 +1,20 @@
++<!--
++category: System
++tags: [find, magnifier, magnifying-glass, lookup, zoom, explore, query, browse, search]
++version: "1.0"
++unicode: "eb1c"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
++  <path d="M21 21l-6 -6" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/settings.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/settings.svg
+new file mode 100644
+index 0000000..c948914
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/settings.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [cog, gear, preferences, configuration, options, config, setup, control, settings]
++category: System
++version: "1.0"
++unicode: "eb20"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065" />
++  <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/trash.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/trash.svg
+new file mode 100644
+index 0000000..71afd76
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/trash.svg
+@@ -0,0 +1,23 @@
++<!--
++tags: [delete, remove, bin, garbage, rubbish, waste-basket, trash-can, recycle-bin, trash]
++category: System
++version: "1.0"
++unicode: "eb41"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 7l16 0" />
++  <path d="M10 11l0 6" />
++  <path d="M14 11l0 6" />
++  <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
++  <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/upload.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/upload.svg
+new file mode 100644
+index 0000000..b20864d
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/upload.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [upload, import, send, arrow-up, cloud, file, transfer, arrow]
++category: Arrows
++version: "1.0"
++unicode: "eb47"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
++  <path d="M7 9l5 -5l5 5" />
++  <path d="M12 4l0 12" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/user.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/user.svg
+new file mode 100644
+index 0000000..6cdc9ac
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/user.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [person, account, profile, avatar, member, people, human, login, identity, user]
++category: System
++version: "1.0"
++unicode: "eb4d"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
++  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/wifi-off.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/wifi-off.svg
+new file mode 100644
+index 0000000..3e249bc
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/wifi-off.svg
+@@ -0,0 +1,23 @@
++<!--
++tags: [wifi, wi-fi, wireless, offline, no-internet, disconnected, disabled, hotspot, off]
++category: Devices
++version: "1.22"
++unicode: "ecfa"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M12 18l.01 0" />
++  <path d="M9.172 15.172a4 4 0 0 1 5.656 0" />
++  <path d="M6.343 12.343a7.963 7.963 0 0 1 3.864 -2.14m4.163 .155a7.965 7.965 0 0 1 3.287 2" />
++  <path d="M3.515 9.515a12 12 0 0 1 3.544 -2.455m3.101 -.92a12 12 0 0 1 10.325 3.374" />
++  <path d="M3 3l18 18" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/x.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/x.svg
+new file mode 100644
+index 0000000..d038c3d
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/x.svg
+@@ -0,0 +1,20 @@
++<!--
++category: System
++tags: [close, cancel, remove, delete, dismiss, exit, clear, cross, times, multiply, x]
++version: "1.0"
++unicode: "eb55"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M18 6l-12 12" />
++  <path d="M6 6l12 12" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py b/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py
+new file mode 100644
+index 0000000..c6b4120
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py
+@@ -0,0 +1,50 @@
++"""
++scripts/descargar_iconos.py — Descarga los íconos Tabler (outline) que usa la
++aplicación a `recursos/iconos/`. Ejecutar una sola vez (o cuando se agregue
++un ícono nuevo a la lista).
++
++    cd escritorio
++    python scripts/descargar_iconos.py
++
++Tabler Icons — https://tabler.io/icons — Licencia MIT.
++"""
++from pathlib import Path
++import sys
++import urllib.request
++
++RAIZ = Path(__file__).resolve().parents[1]
++DESTINO = RAIZ / "recursos" / "iconos"
++BASE_URL = "https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline/{}.svg"
++
++ICONOS = [
++    # Navegación
++    "home", "user", "chart-bar", "device-mobile", "coins", "settings", "droplet", "database",
++    # Acciones
++    "refresh", "lock", "lock-open", "receipt", "calendar-plus", "folder-open", "folder",
++    "search", "credit-card", "printer", "device-floppy", "download", "upload",
++    "plus", "edit", "trash", "eye", "file-text", "clock",
++    # Estados / mensajes
++    "circle-check", "circle-x", "info-circle", "alert-triangle", "alert-octagon",
++    "check", "x", "wifi-off", "arrow-back-up",
++]
++
++
++def main() -> int:
++    DESTINO.mkdir(parents=True, exist_ok=True)
++    errores = 0
++    for nombre in ICONOS:
++        destino = DESTINO / f"{nombre}.svg"
++        if destino.exists():
++            continue
++        try:
++            urllib.request.urlretrieve(BASE_URL.format(nombre), destino)
++            print(f"  ok  {nombre}")
++        except Exception as e:  # noqa: BLE001
++            errores += 1
++            print(f"  ERROR {nombre}: {e}")
++    print(f"Listo. {len(ICONOS) - errores} íconos en {DESTINO}")
++    return 1 if errores else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/Documents/caapd-facturacion/escritorio/ui/componentes/alerta.py b/Documents/caapd-facturacion/escritorio/ui/componentes/alerta.py
+index b7c823b..b1f4c72 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/componentes/alerta.py
++++ b/Documents/caapd-facturacion/escritorio/ui/componentes/alerta.py
+@@ -16,17 +16,20 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ 
+ class AlertaWidget(QFrame):
+     """
+     Componente de alerta visual con ícono y texto descriptivo.
+     """
+ 
+-    ICONOS = {
+-        "exito": "✅",
+-        "aviso": "⚠️",
+-        "peligro": "❌",
+-        "info": "ℹ️",
++    # Color del ícono según el tipo (coincide con alerta_texto_* en tema.qss)
++    COLOR_ICONO = {
++        "exito": "exito",
++        "aviso": "aviso",
++        "peligro": "peligro",
++        "info": "info",
+     }
+ 
+     def __init__(
+@@ -52,14 +55,10 @@ class AlertaWidget(QFrame):
+         layout.setSpacing(12)
+ 
+         # Ícono
+-        self.lbl_icono = QLabel(self.ICONOS.get(tipo, "ℹ️"))
+-        self.lbl_icono.setStyleSheet(
+-            "font-size: 18px; background: transparent;")
+-        self.lbl_icono.setAlignment(
+-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+-        self.lbl_icono.setSizePolicy(
+-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+-        layout.addWidget(self.lbl_icono)
++        self.lbl_icono = iconos.etiqueta(
++            iconos.POR_TIPO.get(tipo, "info-circle"),
++            self.COLOR_ICONO.get(tipo, "info"), 20)
++        layout.addWidget(self.lbl_icono, alignment=Qt.AlignmentFlag.AlignTop)
+ 
+         # Texto del mensaje (se parte en varias líneas y crece en alto según el ancho)
+         self.lbl_mensaje = QLabel(mensaje)
+@@ -77,7 +76,8 @@ class AlertaWidget(QFrame):
+ 
+         # Botón de cerrar opcional
+         if cerrable:
+-            self.btn_cerrar = QPushButton("✕")
++            self.btn_cerrar = QPushButton("")
++            iconos.aplicar(self.btn_cerrar, "x", "gris", 14)
+             self.btn_cerrar.setCursor(Qt.CursorShape.PointingHandCursor)
+             self.btn_cerrar.setFixedSize(24, 24)
+             self.btn_cerrar.setStyleSheet(
+@@ -93,7 +93,9 @@ class AlertaWidget(QFrame):
+             self.tipo = tipo
+             self.setProperty("class", f"alerta alerta_{tipo}")
+             self.lbl_mensaje.setProperty("class", f"alerta_texto_{tipo}")
+-            self.lbl_icono.setText(self.ICONOS.get(tipo, "ℹ️"))
++            iconos.poner_en_etiqueta(
++                self.lbl_icono, iconos.POR_TIPO.get(tipo, "info-circle"),
++                self.COLOR_ICONO.get(tipo, "info"), 20)
+             # Refrescar estilo en Qt
+             self.style().unpolish(self)
+             self.style().polish(self)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/componentes/toast.py b/Documents/caapd-facturacion/escritorio/ui/componentes/toast.py
+index e5ae5b1..2baa0b4 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/componentes/toast.py
++++ b/Documents/caapd-facturacion/escritorio/ui/componentes/toast.py
+@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ 
+ class Toast(QFrame):
+     """Aviso flotante que se oculta solo. Tipos: exito, aviso, peligro, info."""
+@@ -22,7 +24,6 @@ class Toast(QFrame):
+     DURACION_MS = 5000
+     MARGEN = 16
+ 
+-    ICONOS = {"exito": "✅", "aviso": "⚠️", "peligro": "❌", "info": "ℹ️"}
+     # (fondo, texto, borde)
+     COLORES = {
+         "exito": ("#dcfce7", "#166534", "#86efac"),
+@@ -41,9 +42,7 @@ class Toast(QFrame):
+         lay.setContentsMargins(14, 10, 10, 10)
+         lay.setSpacing(10)
+ 
+-        self.lbl_icono = QLabel("ℹ️")
+-        self.lbl_icono.setStyleSheet(
+-            "font-size: 17px; background: transparent; border: none;")
++        self.lbl_icono = iconos.etiqueta("info-circle", "info", 20)
+         lay.addWidget(self.lbl_icono, alignment=Qt.AlignmentFlag.AlignTop)
+ 
+         self.lbl_mensaje = QLabel("")
+@@ -52,7 +51,8 @@ class Toast(QFrame):
+             "background: transparent; border: none; font-size: 13px; font-weight: 600;")
+         lay.addWidget(self.lbl_mensaje, stretch=1)
+ 
+-        self.btn_cerrar = QPushButton("✕")
++        self.btn_cerrar = QPushButton("")
++        iconos.aplicar(self.btn_cerrar, "x", "gris", 14)
+         self.btn_cerrar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_cerrar.setFixedSize(22, 22)
+         self.btn_cerrar.setStyleSheet(
+@@ -81,7 +81,9 @@ class Toast(QFrame):
+             f"QFrame#toast {{ background-color: {fondo}; border: 1px solid {borde}; "
+             f"border-left: 5px solid {texto}; border-radius: 8px; }}"
+         )
+-        self.lbl_icono.setText(self.ICONOS.get(tipo, "ℹ️"))
++        iconos.poner_en_etiqueta(
++            self.lbl_icono, iconos.POR_TIPO.get(tipo, "info-circle"), texto, 20)
++        iconos.recolorear(self.btn_cerrar, texto)
+         self.lbl_mensaje.setText(mensaje)
+         self.lbl_mensaje.setStyleSheet(
+             f"background: transparent; border: none; font-size: 13px; font-weight: 600; color: {texto};"
+diff --git a/Documents/caapd-facturacion/escritorio/ui/iconos.py b/Documents/caapd-facturacion/escritorio/ui/iconos.py
+new file mode 100644
+index 0000000..cd9a75f
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/ui/iconos.py
+@@ -0,0 +1,132 @@
++"""
++ui/iconos.py — Íconos vectoriales de la aplicación (Tabler Icons, licencia MIT).
++
++Los SVG viven en `recursos/iconos/<nombre>.svg` y se tiñen en tiempo de
++ejecución con los colores de la paleta, de modo que un mismo archivo sirve
++para un botón oscuro, uno claro o un chip activo/inactivo.
++
++Uso típico:
++    from ui import iconos
++
++    btn = QPushButton("Actualizar")
++    iconos.aplicar(btn, "refresh")                    # gris pizarra, 16 px
++    iconos.aplicar(btn_nav, "home", "blanco", 18)     # barra azul
++    lbl = iconos.etiqueta("alert-triangle", "aviso", 20)   # QLabel con pixmap
++
++Si falta un SVG no se rompe la app: se devuelve un ícono vacío y se avisa
++una sola vez por consola.
++"""
++from __future__ import annotations
++
++import logging
++from functools import lru_cache
++from pathlib import Path
++from typing import Optional
++
++from PySide6.QtCore import QByteArray, QRectF, QSize, Qt
++from PySide6.QtGui import QIcon, QPainter, QPixmap
++from PySide6.QtSvg import QSvgRenderer
++from PySide6.QtWidgets import QAbstractButton, QLabel
++
++import rutas
++
++log = logging.getLogger(__name__)
++
++DIR_ICONOS: Path = rutas.ruta_recurso("recursos", "iconos")
++
++# Paleta (misma que tema.qss). Se puede pasar un "#rrggbb" directo también.
++COLORES = {
++    "texto": "#334155",      # gris pizarra: botones secundarios, títulos
++    "gris": "#64748b",       # chips inactivos, textos de apoyo
++    "blanco": "#ffffff",     # barra de navegación, botones de color
++    "primario": "#0284c7",   # azul institucional
++    "turquesa": "#0d9488",
++    "exito": "#166534",
++    "aviso": "#9a3412",
++    "peligro": "#991b1b",
++    "info": "#075985",
++}
++
++# Íconos por tipo de mensaje (toast, alertas, banners)
++POR_TIPO = {
++    "exito": "circle-check",
++    "aviso": "alert-triangle",
++    "peligro": "circle-x",
++    "info": "info-circle",
++}
++
++_TAMANOS_ICONO = (16, 20, 24, 32, 48)
++_avisados: set[str] = set()
++
++
++def _color_hex(color: str) -> str:
++    return COLORES.get(color, color)
++
++
++@lru_cache(maxsize=None)
++def _svg_bytes(nombre: str, color_hex: str) -> Optional[bytes]:
++    ruta = DIR_ICONOS / f"{nombre}.svg"
++    if not ruta.exists():
++        if nombre not in _avisados:
++            _avisados.add(nombre)
++            log.warning("Ícono no encontrado: %s (ejecuta scripts/descargar_iconos.py)", ruta)
++        return None
++    svg = ruta.read_text(encoding="utf-8")
++    # Tabler usa stroke="currentColor"; lo reemplazamos por el color pedido.
++    svg = svg.replace("currentColor", color_hex)
++    return svg.encode("utf-8")
++
++
++def pixmap(nombre: str, color: str = "texto", tamano: int = 18, escala: float = 2.0) -> QPixmap:
++    """Devuelve un QPixmap nítido (renderizado a `escala`x para pantallas HiDPI)."""
++    datos = _svg_bytes(nombre, _color_hex(color))
++    px = QPixmap(int(tamano * escala), int(tamano * escala))
++    px.fill(Qt.GlobalColor.transparent)
++    if datos is not None:
++        render = QSvgRenderer(QByteArray(datos))
++        pintor = QPainter(px)
++        pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
++        render.render(pintor, QRectF(0, 0, px.width(), px.height()))
++        pintor.end()
++    px.setDevicePixelRatio(escala)
++    return px
++
++
++@lru_cache(maxsize=None)
++def icono(nombre: str, color: str = "texto") -> QIcon:
++    """QIcon con varias resoluciones; Qt elige la adecuada según iconSize."""
++    ico = QIcon()
++    for t in _TAMANOS_ICONO:
++        ico.addPixmap(pixmap(nombre, color, t, escala=1.0))
++    return ico
++
++
++def aplicar(boton: QAbstractButton, nombre: str, color: str = "texto", tamano: int = 16) -> None:
++    """Pone el ícono a un botón y recuerda su nombre (ver `recolorear`)."""
++    boton.setIcon(icono(nombre, color))
++    boton.setIconSize(QSize(tamano, tamano))
++    boton.setProperty("icono_nombre", nombre)
++    boton.setProperty("icono_tamano", tamano)
++
++
++def recolorear(boton: QAbstractButton, color: str) -> None:
++    """Cambia solo el color del ícono ya aplicado (chips activo/inactivo)."""
++    nombre = boton.property("icono_nombre")
++    if nombre:
++        boton.setIcon(icono(str(nombre), color))
++
++
++def etiqueta(nombre: str, color: str = "texto", tamano: int = 18) -> QLabel:
++    """QLabel que muestra solo el ícono (para tarjetas KPI, alertas, etc.)."""
++    lbl = QLabel()
++    lbl.setPixmap(pixmap(nombre, color, tamano))
++    lbl.setFixedSize(tamano, tamano)
++    lbl.setStyleSheet("background: transparent; border: none;")
++    return lbl
++
++
++def poner_en_etiqueta(lbl: QLabel, nombre: str, color: str = "texto", tamano: int = 18) -> None:
++    """Reemplaza el contenido de un QLabel existente por el ícono."""
++    lbl.setText("")
++    lbl.setPixmap(pixmap(nombre, color, tamano))
++    lbl.setFixedSize(tamano, tamano)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py b/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py
+index 950ff6a..2c4e9a6 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py
+@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
+ 
+ import rutas
+ from servicios.datos import ServicioDatos
++from ui import iconos
+ from ui.componentes.toast import Toast
+ from ui.hilos import Worker, mostrar_dialogo_error
+ from ui.paginas.cobros_modelo import DelegadoFilasCobros, ModeloCobros, ProxyCobros
+@@ -50,7 +51,7 @@ ANCHO_MINIMO_DOS_COLUMNAS = 1150
+ class PaginaCobros(QWidget):
+     """Pantalla interactiva unificada de facturación, cobranza y control de morosidad."""
+ 
+-    TEXTO_BTN_ACTUALIZAR = "🔄 Actualizar"
++    TEXTO_BTN_ACTUALIZAR = "Actualizar"
+ 
+     def __init__(self, servicio_datos: ServicioDatos, parent: Optional[QWidget] = None) -> None:
+         super().__init__(parent)
+@@ -109,7 +110,8 @@ class PaginaCobros(QWidget):
+         fila_encabezado.addWidget(self.lbl_badge_periodo)
+ 
+         # Botón Carpeta de recibos (Escritorio/recibos) — entre Periodo y Actualizar
+-        self.btn_carpeta_recibos = QPushButton("📂 Carpeta de recibos")
++        self.btn_carpeta_recibos = QPushButton("Carpeta de recibos")
++        iconos.aplicar(self.btn_carpeta_recibos, "folder-open")
+         self.btn_carpeta_recibos.setProperty("class", "boton boton_secundario")
+         self.btn_carpeta_recibos.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_carpeta_recibos.setToolTip(
+@@ -119,6 +121,7 @@ class PaginaCobros(QWidget):
+ 
+         # Botón Actualizar
+         self.btn_actualizar = QPushButton(self.TEXTO_BTN_ACTUALIZAR)
++        iconos.aplicar(self.btn_actualizar, "refresh")
+         self.btn_actualizar.setProperty("class", "boton boton_secundario")
+         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_actualizar.clicked.connect(self.accion_actualizar)
+@@ -131,11 +134,11 @@ class PaginaCobros(QWidget):
+         fila_kpi.setSpacing(10)
+ 
+         self.card_facturado = self._crear_tarjeta_kpi(
+-            "Total Facturado", "S/. 0.00", "📊")
++            "Total Facturado", "S/. 0.00", "chart-bar", "primario")
+         self.card_recaudado = self._crear_tarjeta_kpi(
+-            "Recaudado", "S/. 0.00", "💰")
++            "Recaudado", "S/. 0.00", "coins", "exito")
+         self.card_corte = self._crear_tarjeta_kpi(
+-            "En Lista de Corte", "0 usuarios", "🚨")
++            "En Lista de Corte", "0 usuarios", "alert-octagon", "peligro")
+ 
+         fila_kpi.addWidget(self.card_facturado)
+         fila_kpi.addWidget(self.card_recaudado)
+@@ -157,7 +160,7 @@ class PaginaCobros(QWidget):
+         self.btn_filtro_pagados = self._crear_boton_filtro(
+             "Pagados (0)", "pagados")
+         self.btn_filtro_alertas = self._crear_boton_filtro(
+-            "⚠️ Con Alertas (0)", "alertas")
++            "Con Alertas (0)", "alertas")
+ 
+         # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
+         self.btn_actualizar_excel = QPushButton("Actualizar Excel")
+@@ -205,7 +208,9 @@ class PaginaCobros(QWidget):
+ 
+         self.input_buscar = QLineEdit()
+         self.input_buscar.setPlaceholderText(
+-            "🔍 Buscar por titular, DNI, conexión, N° recibo o medidor...")
++            "Buscar por titular, DNI, conexión, N° recibo o medidor...")
++        self.input_buscar.addAction(
++            iconos.icono("search", "gris"), QLineEdit.ActionPosition.LeadingPosition)
+         self.input_buscar.setClearButtonEnabled(True)
+         self.input_buscar.setMinimumWidth(220)
+         self.input_buscar.textChanged.connect(
+@@ -282,7 +287,8 @@ class PaginaCobros(QWidget):
+         # 6. Toast flotante (no forma parte del layout: se dibuja encima del contenido)
+         self.toast = Toast(self)
+ 
+-    def _crear_tarjeta_kpi(self, titulo: str, valor_defecto: str, icono: str) -> QFrame:
++    def _crear_tarjeta_kpi(self, titulo: str, valor_defecto: str,
++                           icono: str, color_icono: str = "texto") -> QFrame:
+         card = QFrame()
+         card.setProperty("class", "tarjeta")
+         card.setSizePolicy(QSizePolicy.Policy.Expanding,
+@@ -304,8 +310,7 @@ class PaginaCobros(QWidget):
+         col.addWidget(lbl_val)
+         lay.addLayout(col, stretch=1)
+ 
+-        lbl_ico = QLabel(icono)
+-        lbl_ico.setStyleSheet("font-size: 18px;")
++        lbl_ico = iconos.etiqueta(icono, color_icono, 22)
+         lay.addWidget(lbl_ico, alignment=Qt.AlignmentFlag.AlignTop)
+ 
+         card.lbl_valor = lbl_val  # type: ignore
+@@ -319,6 +324,7 @@ class PaginaCobros(QWidget):
+         # El filtro "Con Alertas" usa el estilo ámbar de advertencia, igual que "Pendientes de DNI"
+         if clave == "alertas":
+             btn.setProperty("class", "filtro_btn filtro_btn_aviso")
++            iconos.aplicar(btn, "alert-triangle", "aviso", 15)
+         else:
+             btn.setProperty("class", "filtro_btn")
+         btn.clicked.connect(lambda: self._al_clic_filtro(clave))
+@@ -380,7 +386,7 @@ class PaginaCobros(QWidget):
+         """)
+         lay_alerta = QVBoxLayout(self.box_alerta_medidor)
+         lay_alerta.setContentsMargins(4, 4, 4, 4)
+-        self.lbl_texto_alerta_medidor = QLabel("⚠️ Observación en medidor")
++        self.lbl_texto_alerta_medidor = QLabel("Observación en medidor")
+         self.lbl_texto_alerta_medidor.setStyleSheet(
+             "color: #92400e; font-size: 12px; font-weight: 500;")
+         self.lbl_texto_alerta_medidor.setWordWrap(True)
+@@ -427,7 +433,8 @@ class PaginaCobros(QWidget):
+         lay.addWidget(sep2)
+ 
+         # Botones de Acción
+-        self.btn_marcar_pagado = QPushButton("💳 Marcar como pagado")
++        self.btn_marcar_pagado = QPushButton("Marcar como pagado")
++        iconos.aplicar(self.btn_marcar_pagado, "credit-card", "blanco", 18)
+         self.btn_marcar_pagado.setProperty(
+             "class", "boton boton_exito boton_grande")
+         self.btn_marcar_pagado.setCursor(Qt.CursorShape.PointingHandCursor)
+@@ -442,7 +449,8 @@ class PaginaCobros(QWidget):
+         self.btn_marcar_pagado.clicked.connect(self._accion_marcar_pagado)
+         lay.addWidget(self.btn_marcar_pagado)
+ 
+-        self.btn_ver_recibo = QPushButton("🖨️ Imprimir / Descargar recibo PDF")
++        self.btn_ver_recibo = QPushButton("Imprimir / Descargar recibo PDF")
++        iconos.aplicar(self.btn_ver_recibo, "printer", "blanco", 18)
+         self.btn_ver_recibo.setProperty(
+             "class", "boton boton_primario boton_grande")
+         self.btn_ver_recibo.setCursor(Qt.CursorShape.PointingHandCursor)
+@@ -757,7 +765,7 @@ class PaginaCobros(QWidget):
+         self.btn_filtro_dos_meses.setText(f"2 Meses ({n_dos_meses})")
+         self.btn_filtro_corte.setText(f"Corte 3+ m. ({n_corte})")
+         self.btn_filtro_pagados.setText(f"Pagados ({n_pagados})")
+-        self.btn_filtro_alertas.setText(f"⚠️ Con Alertas ({n_alertas})")
++        self.btn_filtro_alertas.setText(f"Con Alertas ({n_alertas})")
+ 
+     # -----------------------------------------------------------------------
+     # Filtros y Búsqueda
+@@ -779,6 +787,8 @@ class PaginaCobros(QWidget):
+         for btn in chips:
+             activo = (btn.property("filtro_clave") == clave)
+             btn.setProperty("activo", "true" if activo else "false")
++            # El chip de alertas lleva ícono: blanco cuando está activo, ámbar si no
++            iconos.recolorear(btn, "blanco" if activo else "aviso")
+             btn.style().unpolish(btn)
+             btn.style().polish(btn)
+ 
+@@ -845,7 +855,7 @@ class PaginaCobros(QWidget):
+                 if nota:
+                     alertas.append(f"Nota: {nota}")
+         if alertas:
+-            self.lbl_texto_alerta_medidor.setText("⚠️ " + "\n".join(alertas))
++            self.lbl_texto_alerta_medidor.setText("\n".join(alertas))
+             self.box_alerta_medidor.show()
+         else:
+             self.box_alerta_medidor.hide()
+@@ -874,18 +884,18 @@ class PaginaCobros(QWidget):
+                 "background-color: #f1f5f9; color: #475569; font-weight: bold; padding: 6px; border-radius: 6px;"
+             )
+         elif esta_pagado:
+-            self.lbl_ficha_badge_mora.setText("✓ Pagado")
++            self.lbl_ficha_badge_mora.setText("Pagado")
+             self.lbl_ficha_badge_mora.setStyleSheet(
+                 "background-color: #dcfce7; color: #166534; font-weight: bold; padding: 6px; border-radius: 6px;"
+             )
+         elif meses >= 3:
+             self.lbl_ficha_badge_mora.setText(
+-                f"🚨 CORTE — {meses} meses sin pagar")
++                f"CORTE — {meses} meses sin pagar")
+             self.lbl_ficha_badge_mora.setStyleSheet(
+                 "background-color: #fee2e2; color: #991b1b; font-weight: bold; padding: 6px; border-radius: 6px;"
+             )
+         elif meses == 2:
+-            self.lbl_ficha_badge_mora.setText("⚠️ 2 Meses adeudados")
++            self.lbl_ficha_badge_mora.setText("2 Meses adeudados")
+             self.lbl_ficha_badge_mora.setStyleSheet(
+                 "background-color: #ffedd5; color: #9a3412; font-weight: bold; padding: 6px; border-radius: 6px;"
+             )
+@@ -899,9 +909,9 @@ class PaginaCobros(QWidget):
+         self.btn_marcar_pagado.setEnabled(not esta_pagado)
+         self.btn_marcar_pagado.setVisible(not esta_pagado)
+         if not tiene_recibo:
+-            self.btn_marcar_pagado.setText("💳 Emitir y cobrar")
++            self.btn_marcar_pagado.setText("Emitir y cobrar")
+         else:
+-            self.btn_marcar_pagado.setText("💳 Marcar como pagado")
++            self.btn_marcar_pagado.setText("Marcar como pagado")
+ 
+         self.btn_anular_cobro.setEnabled(esta_pagado)
+         self.btn_anular_cobro.setVisible(esta_pagado)
+@@ -909,9 +919,9 @@ class PaginaCobros(QWidget):
+         self.btn_ver_recibo.setEnabled(True)
+         self.btn_ver_recibo.setVisible(True)
+         if tiene_recibo:
+-            self.btn_ver_recibo.setText("🖨️ Imprimir / Descargar recibo PDF")
++            self.btn_ver_recibo.setText("Imprimir / Descargar recibo PDF")
+         else:
+-            self.btn_ver_recibo.setText("🖨️ Emitir e imprimir PDF")
++            self.btn_ver_recibo.setText("Emitir e imprimir PDF")
+ 
+     def _limpiar_ficha(self) -> None:
+         self.item_seleccionado = None
+@@ -927,7 +937,7 @@ class PaginaCobros(QWidget):
+         self.btn_marcar_pagado.setEnabled(False)
+         self.btn_anular_cobro.setEnabled(False)
+         self.btn_ver_recibo.setEnabled(False)
+-        self.btn_ver_recibo.setText("🖨️ Imprimir / Descargar recibo PDF")
++        self.btn_ver_recibo.setText("Imprimir / Descargar recibo PDF")
+ 
+     # -----------------------------------------------------------------------
+     # Acciones de Cobro y Recibos
+@@ -1165,28 +1175,28 @@ class PaginaCobros(QWidget):
+         esta_pag = (pag >= tot and tot > 0.0)
+ 
+         if not tiene_rec:
+-            act_emitir = menu.addAction(f"🧾 Emitir recibo a {nom}")
++            act_emitir = menu.addAction(iconos.icono("receipt"), f"Emitir recibo a {nom}")
+             act_emitir.triggered.connect(self._accion_generar_individual)
+-            act_cobrar = menu.addAction(f"💳 Emitir y cobrar S/. {tot:,.2f}")
++            act_cobrar = menu.addAction(iconos.icono("credit-card"), f"Emitir y cobrar S/. {tot:,.2f}")
+             act_cobrar.triggered.connect(self._accion_marcar_pagado)
+-            act_ver = menu.addAction("🖨️ Emitir e imprimir PDF")
++            act_ver = menu.addAction(iconos.icono("printer"), "Emitir e imprimir PDF")
+             act_ver.triggered.connect(self._accion_ver_recibo)
+         else:
+             if not esta_pag:
+                 act_cobrar = menu.addAction(
+-                    f"💳 Marcar como pagado (S/. {tot:,.2f})")
++                    iconos.icono("credit-card"), f"Marcar como pagado (S/. {tot:,.2f})")
+                 act_cobrar.triggered.connect(self._accion_marcar_pagado)
+             else:
+-                act_anular = menu.addAction(f"↩️ Anular cobro de {nom}")
++                act_anular = menu.addAction(iconos.icono("arrow-back-up"), f"Anular cobro de {nom}")
+                 act_anular.triggered.connect(self._accion_anular_cobro)
+-            act_ver = menu.addAction("🖨️ Imprimir / Descargar recibo PDF")
++            act_ver = menu.addAction(iconos.icono("printer"), "Imprimir / Descargar recibo PDF")
+             act_ver.triggered.connect(self._accion_ver_recibo)
+             act_guardar = menu.addAction(
+-                "💾 Guardar recibo PDF en otra carpeta...")
++                iconos.icono("device-floppy"), "Guardar recibo PDF en otra carpeta...")
+             act_guardar.triggered.connect(self._accion_guardar_recibo_como)
+ 
+         menu.addSeparator()
+-        act_carpeta = menu.addAction("📂 Abrir carpeta de recibos")
++        act_carpeta = menu.addAction(iconos.icono("folder-open"), "Abrir carpeta de recibos")
+         act_carpeta.triggered.connect(self._abrir_carpeta_recibos)
+ 
+         menu.exec(self.tabla.viewport().mapToGlobal(pos))
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py b/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py
+index 8ddfa55..722a80a 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py
+@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
+ )
+ 
+ from servicios.datos import ServicioDatos
++from ui import iconos
+ from ui.componentes.alerta import AlertaWidget
+ from ui.componentes.barra_progreso_sector import BarraProgresoSector
+ from ui.componentes.indicador_carga import IndicadorCarga
+@@ -94,7 +95,8 @@ class PaginaInicio(QWidget):
+         fila_encabezado.addWidget(self.indicador_carga)
+ 
+         # Botón Actualizar
+-        self.btn_actualizar = QPushButton("🔄 Actualizar")
++        self.btn_actualizar = QPushButton("Actualizar")
++        iconos.aplicar(self.btn_actualizar, "refresh")
+         self.btn_actualizar.setProperty("class", "boton boton_secundario")
+         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_actualizar.setToolTip(
+@@ -141,7 +143,7 @@ class PaginaInicio(QWidget):
+         self.layout_card_sectores.setContentsMargins(16, 10, 16, 10)
+         self.layout_card_sectores.setSpacing(6)
+ 
+-        lbl_titulo_sectores = QLabel("📊 Avance de lecturas por sector")
++        lbl_titulo_sectores = QLabel("Avance de lecturas por sector")
+         lbl_titulo_sectores.setObjectName("tarjeta_titulo")
+         self.layout_card_sectores.addWidget(lbl_titulo_sectores)
+ 
+@@ -307,7 +309,7 @@ class PaginaInicio(QWidget):
+         info_extra = ""
+         if conflictos:
+             info_extra = (
+-                f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
++                f"\n\nSe detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                 + "\n".join(
+                     f"  • {c['nombre']} (Medidor {c['nro_medidor']}): "
+                     f"ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)"
+@@ -402,42 +404,48 @@ class PaginaInicio(QWidget):
+             botones_layout.setSpacing(8)
+ 
+             if estado == "ABIERTO":
+-                btn1 = QPushButton("📊 Ir a Lecturas")
++                btn1 = QPushButton("Ir a Lecturas")
++                iconos.aplicar(btn1, "chart-bar", "blanco")
+                 btn1.setProperty("class", "boton boton_primario boton_grande")
+                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn1.clicked.connect(
+                     lambda: self.solicitar_navegacion.emit("lecturas"))
+                 botones_layout.addWidget(btn1)
+ 
+-                btn2 = QPushButton("🔒 Cerrar lecturas")
++                btn2 = QPushButton("Cerrar lecturas")
++                iconos.aplicar(btn2, "lock")
+                 btn2.setProperty("class", "boton boton_secundario")
+                 btn2.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn2.clicked.connect(self._cerrar_lecturas)
+                 botones_layout.addWidget(btn2)
+ 
+             elif estado == "CERRADO":
+-                btn1 = QPushButton("🧾 Generar recibos")
++                btn1 = QPushButton("Generar recibos")
++                iconos.aplicar(btn1, "receipt", "blanco")
+                 btn1.setProperty("class", "boton boton_primario boton_grande")
+                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn1.clicked.connect(
+                     lambda: self.solicitar_navegacion.emit("cobros:emitir"))
+                 botones_layout.addWidget(btn1)
+ 
+-                btn2 = QPushButton("🔓 Reabrir lecturas")
++                btn2 = QPushButton("Reabrir lecturas")
++                iconos.aplicar(btn2, "lock-open")
+                 btn2.setProperty("class", "boton boton_secundario")
+                 btn2.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn2.clicked.connect(self._reabrir_lecturas)
+                 botones_layout.addWidget(btn2)
+ 
+             elif estado == "FACTURADO":
+-                btn1 = QPushButton("💰 Ir a Cobros")
++                btn1 = QPushButton("Ir a Cobros")
++                iconos.aplicar(btn1, "coins", "blanco")
+                 btn1.setProperty("class", "boton boton_primario boton_grande")
+                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn1.clicked.connect(
+                     lambda: self.solicitar_navegacion.emit("cobros"))
+                 botones_layout.addWidget(btn1)
+ 
+-                btn2 = QPushButton("📅 Abrir mes nuevo")
++                btn2 = QPushButton("Abrir mes nuevo")
++                iconos.aplicar(btn2, "calendar-plus", "blanco")
+                 btn2.setProperty("class", "boton boton_exito boton_grande")
+                 btn2.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn2.clicked.connect(self.abrir_dialogo_nuevo_mes)
+@@ -456,9 +464,7 @@ class PaginaInicio(QWidget):
+             alerta_layout.setContentsMargins(16, 12, 16, 12)
+             alerta_layout.setSpacing(14)
+ 
+-            lbl_icono = QLabel("⚠️")
+-            lbl_icono.setStyleSheet(
+-                "font-size: 20px; background: transparent;")
++            lbl_icono = iconos.etiqueta("alert-triangle", "aviso", 22)
+             alerta_layout.addWidget(lbl_icono)
+ 
+             lbl_txt = QLabel(
+@@ -467,7 +473,8 @@ class PaginaInicio(QWidget):
+             lbl_txt.setStyleSheet("background: transparent;")
+             alerta_layout.addWidget(lbl_txt, stretch=1)
+ 
+-            btn_abrir = QPushButton("📅 Abrir mes nuevo")
++            btn_abrir = QPushButton("Abrir mes nuevo")
++            iconos.aplicar(btn_abrir, "calendar-plus", "blanco")
+             btn_abrir.setProperty("class", "boton boton_exito")
+             btn_abrir.setCursor(Qt.CursorShape.PointingHandCursor)
+             btn_abrir.clicked.connect(self.abrir_dialogo_nuevo_mes)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/ventana_principal.py b/Documents/caapd-facturacion/escritorio/ui/ventana_principal.py
+index d47fc1a..3e627ee 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/ventana_principal.py
++++ b/Documents/caapd-facturacion/escritorio/ui/ventana_principal.py
+@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
+ 
+ import rutas
+ from servicios.datos import ServicioDatos
++from ui import iconos
+ from ui.hilos import Worker, esperar_hilos, mostrar_dialogo_error
+ from ui.paginas.cobros import PaginaCobros
+ from ui.paginas.configuracion import PaginaConfiguracion
+@@ -135,7 +136,7 @@ class VentanaPrincipal(QMainWindow):
+         """)
+         lay = QHBoxLayout(banner)
+         lay.setContentsMargins(16, 4, 16, 4)
+-        lbl = QLabel("🟡 <b>MODO CONTINGENCIA / RESPALDO:</b> Operando sin conexión al servidor desde el archivo Excel. Los cambios se guardarán localmente.")
++        lbl = QLabel("<b>MODO CONTINGENCIA / RESPALDO:</b> Operando sin conexión al servidor desde el archivo Excel. Los cambios se guardarán localmente.")
+         lbl.setStyleSheet("color: #92400e; font-size: 13px;")
+         lay.addWidget(lbl)
+         lay.addStretch(1)
+@@ -150,8 +151,10 @@ class VentanaPrincipal(QMainWindow):
+         layout.setContentsMargins(20, 0, 20, 0)
+         layout.setSpacing(16)
+ 
+-        # Logo: 💧 CAAPD Ispacas
+-        lbl_logo = QLabel('💧 <span style="color: #06b6d4;">CAAPD</span> Ispacas')
++        # Logo: [gota] CAAPD Ispacas
++        lbl_logo_icono = iconos.etiqueta("droplet", "#06b6d4", 22)
++        layout.addWidget(lbl_logo_icono)
++        lbl_logo = QLabel('<span style="color: #06b6d4;">CAAPD</span> Ispacas')
+         lbl_logo.setObjectName("nav_logo")
+         lbl_logo.setTextFormat(Qt.TextFormat.RichText)
+         layout.addWidget(lbl_logo)
+@@ -160,16 +163,17 @@ class VentanaPrincipal(QMainWindow):
+ 
+         # Lista de enlaces / botones (6 secciones)
+         items_nav = [
+-            ("inicio", "🏠 Inicio"),
+-            ("usuarios", "👤 Usuarios"),
+-            ("lecturas", "📊 Lecturas"),
+-            ("lectores", "📱 Lectores"),
+-            ("cobros", "💰 Cobros"),
+-            ("configuracion", "⚙️ Configuración"),
++            ("inicio", "Inicio", "home"),
++            ("usuarios", "Usuarios", "user"),
++            ("lecturas", "Lecturas", "chart-bar"),
++            ("lectores", "Lectores", "device-mobile"),
++            ("cobros", "Cobros", "coins"),
++            ("configuracion", "Configuración", "settings"),
+         ]
+ 
+-        for clave, texto in items_nav:
++        for clave, texto, nombre_icono in items_nav:
+             btn = QPushButton(texto)
++            iconos.aplicar(btn, nombre_icono, "blanco", 18)
+             btn.setObjectName(f"nav_{clave}")
+             btn.setProperty("class", "nav_boton")
+             btn.setProperty("activo", "false")
+@@ -193,7 +197,8 @@ class VentanaPrincipal(QMainWindow):
+         lbl_copy.setObjectName("pie_texto")
+         layout.addWidget(lbl_copy)
+ 
+-        btn_abrir_bd = QPushButton("📁 Base de datos")
++        btn_abrir_bd = QPushButton("Base de datos")
++        iconos.aplicar(btn_abrir_bd, "database", "exito", 14)
+         btn_abrir_bd.setCursor(Qt.CursorShape.PointingHandCursor)
+         btn_abrir_bd.setStyleSheet("""
+             QPushButton {

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 import rutas
 from servicios.datos import ServicioDatos
+from ui import iconos
 from ui.hilos import Worker, esperar_hilos, mostrar_dialogo_error
 from ui.paginas.cobros import PaginaCobros
 from ui.paginas.configuracion import PaginaConfiguracion
@@ -135,7 +136,7 @@ class VentanaPrincipal(QMainWindow):
         """)
         lay = QHBoxLayout(banner)
         lay.setContentsMargins(16, 4, 16, 4)
-        lbl = QLabel("🟡 <b>MODO CONTINGENCIA / RESPALDO:</b> Operando sin conexión al servidor desde el archivo Excel. Los cambios se guardarán localmente.")
+        lbl = QLabel("<b>MODO CONTINGENCIA / RESPALDO:</b> Operando sin conexión al servidor desde el archivo Excel. Los cambios se guardarán localmente.")
         lbl.setStyleSheet("color: #92400e; font-size: 13px;")
         lay.addWidget(lbl)
         lay.addStretch(1)
@@ -150,8 +151,10 @@ class VentanaPrincipal(QMainWindow):
         layout.setContentsMargins(20, 0, 20, 0)
         layout.setSpacing(16)
 
-        # Logo: 💧 CAAPD Ispacas
-        lbl_logo = QLabel('💧 <span style="color: #06b6d4;">CAAPD</span> Ispacas')
+        # Logo: [gota] CAAPD Ispacas
+        lbl_logo_icono = iconos.etiqueta("droplet", "#06b6d4", 22)
+        layout.addWidget(lbl_logo_icono)
+        lbl_logo = QLabel('<span style="color: #06b6d4;">CAAPD</span> Ispacas')
         lbl_logo.setObjectName("nav_logo")
         lbl_logo.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(lbl_logo)
@@ -160,16 +163,17 @@ class VentanaPrincipal(QMainWindow):
 
         # Lista de enlaces / botones (6 secciones)
         items_nav = [
-            ("inicio", "🏠 Inicio"),
-            ("usuarios", "👤 Usuarios"),
-            ("lecturas", "📊 Lecturas"),
-            ("lectores", "📱 Lectores"),
-            ("cobros", "💰 Cobros"),
-            ("configuracion", "⚙️ Configuración"),
+            ("inicio", "Inicio", "home"),
+            ("usuarios", "Usuarios", "user"),
+            ("lecturas", "Lecturas", "chart-bar"),
+            ("lectores", "Lectores", "device-mobile"),
+            ("cobros", "Cobros", "coins"),
+            ("configuracion", "Configuración", "settings"),
         ]
 
-        for clave, texto in items_nav:
+        for clave, texto, nombre_icono in items_nav:
             btn = QPushButton(texto)
+            iconos.aplicar(btn, nombre_icono, "blanco", 18)
             btn.setObjectName(f"nav_{clave}")
             btn.setProperty("class", "nav_boton")
             btn.setProperty("activo", "false")
@@ -193,7 +197,8 @@ class VentanaPrincipal(QMainWindow):
         lbl_copy.setObjectName("pie_texto")
         layout.addWidget(lbl_copy)
 
-        btn_abrir_bd = QPushButton("📁 Base de datos")
+        btn_abrir_bd = QPushButton("Base de datos")
+        iconos.aplicar(btn_abrir_bd, "database", "exito", 14)
         btn_abrir_bd.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_abrir_bd.setStyleSheet("""
             QPushButton {

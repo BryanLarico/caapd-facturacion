@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from servicios.datos import ServicioDatos
+from ui import iconos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.barra_progreso_sector import BarraProgresoSector
 from ui.componentes.indicador_carga import IndicadorCarga
@@ -94,7 +95,8 @@ class PaginaInicio(QWidget):
         fila_encabezado.addWidget(self.indicador_carga)
 
         # Botón Actualizar
-        self.btn_actualizar = QPushButton("🔄 Actualizar")
+        self.btn_actualizar = QPushButton("Actualizar")
+        iconos.aplicar(self.btn_actualizar, "refresh")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_actualizar.setToolTip(
@@ -141,7 +143,7 @@ class PaginaInicio(QWidget):
         self.layout_card_sectores.setContentsMargins(16, 10, 16, 10)
         self.layout_card_sectores.setSpacing(6)
 
-        lbl_titulo_sectores = QLabel("📊 Avance de lecturas por sector")
+        lbl_titulo_sectores = QLabel("Avance de lecturas por sector")
         lbl_titulo_sectores.setObjectName("tarjeta_titulo")
         self.layout_card_sectores.addWidget(lbl_titulo_sectores)
 
@@ -307,7 +309,7 @@ class PaginaInicio(QWidget):
         info_extra = ""
         if conflictos:
             info_extra = (
-                f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                f"\n\nSe detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
                 + "\n".join(
                     f"  • {c['nombre']} (Medidor {c['nro_medidor']}): "
                     f"ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)"
@@ -402,42 +404,48 @@ class PaginaInicio(QWidget):
             botones_layout.setSpacing(8)
 
             if estado == "ABIERTO":
-                btn1 = QPushButton("📊 Ir a Lecturas")
+                btn1 = QPushButton("Ir a Lecturas")
+                iconos.aplicar(btn1, "chart-bar", "blanco")
                 btn1.setProperty("class", "boton boton_primario boton_grande")
                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn1.clicked.connect(
                     lambda: self.solicitar_navegacion.emit("lecturas"))
                 botones_layout.addWidget(btn1)
 
-                btn2 = QPushButton("🔒 Cerrar lecturas")
+                btn2 = QPushButton("Cerrar lecturas")
+                iconos.aplicar(btn2, "lock")
                 btn2.setProperty("class", "boton boton_secundario")
                 btn2.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn2.clicked.connect(self._cerrar_lecturas)
                 botones_layout.addWidget(btn2)
 
             elif estado == "CERRADO":
-                btn1 = QPushButton("🧾 Generar recibos")
+                btn1 = QPushButton("Generar recibos")
+                iconos.aplicar(btn1, "receipt", "blanco")
                 btn1.setProperty("class", "boton boton_primario boton_grande")
                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn1.clicked.connect(
                     lambda: self.solicitar_navegacion.emit("cobros:emitir"))
                 botones_layout.addWidget(btn1)
 
-                btn2 = QPushButton("🔓 Reabrir lecturas")
+                btn2 = QPushButton("Reabrir lecturas")
+                iconos.aplicar(btn2, "lock-open")
                 btn2.setProperty("class", "boton boton_secundario")
                 btn2.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn2.clicked.connect(self._reabrir_lecturas)
                 botones_layout.addWidget(btn2)
 
             elif estado == "FACTURADO":
-                btn1 = QPushButton("💰 Ir a Cobros")
+                btn1 = QPushButton("Ir a Cobros")
+                iconos.aplicar(btn1, "coins", "blanco")
                 btn1.setProperty("class", "boton boton_primario boton_grande")
                 btn1.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn1.clicked.connect(
                     lambda: self.solicitar_navegacion.emit("cobros"))
                 botones_layout.addWidget(btn1)
 
-                btn2 = QPushButton("📅 Abrir mes nuevo")
+                btn2 = QPushButton("Abrir mes nuevo")
+                iconos.aplicar(btn2, "calendar-plus", "blanco")
                 btn2.setProperty("class", "boton boton_exito boton_grande")
                 btn2.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn2.clicked.connect(self.abrir_dialogo_nuevo_mes)
@@ -456,9 +464,7 @@ class PaginaInicio(QWidget):
             alerta_layout.setContentsMargins(16, 12, 16, 12)
             alerta_layout.setSpacing(14)
 
-            lbl_icono = QLabel("⚠️")
-            lbl_icono.setStyleSheet(
-                "font-size: 20px; background: transparent;")
+            lbl_icono = iconos.etiqueta("alert-triangle", "aviso", 22)
             alerta_layout.addWidget(lbl_icono)
 
             lbl_txt = QLabel(
@@ -467,7 +473,8 @@ class PaginaInicio(QWidget):
             lbl_txt.setStyleSheet("background: transparent;")
             alerta_layout.addWidget(lbl_txt, stretch=1)
 
-            btn_abrir = QPushButton("📅 Abrir mes nuevo")
+            btn_abrir = QPushButton("Abrir mes nuevo")
+            iconos.aplicar(btn_abrir, "calendar-plus", "blanco")
             btn_abrir.setProperty("class", "boton boton_exito")
             btn_abrir.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_abrir.clicked.connect(self.abrir_dialogo_nuevo_mes)

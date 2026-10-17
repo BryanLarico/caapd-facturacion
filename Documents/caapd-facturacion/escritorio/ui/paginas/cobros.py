@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 
 import rutas
 from servicios.datos import ServicioDatos
+from ui import iconos
 from ui.componentes.toast import Toast
 from ui.hilos import Worker, mostrar_dialogo_error
 from ui.paginas.cobros_modelo import DelegadoFilasCobros, ModeloCobros, ProxyCobros
@@ -50,7 +51,7 @@ ANCHO_MINIMO_DOS_COLUMNAS = 1150
 class PaginaCobros(QWidget):
     """Pantalla interactiva unificada de facturación, cobranza y control de morosidad."""
 
-    TEXTO_BTN_ACTUALIZAR = "🔄 Actualizar"
+    TEXTO_BTN_ACTUALIZAR = "Actualizar"
 
     def __init__(self, servicio_datos: ServicioDatos, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -109,7 +110,8 @@ class PaginaCobros(QWidget):
         fila_encabezado.addWidget(self.lbl_badge_periodo)
 
         # Botón Carpeta de recibos (Escritorio/recibos) — entre Periodo y Actualizar
-        self.btn_carpeta_recibos = QPushButton("📂 Carpeta de recibos")
+        self.btn_carpeta_recibos = QPushButton("Carpeta de recibos")
+        iconos.aplicar(self.btn_carpeta_recibos, "folder-open")
         self.btn_carpeta_recibos.setProperty("class", "boton boton_secundario")
         self.btn_carpeta_recibos.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_carpeta_recibos.setToolTip(
@@ -119,6 +121,7 @@ class PaginaCobros(QWidget):
 
         # Botón Actualizar
         self.btn_actualizar = QPushButton(self.TEXTO_BTN_ACTUALIZAR)
+        iconos.aplicar(self.btn_actualizar, "refresh")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_actualizar.clicked.connect(self.accion_actualizar)
@@ -131,11 +134,11 @@ class PaginaCobros(QWidget):
         fila_kpi.setSpacing(10)
 
         self.card_facturado = self._crear_tarjeta_kpi(
-            "Total Facturado", "S/. 0.00", "📊")
+            "Total Facturado", "S/. 0.00", "chart-bar", "primario")
         self.card_recaudado = self._crear_tarjeta_kpi(
-            "Recaudado", "S/. 0.00", "💰")
+            "Recaudado", "S/. 0.00", "coins", "exito")
         self.card_corte = self._crear_tarjeta_kpi(
-            "En Lista de Corte", "0 usuarios", "🚨")
+            "En Lista de Corte", "0 usuarios", "alert-octagon", "peligro")
 
         fila_kpi.addWidget(self.card_facturado)
         fila_kpi.addWidget(self.card_recaudado)
@@ -157,7 +160,7 @@ class PaginaCobros(QWidget):
         self.btn_filtro_pagados = self._crear_boton_filtro(
             "Pagados (0)", "pagados")
         self.btn_filtro_alertas = self._crear_boton_filtro(
-            "⚠️ Con Alertas (0)", "alertas")
+            "Con Alertas (0)", "alertas")
 
         # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
         self.btn_actualizar_excel = QPushButton("Actualizar Excel")
@@ -205,7 +208,9 @@ class PaginaCobros(QWidget):
 
         self.input_buscar = QLineEdit()
         self.input_buscar.setPlaceholderText(
-            "🔍 Buscar por titular, DNI, conexión, N° recibo o medidor...")
+            "Buscar por titular, DNI, conexión, N° recibo o medidor...")
+        self.input_buscar.addAction(
+            iconos.icono("search", "gris"), QLineEdit.ActionPosition.LeadingPosition)
         self.input_buscar.setClearButtonEnabled(True)
         self.input_buscar.setMinimumWidth(220)
         self.input_buscar.textChanged.connect(
@@ -282,7 +287,8 @@ class PaginaCobros(QWidget):
         # 6. Toast flotante (no forma parte del layout: se dibuja encima del contenido)
         self.toast = Toast(self)
 
-    def _crear_tarjeta_kpi(self, titulo: str, valor_defecto: str, icono: str) -> QFrame:
+    def _crear_tarjeta_kpi(self, titulo: str, valor_defecto: str,
+                           icono: str, color_icono: str = "texto") -> QFrame:
         card = QFrame()
         card.setProperty("class", "tarjeta")
         card.setSizePolicy(QSizePolicy.Policy.Expanding,
@@ -304,8 +310,7 @@ class PaginaCobros(QWidget):
         col.addWidget(lbl_val)
         lay.addLayout(col, stretch=1)
 
-        lbl_ico = QLabel(icono)
-        lbl_ico.setStyleSheet("font-size: 18px;")
+        lbl_ico = iconos.etiqueta(icono, color_icono, 22)
         lay.addWidget(lbl_ico, alignment=Qt.AlignmentFlag.AlignTop)
 
         card.lbl_valor = lbl_val  # type: ignore
@@ -319,6 +324,7 @@ class PaginaCobros(QWidget):
         # El filtro "Con Alertas" usa el estilo ámbar de advertencia, igual que "Pendientes de DNI"
         if clave == "alertas":
             btn.setProperty("class", "filtro_btn filtro_btn_aviso")
+            iconos.aplicar(btn, "alert-triangle", "aviso", 15)
         else:
             btn.setProperty("class", "filtro_btn")
         btn.clicked.connect(lambda: self._al_clic_filtro(clave))
@@ -380,7 +386,7 @@ class PaginaCobros(QWidget):
         """)
         lay_alerta = QVBoxLayout(self.box_alerta_medidor)
         lay_alerta.setContentsMargins(4, 4, 4, 4)
-        self.lbl_texto_alerta_medidor = QLabel("⚠️ Observación en medidor")
+        self.lbl_texto_alerta_medidor = QLabel("Observación en medidor")
         self.lbl_texto_alerta_medidor.setStyleSheet(
             "color: #92400e; font-size: 12px; font-weight: 500;")
         self.lbl_texto_alerta_medidor.setWordWrap(True)
@@ -427,7 +433,8 @@ class PaginaCobros(QWidget):
         lay.addWidget(sep2)
 
         # Botones de Acción
-        self.btn_marcar_pagado = QPushButton("💳 Marcar como pagado")
+        self.btn_marcar_pagado = QPushButton("Marcar como pagado")
+        iconos.aplicar(self.btn_marcar_pagado, "credit-card", "blanco", 18)
         self.btn_marcar_pagado.setProperty(
             "class", "boton boton_exito boton_grande")
         self.btn_marcar_pagado.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -442,7 +449,8 @@ class PaginaCobros(QWidget):
         self.btn_marcar_pagado.clicked.connect(self._accion_marcar_pagado)
         lay.addWidget(self.btn_marcar_pagado)
 
-        self.btn_ver_recibo = QPushButton("🖨️ Imprimir / Descargar recibo PDF")
+        self.btn_ver_recibo = QPushButton("Imprimir / Descargar recibo PDF")
+        iconos.aplicar(self.btn_ver_recibo, "printer", "blanco", 18)
         self.btn_ver_recibo.setProperty(
             "class", "boton boton_primario boton_grande")
         self.btn_ver_recibo.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -757,7 +765,7 @@ class PaginaCobros(QWidget):
         self.btn_filtro_dos_meses.setText(f"2 Meses ({n_dos_meses})")
         self.btn_filtro_corte.setText(f"Corte 3+ m. ({n_corte})")
         self.btn_filtro_pagados.setText(f"Pagados ({n_pagados})")
-        self.btn_filtro_alertas.setText(f"⚠️ Con Alertas ({n_alertas})")
+        self.btn_filtro_alertas.setText(f"Con Alertas ({n_alertas})")
 
     # -----------------------------------------------------------------------
     # Filtros y Búsqueda
@@ -779,6 +787,8 @@ class PaginaCobros(QWidget):
         for btn in chips:
             activo = (btn.property("filtro_clave") == clave)
             btn.setProperty("activo", "true" if activo else "false")
+            # El chip de alertas lleva ícono: blanco cuando está activo, ámbar si no
+            iconos.recolorear(btn, "blanco" if activo else "aviso")
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
@@ -845,7 +855,7 @@ class PaginaCobros(QWidget):
                 if nota:
                     alertas.append(f"Nota: {nota}")
         if alertas:
-            self.lbl_texto_alerta_medidor.setText("⚠️ " + "\n".join(alertas))
+            self.lbl_texto_alerta_medidor.setText("\n".join(alertas))
             self.box_alerta_medidor.show()
         else:
             self.box_alerta_medidor.hide()
@@ -874,18 +884,18 @@ class PaginaCobros(QWidget):
                 "background-color: #f1f5f9; color: #475569; font-weight: bold; padding: 6px; border-radius: 6px;"
             )
         elif esta_pagado:
-            self.lbl_ficha_badge_mora.setText("✓ Pagado")
+            self.lbl_ficha_badge_mora.setText("Pagado")
             self.lbl_ficha_badge_mora.setStyleSheet(
                 "background-color: #dcfce7; color: #166534; font-weight: bold; padding: 6px; border-radius: 6px;"
             )
         elif meses >= 3:
             self.lbl_ficha_badge_mora.setText(
-                f"🚨 CORTE — {meses} meses sin pagar")
+                f"CORTE — {meses} meses sin pagar")
             self.lbl_ficha_badge_mora.setStyleSheet(
                 "background-color: #fee2e2; color: #991b1b; font-weight: bold; padding: 6px; border-radius: 6px;"
             )
         elif meses == 2:
-            self.lbl_ficha_badge_mora.setText("⚠️ 2 Meses adeudados")
+            self.lbl_ficha_badge_mora.setText("2 Meses adeudados")
             self.lbl_ficha_badge_mora.setStyleSheet(
                 "background-color: #ffedd5; color: #9a3412; font-weight: bold; padding: 6px; border-radius: 6px;"
             )
@@ -899,9 +909,9 @@ class PaginaCobros(QWidget):
         self.btn_marcar_pagado.setEnabled(not esta_pagado)
         self.btn_marcar_pagado.setVisible(not esta_pagado)
         if not tiene_recibo:
-            self.btn_marcar_pagado.setText("💳 Emitir y cobrar")
+            self.btn_marcar_pagado.setText("Emitir y cobrar")
         else:
-            self.btn_marcar_pagado.setText("💳 Marcar como pagado")
+            self.btn_marcar_pagado.setText("Marcar como pagado")
 
         self.btn_anular_cobro.setEnabled(esta_pagado)
         self.btn_anular_cobro.setVisible(esta_pagado)
@@ -909,9 +919,9 @@ class PaginaCobros(QWidget):
         self.btn_ver_recibo.setEnabled(True)
         self.btn_ver_recibo.setVisible(True)
         if tiene_recibo:
-            self.btn_ver_recibo.setText("🖨️ Imprimir / Descargar recibo PDF")
+            self.btn_ver_recibo.setText("Imprimir / Descargar recibo PDF")
         else:
-            self.btn_ver_recibo.setText("🖨️ Emitir e imprimir PDF")
+            self.btn_ver_recibo.setText("Emitir e imprimir PDF")
 
     def _limpiar_ficha(self) -> None:
         self.item_seleccionado = None
@@ -927,7 +937,7 @@ class PaginaCobros(QWidget):
         self.btn_marcar_pagado.setEnabled(False)
         self.btn_anular_cobro.setEnabled(False)
         self.btn_ver_recibo.setEnabled(False)
-        self.btn_ver_recibo.setText("🖨️ Imprimir / Descargar recibo PDF")
+        self.btn_ver_recibo.setText("Imprimir / Descargar recibo PDF")
 
     # -----------------------------------------------------------------------
     # Acciones de Cobro y Recibos
@@ -1165,28 +1175,28 @@ class PaginaCobros(QWidget):
         esta_pag = (pag >= tot and tot > 0.0)
 
         if not tiene_rec:
-            act_emitir = menu.addAction(f"🧾 Emitir recibo a {nom}")
+            act_emitir = menu.addAction(iconos.icono("receipt"), f"Emitir recibo a {nom}")
             act_emitir.triggered.connect(self._accion_generar_individual)
-            act_cobrar = menu.addAction(f"💳 Emitir y cobrar S/. {tot:,.2f}")
+            act_cobrar = menu.addAction(iconos.icono("credit-card"), f"Emitir y cobrar S/. {tot:,.2f}")
             act_cobrar.triggered.connect(self._accion_marcar_pagado)
-            act_ver = menu.addAction("🖨️ Emitir e imprimir PDF")
+            act_ver = menu.addAction(iconos.icono("printer"), "Emitir e imprimir PDF")
             act_ver.triggered.connect(self._accion_ver_recibo)
         else:
             if not esta_pag:
                 act_cobrar = menu.addAction(
-                    f"💳 Marcar como pagado (S/. {tot:,.2f})")
+                    iconos.icono("credit-card"), f"Marcar como pagado (S/. {tot:,.2f})")
                 act_cobrar.triggered.connect(self._accion_marcar_pagado)
             else:
-                act_anular = menu.addAction(f"↩️ Anular cobro de {nom}")
+                act_anular = menu.addAction(iconos.icono("arrow-back-up"), f"Anular cobro de {nom}")
                 act_anular.triggered.connect(self._accion_anular_cobro)
-            act_ver = menu.addAction("🖨️ Imprimir / Descargar recibo PDF")
+            act_ver = menu.addAction(iconos.icono("printer"), "Imprimir / Descargar recibo PDF")
             act_ver.triggered.connect(self._accion_ver_recibo)
             act_guardar = menu.addAction(
-                "💾 Guardar recibo PDF en otra carpeta...")
+                iconos.icono("device-floppy"), "Guardar recibo PDF en otra carpeta...")
             act_guardar.triggered.connect(self._accion_guardar_recibo_como)
 
         menu.addSeparator()
-        act_carpeta = menu.addAction("📂 Abrir carpeta de recibos")
+        act_carpeta = menu.addAction(iconos.icono("folder-open"), "Abrir carpeta de recibos")
         act_carpeta.triggered.connect(self._abrir_carpeta_recibos)
 
         menu.exec(self.tabla.viewport().mapToGlobal(pos))
