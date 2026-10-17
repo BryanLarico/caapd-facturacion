@@ -6,6 +6,7 @@ Incluye:
 - DialogoCorregirDni: Reasignar DNI real a personas con ID provisional.
 - DialogoDetalleUsuario: Vista detallada de la ficha de un abonado.
 """
+import re
 from typing import Any, Dict, List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -83,8 +84,8 @@ class DialogoUsuario(QDialog):
         layout_id.addWidget(lbl_id)
 
         self.campo_id = QLineEdit()
-        self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072) o SD-xxx")
-        self.campo_id.setMaxLength(12)
+        self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072), con sufijo (30771072-1) o SD-xxx")
+        self.campo_id.setMaxLength(11)
         layout_id.addWidget(self.campo_id)
         self.msg_id = self._crear_mensaje_campo()
         layout_id.addWidget(self.msg_id)
@@ -435,12 +436,40 @@ class DialogoUsuario(QDialog):
             self._tocados.add(clave)
         self._validar_formulario()
 
+    # DNI de 7-8 digitos, opcionalmente con sufijo para una misma persona con
+    # varias conexiones: 76469789, 76469789-1, 76469789-A. Tambien SD-xxx.
+    _PATRON_DNI = re.compile(r"^(\d{7,8})(?:-([A-Za-z0-9]{1,2}))?$")
+
     def _normalizar_id_ingresado(self, texto: str) -> Optional[str]:
-        """Devuelve el ID normalizado o None si el formato no es valido."""
-        if texto.isdigit() and len(texto) in (7, 8):
-            return codigos.normalizar_dni(texto)
+        """Devuelve el ID normalizado o None si el formato no es valido.
+
+        '7646978'      -> '07646978'
+        '76469789-1'   -> '76469789-1'
+        '76469789-a'   -> '76469789-A'
+        'SD-012'       -> 'SD-012'
+        """
+        texto = texto.strip().upper()
+        m = self._PATRON_DNI.match(texto)
+        if m:
+            base = codigos.normalizar_dni(m.group(1))
+            sufijo = m.group(2)
+            return f"{base}-{sufijo}" if sufijo else base
         if texto.startswith("SD-") and len(texto) > 3:
             return texto
+        return None
+
+    def _sugerir_sufijo_libre(self, id_norm: str) -> Optional[str]:
+        """Si el DNI ya existe, propone el siguiente ID con sufijo libre (-1, -2, ...)."""
+        base = id_norm.split("-")[0]
+        if not base.isdigit():
+            return None
+        for n in range(1, 10):
+            candidato = f"{base}-{n}"
+            try:
+                if self.servicio.obtener_usuario(candidato) is None:
+                    return candidato
+            except Exception:
+                return None
         return None
 
     def _calcular_errores(self) -> Dict[str, tuple]:
@@ -462,15 +491,20 @@ class DialogoUsuario(QDialog):
                 id_norm = self._normalizar_id_ingresado(texto_id)
                 if id_norm is None:
                     errores["dni"] = (
-                        "El DNI debe tener 7 u 8 dígitos (o formato SD-xxx).", "error")
+                        "El DNI debe tener 8 dígitos; si la persona ya tiene otra conexión "
+                        "usa un sufijo: 76469789-1 (o formato SD-xxx).", "error")
                 elif id_norm != self.id_original:
                     try:
                         existe = self.servicio.obtener_usuario(id_norm) is not None
                     except Exception:
                         existe = False
                     if existe:
-                        errores["dni"] = (
-                            f"Ya existe un usuario registrado con el DNI {id_norm}.", "error")
+                        sugerido = self._sugerir_sufijo_libre(id_norm)
+                        msg = f"Ya existe un usuario con el ID {id_norm}."
+                        if sugerido:
+                            msg += (f" Si es la misma persona con otra conexión, "
+                                    f"regístrala como {sugerido}.")
+                        errores["dni"] = (msg, "error")
 
         # Conexion (opcional, pero si se escribe debe ser numerica)
         texto_con = self.campo_conexion.text().strip()
@@ -611,13 +645,12 @@ class DialogoUsuario(QDialog):
             if sin_dni or not nuevo_id:
                 id_final = self.servicio.obtener_siguiente_id_sd()
             else:
-                if nuevo_id.isdigit() and len(nuevo_id) in (7, 8):
-                    id_final = codigos.normalizar_dni(nuevo_id)
-                elif nuevo_id.startswith("SD-") or nuevo_id.isdigit():
-                    id_final = nuevo_id
-                else:
+                id_final = self._normalizar_id_ingresado(nuevo_id) or ""
+                if not id_final:
                     QMessageBox.warning(
-                        self, "DNI inválido", "El DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
+                        self, "DNI inválido",
+                        "El DNI debe contener 7 u 8 dígitos (opcionalmente con sufijo, ej. 76469789-1), "
+                        "o tener formato SD-xxx.")
                     self.campo_id.setFocus()
                     return
 
@@ -631,13 +664,12 @@ class DialogoUsuario(QDialog):
             # Modo edición: si el usuario cambió el DNI / ID (ej. de SD-001 a DNI real)
             id_final = self.id_original
             if nuevo_id and nuevo_id != self.id_original:
-                if nuevo_id.isdigit() and len(nuevo_id) in (7, 8):
-                    norm_id = codigos.normalizar_dni(nuevo_id)
-                elif nuevo_id.startswith("SD-") or nuevo_id.isdigit():
-                    norm_id = nuevo_id
-                else:
+                norm_id = self._normalizar_id_ingresado(nuevo_id) or ""
+                if not norm_id:
                     QMessageBox.warning(
-                        self, "DNI inválido", "El nuevo DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx.")
+                        self, "DNI inválido",
+                        "El nuevo DNI debe contener 7 u 8 dígitos (opcionalmente con sufijo, ej. 76469789-1), "
+                        "o tener formato SD-xxx.")
                     self.campo_id.setFocus()
                     return
 

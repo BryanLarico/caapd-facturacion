@@ -540,3 +540,34 @@ def test_pagina_usuarios_btn_actualizar_excel(qtbot, datos_usuarios_prueba):
     assert pagina.btn_actualizar_excel.property("activo") == "false"
 
 
+
+
+def test_dialogo_usuario_acepta_dni_con_sufijo(qtbot, datos_usuarios_prueba):
+    """Una misma persona puede tener 2 conexiones: 30771072 y 30771072-1 (o -A)."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+    dialogo.campo_nombre.setText("QUISPE CONDORI, JUAN (2DA CONEXION)")
+    dialogo.campo_direccion.setText("JR. LIMA 45")
+    dialogo.campo_nuevo_medidor.setText("55443322")
+    dialogo._agregar_medidor()
+
+    # DNI repetido: se bloquea y se sugiere el sufijo libre
+    dialogo.campo_id.setText("30771072")
+    dialogo._marcar_tocado("dni")
+    assert not dialogo.btn_guardar.isEnabled()
+    assert "30771072-1" in dialogo.msg_id.text()
+
+    # Con sufijo numerico o letra se acepta y se normaliza en mayusculas
+    dialogo.campo_id.setText("30771072-1")
+    assert dialogo.btn_guardar.isEnabled()
+    assert dialogo._normalizar_id_ingresado("30771072-a") == "30771072-A"
+    assert dialogo._normalizar_id_ingresado("7646978") == "07646978"
+    assert dialogo._normalizar_id_ingresado("30771072-") is None
+    assert dialogo._normalizar_id_ingresado("3077") is None
+
+    dialogo._guardar()
+    assert "30771072-1" in servicio.usuarios
+    assert "55443322" in servicio.usuarios["30771072-1"]["medidores"]
