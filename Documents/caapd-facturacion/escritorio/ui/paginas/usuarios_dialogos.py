@@ -8,7 +8,8 @@ Incluye:
 """
 import re
 from typing import Any, Dict, List, Optional
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRegularExpression
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -58,7 +59,8 @@ class DialogoUsuario(QDialog):
 
         self.setWindowTitle(
             "Editar Usuario" if self.es_edicion else "Nuevo Usuario")
-        self.resize(540, 560)
+        self.resize(560, 680)
+        self.setMinimumWidth(520)
         self.setModal(True)
 
         self._construir_ui()
@@ -84,7 +86,8 @@ class DialogoUsuario(QDialog):
         layout_id.addWidget(lbl_id)
 
         self.campo_id = QLineEdit()
-        self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072), con sufijo (30771072-1) o SD-xxx")
+        self.campo_id.setPlaceholderText(
+            "8 dígitos (ej. 30771072), con sufijo (30771072-1) o SD-xxx")
         self.campo_id.setMaxLength(11)
         layout_id.addWidget(self.campo_id)
         self.msg_id = self._crear_mensaje_campo()
@@ -127,6 +130,12 @@ class DialogoUsuario(QDialog):
         self.campo_nombre = QLineEdit()
         self.campo_nombre.setPlaceholderText(
             "Ej. CONDORI MAMANI, CARLOS ALBERTO")
+        # Solo letras (incluye tildes y Ñ), espacios y signos propios de nombres (, . ' -)
+        self.campo_nombre.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ,.'\-]*"), self.campo_nombre))
+        self.campo_nombre.setMaxLength(120)
+        self.campo_nombre.textEdited.connect(
+            lambda t: self.campo_nombre.setText(t.upper()) if t != t.upper() else None)
         col_nombre.addWidget(self.campo_nombre)
         self.msg_nombre = self._crear_mensaje_campo()
         col_nombre.addWidget(self.msg_nombre)
@@ -222,6 +231,9 @@ class DialogoUsuario(QDialog):
         self.campo_nuevo_medidor = QLineEdit()
         self.campo_nuevo_medidor.setPlaceholderText(
             "N° de medidor (ej. 22392996)")
+        # Solo dígitos, máximo 12 (los medidores reales tienen entre 6 y 9)
+        self.campo_nuevo_medidor.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r"\d{0,12}"), self.campo_nuevo_medidor))
         self.campo_nuevo_medidor.returnPressed.connect(self._agregar_medidor)
         fila_add_med.addWidget(self.campo_nuevo_medidor, stretch=1)
 
@@ -245,16 +257,25 @@ class DialogoUsuario(QDialog):
 
         layout_principal.addStretch(1)
 
-        # Botones de pie
-        fila_botones = QHBoxLayout()
-        fila_botones.setSpacing(10)
-
-        # Resumen de lo que falta para poder guardar (gris; rojo tras intentar guardar)
+        # Resumen de lo que falta para poder guardar (gris; rojo tras intentar guardar).
+        # Va en su propia fila, con altura fija para 2 líneas, y reserva el espacio
+        # aunque esté oculto: el diálogo no cambia de tamaño al aparecer/desaparecer.
         self.lbl_resumen = QLabel("")
         self.lbl_resumen.setProperty("class", "campo_mensaje")
         self.lbl_resumen.setWordWrap(True)
+        self.lbl_resumen.setFixedHeight(36)
+        self.lbl_resumen.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        politica_resumen = self.lbl_resumen.sizePolicy()
+        politica_resumen.setRetainSizeWhenHidden(True)
+        self.lbl_resumen.setSizePolicy(politica_resumen)
         self.lbl_resumen.hide()
-        fila_botones.addWidget(self.lbl_resumen, stretch=1)
+        layout_principal.addWidget(self.lbl_resumen)
+
+        # Botones de pie
+        fila_botones = QHBoxLayout()
+        fila_botones.setSpacing(10)
+        fila_botones.addStretch(1)
 
         btn_cancelar = QPushButton("Cancelar")
         btn_cancelar.setProperty("class", "boton boton_secundario")
@@ -272,7 +293,8 @@ class DialogoUsuario(QDialog):
         # Validacion en vivo: cada cambio recalcula errores y el estado de Guardar
         self.campo_id.textEdited.connect(
             lambda _t: self._marcar_tocado("dni"))
-        self.campo_id.textChanged.connect(lambda _t: self._validar_formulario())
+        self.campo_id.textChanged.connect(
+            lambda _t: self._validar_formulario())
         self.campo_conexion.textEdited.connect(
             lambda _t: self._marcar_tocado("conexion"))
         self.campo_conexion.textChanged.connect(
@@ -352,7 +374,19 @@ class DialogoUsuario(QDialog):
         txt = self.campo_nuevo_medidor.text().strip()
         if not txt:
             return
+        if not txt.isdigit():
+            self._marcar_tocado("medidores")
+            self._mostrar_estado_campo(
+                self.campo_nuevo_medidor, self.msg_medidores,
+                "El número de medidor solo admite dígitos (ej. 22392996).", "error")
+            return
         med_norm = codigos.normalizar_medidor(txt)
+        if med_norm in self.medidores_lista:
+            self._mostrar_estado_campo(
+                self.campo_nuevo_medidor, self.msg_medidores,
+                f"El medidor {med_norm} ya está en la lista.", "aviso")
+            self.campo_nuevo_medidor.selectAll()
+            return
         if med_norm not in self.medidores_lista:
             self.medidores_lista.append(med_norm)
             self._renderizar_chips_medidores()
@@ -418,11 +452,19 @@ class DialogoUsuario(QDialog):
     }
 
     def _crear_mensaje_campo(self) -> QLabel:
-        """Etiqueta pequeña bajo un campo para mostrar el error/aviso del campo."""
+        """Etiqueta pequeña bajo un campo para mostrar el error/aviso del campo.
+
+            Reserva su espacio aunque esté oculta y no usa word-wrap: así el diálogo
+            no cambia de altura con cada tecla (evita el aviso QWindowsWindow::setGeometry).
+            """
         lbl = QLabel("")
         lbl.setProperty("class", "campo_mensaje")
         lbl.setProperty("nivel", "error")
-        lbl.setWordWrap(True)
+        lbl.setWordWrap(False)
+        lbl.setFixedHeight(18)
+        politica = lbl.sizePolicy()
+        politica.setRetainSizeWhenHidden(True)
+        lbl.setSizePolicy(politica)
         lbl.hide()
         return lbl
 
@@ -495,7 +537,8 @@ class DialogoUsuario(QDialog):
                         "usa un sufijo: 76469789-1 (o formato SD-xxx).", "error")
                 elif id_norm != self.id_original:
                     try:
-                        existe = self.servicio.obtener_usuario(id_norm) is not None
+                        existe = self.servicio.obtener_usuario(
+                            id_norm) is not None
                     except Exception:
                         existe = False
                     if existe:
@@ -513,9 +556,22 @@ class DialogoUsuario(QDialog):
                 "La conexión solo admite números (6 dígitos).", "error")
 
         # Nombre
-        if len(self.campo_nombre.text().strip()) < 3:
+        texto_nombre = self.campo_nombre.text().strip()
+        if not texto_nombre:
             errores["nombre"] = (
                 "Ingresa los apellidos y nombres completos.", "error")
+        elif re.search(r"\d", texto_nombre):
+            errores["nombre"] = (
+                "El nombre solo admite letras; no puede contener números.", "error")
+        elif not re.fullmatch(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ,.'\-]+", texto_nombre):
+            errores["nombre"] = (
+                "El nombre solo admite letras, espacios, coma, punto y guion.", "error")
+        elif len(re.sub(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", "", texto_nombre)) < 3:
+            errores["nombre"] = (
+                "Ingresa los apellidos y nombres completos (mínimo 3 letras).", "error")
+        elif len(texto_nombre.split()) < 2:
+            errores["nombre"] = (
+                "Ingresa al menos apellido y nombre (ej. CONDORI MAMANI, CARLOS).", "error")
 
         # Direccion
         if not self.campo_direccion.text().strip():
@@ -524,7 +580,10 @@ class DialogoUsuario(QDialog):
 
         # Medidores
         pendiente = self.campo_nuevo_medidor.text().strip()
-        if not self.medidores_lista:
+        if pendiente and not pendiente.isdigit():
+            errores["medidores"] = (
+                "El número de medidor solo admite dígitos (ej. 22392996).", "error")
+        elif not self.medidores_lista:
             if pendiente:
                 errores["medidores"] = (
                     f"Pulsa «Añadir» (o Enter) para agregar el medidor {pendiente}.", "aviso_bloqueante")
@@ -590,7 +649,8 @@ class DialogoUsuario(QDialog):
         if hay_bloqueo:
             faltan = [self.NOMBRES_CAMPO[c]
                       for c in ("dni", "nombre", "direccion", "medidores", "conexion") if c in errores]
-            self.lbl_resumen.setText("Para guardar falta: " + ", ".join(faltan) + ".")
+            self.lbl_resumen.setText(
+                "Para guardar falta: " + ", ".join(faltan) + ".")
             self.lbl_resumen.setProperty(
                 "nivel", "error" if mostrar_todo else "info")
             self._repintar(self.lbl_resumen)
