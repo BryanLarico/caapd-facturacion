@@ -49,9 +49,9 @@ class DialogoLector(QDialog):
 
         # Encabezado
         texto_titulo = (
-            f"✏️ Editar Lector: {self.lector.get('display_name') or self.lector.get('email', '')}"
+            f"Editar Lector: {self.lector.get('display_name') or self.lector.get('email', '')}"
             if self.es_edicion
-            else "➕ Registrar Nuevo Lector"
+            else "Registrar Nuevo Lector"
         )
         lbl_titulo = QLabel(texto_titulo)
         lbl_titulo.setObjectName("dialogo_titulo")
@@ -176,7 +176,7 @@ class DialogoLector(QDialog):
         self.txt_confirm_pass.setEchoMode(modo)
 
     def _mostrar_error(self, mensaje: str) -> None:
-        self.lbl_error.setText(f"⚠️ {mensaje}")
+        self.lbl_error.setText(mensaje)
         self.lbl_error.show()
 
     def _guardar(self) -> None:

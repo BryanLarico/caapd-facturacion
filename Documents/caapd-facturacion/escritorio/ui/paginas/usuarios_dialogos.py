@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 import codigos
 from servicios.datos import ServicioDatos
 from ui.hilos import mostrar_dialogo_aviso, mostrar_dialogo_error
@@ -63,7 +65,7 @@ class DialogoUsuario(QDialog):
         layout_principal.setSpacing(14)
 
         # Encabezado del diálogo
-        titulo_txt = f"✏️ Editar Usuario: {self.usuario.get('nombre', '')}" if self.es_edicion else "➕ Registrar Nuevo Usuario"
+        titulo_txt = f"Editar Usuario: {self.usuario.get('nombre', '')}" if self.es_edicion else "Registrar Nuevo Usuario"
         lbl_titulo = QLabel(titulo_txt)
         lbl_titulo.setObjectName("dialogo_titulo")
         layout_principal.addWidget(lbl_titulo)
@@ -210,7 +212,8 @@ class DialogoUsuario(QDialog):
         self.campo_nuevo_medidor.returnPressed.connect(self._agregar_medidor)
         fila_add_med.addWidget(self.campo_nuevo_medidor, stretch=1)
 
-        btn_add_med = QPushButton("➕ Añadir")
+        btn_add_med = QPushButton("Añadir")
+        iconos.aplicar(btn_add_med, "plus")
         btn_add_med.setProperty("class", "boton boton_secundario")
         btn_add_med.clicked.connect(self._agregar_medidor)
         fila_add_med.addWidget(btn_add_med)
@@ -236,7 +239,8 @@ class DialogoUsuario(QDialog):
         btn_cancelar.clicked.connect(self.reject)
         fila_botones.addWidget(btn_cancelar)
 
-        btn_guardar = QPushButton("💾 Guardar Usuario")
+        btn_guardar = QPushButton("Guardar Usuario")
+        iconos.aplicar(btn_guardar, "device-floppy", "blanco")
         btn_guardar.setProperty("class", "boton boton_primario")
         btn_guardar.clicked.connect(self._guardar)
         fila_botones.addWidget(btn_guardar)
@@ -326,11 +330,13 @@ class DialogoUsuario(QDialog):
                 l_chip.setContentsMargins(6, 2, 6, 2)
                 l_chip.setSpacing(6)
 
-                lbl_m = QLabel(f"💧 {m}")
+                l_chip.addWidget(iconos.etiqueta("droplet", "primario", 14))
+                lbl_m = QLabel(str(m))
                 lbl_m.setProperty("class", "chip_texto")
                 l_chip.addWidget(lbl_m)
 
-                btn_del = QPushButton("✕")
+                btn_del = QPushButton("")
+                iconos.aplicar(btn_del, "x", "peligro", 12)
                 btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_del.setStyleSheet(
                     "border: none; background: transparent; color: #dc2626; font-weight: bold;")
@@ -535,7 +541,8 @@ class DialogoCorregirDni(QDialog):
         btn_cancelar.clicked.connect(self.reject)
         fila_botones.addWidget(btn_cancelar)
 
-        btn_confirmar = QPushButton("✅ Confirmar y Renombrar DNI")
+        btn_confirmar = QPushButton("Confirmar y Renombrar DNI")
+        iconos.aplicar(btn_confirmar, "circle-check", "blanco")
         btn_confirmar.setProperty("class", "boton boton_aviso")
         btn_confirmar.clicked.connect(self._confirmar)
         fila_botones.addWidget(btn_confirmar)

@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 import codigos
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
@@ -78,7 +80,8 @@ class PaginaUsuarios(QWidget):
         fila_encabezado.addWidget(self.indicador_carga)
 
         # Botón de cabecera
-        self.btn_nuevo = QPushButton("➕ Nuevo Usuario")
+        self.btn_nuevo = QPushButton("Nuevo Usuario")
+        iconos.aplicar(self.btn_nuevo, "user-plus", "blanco")
         self.btn_nuevo.setProperty("class", "boton boton_primario")
         self.btn_nuevo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_nuevo.clicked.connect(self.abrir_modal_nuevo)
@@ -110,7 +113,8 @@ class PaginaUsuarios(QWidget):
         self.campo_busqueda.textChanged.connect(self._al_cambiar_texto_busqueda)
         fila_busqueda.addWidget(self.campo_busqueda, stretch=1)
 
-        self.btn_limpiar_busqueda = QPushButton("✖ Limpiar")
+        self.btn_limpiar_busqueda = QPushButton("Limpiar")
+        iconos.aplicar(self.btn_limpiar_busqueda, "x")
         self.btn_limpiar_busqueda.setProperty("class", "boton boton_secundario")
         self.btn_limpiar_busqueda.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_limpiar_busqueda.clicked.connect(self.limpiar_busqueda)
@@ -126,7 +130,8 @@ class PaginaUsuarios(QWidget):
         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
         self.btn_filtro_activos = self._crear_boton_filtro("Activos (0)", "activos")
         self.btn_filtro_inactivos = self._crear_boton_filtro("Inactivos (0)", "inactivos")
-        self.btn_filtro_pendientes = self._crear_boton_filtro("⚠️ Pendientes de DNI (0)", "pendientes")
+        self.btn_filtro_pendientes = self._crear_boton_filtro("Pendientes de DNI (0)", "pendientes")
+        iconos.aplicar(self.btn_filtro_pendientes, "alert-triangle", "aviso", 15)
 
         # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
         self.btn_actualizar_excel = QPushButton("Actualizar Excel")
@@ -191,13 +196,15 @@ class PaginaUsuarios(QWidget):
         fila_acciones = QHBoxLayout()
         fila_acciones.setSpacing(8)
 
-        self.btn_accion_editar = QPushButton("✏️ Editar Usuario")
+        self.btn_accion_editar = QPushButton("Editar Usuario")
+        iconos.aplicar(self.btn_accion_editar, "pencil")
         self.btn_accion_editar.setProperty("class", "boton boton_secundario")
         self.btn_accion_editar.setEnabled(False)
         self.btn_accion_editar.clicked.connect(self._accion_editar)
         fila_acciones.addWidget(self.btn_accion_editar)
 
-        self.btn_accion_estado = QPushButton("⏸️ Desactivar")
+        self.btn_accion_estado = QPushButton("Desactivar")
+        iconos.aplicar(self.btn_accion_estado, "player-pause")
         self.btn_accion_estado.setProperty("class", "boton boton_secundario")
         self.btn_accion_estado.setEnabled(False)
         self.btn_accion_estado.clicked.connect(self._accion_cambiar_estado)
@@ -246,7 +253,7 @@ class PaginaUsuarios(QWidget):
         self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
         self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
         self.btn_actualizar_excel.setEnabled(False)
-        self.btn_actualizar_excel.setText("⏳ Actualizando…")
+        self.btn_actualizar_excel.setText("Actualizando…")
 
         ventana = self.window()
         if hasattr(ventana, "mostrar_progreso"):
@@ -355,7 +362,7 @@ class PaginaUsuarios(QWidget):
         self.btn_filtro_todos.setText(f"Todos ({total})")
         self.btn_filtro_activos.setText(f"Activos ({activos})")
         self.btn_filtro_inactivos.setText(f"Inactivos ({inactivos})")
-        self.btn_filtro_pendientes.setText(f"⚠️ Pendientes de DNI ({pendientes})")
+        self.btn_filtro_pendientes.setText(f"Pendientes de DNI ({pendientes})")
 
         if pendientes > 0:
             self.btn_filtro_pendientes.setProperty("class", "filtro_btn filtro_btn_aviso")
@@ -374,6 +381,7 @@ class PaginaUsuarios(QWidget):
         for c, btn in botones:
             activo_val = "true" if c == clave else "false"
             btn.setProperty("activo", activo_val)
+            iconos.recolorear(btn, "blanco" if c == clave else "aviso")
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
@@ -421,7 +429,9 @@ class PaginaUsuarios(QWidget):
             if u:
                 es_act = bool(u.get("activo", True))
                 self.btn_accion_estado.setEnabled(True)
-                self.btn_accion_estado.setText("⏸️ Desactivar" if es_act else "▶️ Activar")
+                self.btn_accion_estado.setText("Desactivar" if es_act else "Activar")
+                iconos.aplicar(self.btn_accion_estado,
+                               "player-pause" if es_act else "player-play")
                 return
 
         self.btn_accion_estado.setEnabled(False)

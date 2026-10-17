@@ -91,7 +91,7 @@ def test_modelo_usuarios_filas_columnas_y_datos(datos_usuarios_prueba):
     # Columna 1: DNI (verificar badge pendiente)
     idx_pend = modelo.index(2, 1)  # 30770349-1
     assert "30770349-1" in modelo.data(idx_pend, Qt.ItemDataRole.DisplayRole)
-    assert "⚠️" in modelo.data(idx_pend, Qt.ItemDataRole.DisplayRole)
+    assert not modelo.data(idx_pend, Qt.ItemDataRole.DecorationRole).isNull()
 
     # Columna 7: Estado
     idx_inactivo = modelo.index(1, 7)

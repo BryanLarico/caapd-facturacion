@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 import calculos
 from servicios.datos import ServicioDatos
 from ui.componentes.indicador_carga import IndicadorCarga
@@ -80,7 +82,7 @@ class DialogoLectura(QDialog):
         layout_card = QHBoxLayout(card_medidor)
         layout_card.setContentsMargins(12, 8, 12, 8)
 
-        lbl_med = QLabel(f"💧 Medidor: <b>{self.item.get('nro_medidor')}</b>")
+        lbl_med = QLabel(f"Medidor: <b>{self.item.get('nro_medidor')}</b>")
         lbl_med.setStyleSheet("font-size: 13px; color: #0369a1;")
         layout_card.addWidget(lbl_med)
 
@@ -186,7 +188,8 @@ class DialogoLectura(QDialog):
         self.btn_cancelar.clicked.connect(self.reject)
         fila_btns.addWidget(self.btn_cancelar)
 
-        self.btn_guardar = QPushButton("💾 Guardar lectura")
+        self.btn_guardar = QPushButton("Guardar lectura")
+        iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
         self.btn_guardar.setProperty("class", "boton boton_primario")
         self.btn_guardar.clicked.connect(self._ejecutar_guardado)
         fila_btns.addWidget(self.btn_guardar)
@@ -207,7 +210,7 @@ class DialogoLectura(QDialog):
             return
 
         if not texto.isdigit():
-            self.lbl_feedback_consumo.setText("⚠️ Ingrese solo números enteros.")
+            self.lbl_feedback_consumo.setText("Ingrese solo números enteros.")
             self.lbl_feedback_consumo.setStyleSheet("color: #dc2626;")
             self.lbl_alerta.hide()
             return
@@ -221,7 +224,7 @@ class DialogoLectura(QDialog):
             self.lbl_feedback_consumo.setText(f"Consumo negativo: {act - ant} m³")
             self.lbl_feedback_consumo.setStyleSheet("color: #dc2626; font-weight: bold;")
             self.lbl_alerta.setText(
-                "⚠️ La lectura actual es menor que la anterior. "
+                "La lectura actual es menor que la anterior. "
                 "Si el medidor fue reemplazado, seleccione 'Cambio de medidor' en Novedad."
             )
             self.lbl_alerta.show()

@@ -26,6 +26,10 @@ ICONOS = [
     # Estados / mensajes
     "circle-check", "circle-x", "info-circle", "alert-triangle", "alert-octagon",
     "check", "x", "wifi-off", "arrow-back-up",
+    # Diálogos, pestañas y acciones secundarias
+    "cloud-upload", "cloud-download", "help-circle", "player-pause", "player-play", "bulb",
+    "shield-check", "map-pin", "clipboard-list", "receipt-tax", "bolt", "confetti", "file-zip",
+    "rocket", "pencil", "user-plus", "hourglass",
 ]
 
 

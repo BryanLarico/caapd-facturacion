@@ -1,0 +1,1710 @@
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/bolt.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/bolt.svg
+new file mode 100644
+index 0000000..7fc72f5
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/bolt.svg
+@@ -0,0 +1,19 @@
++<!--
++category: Design
++tags: [lightning, flash, electricity, power, energy, thunder, fast, zap, bolt]
++version: "1.0"
++unicode: "ea38"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/bulb.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/bulb.svg
+new file mode 100644
+index 0000000..4483b64
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/bulb.svg
+@@ -0,0 +1,21 @@
++<!--
++category: Design
++tags: [bulb, lightbulb, light, idea, lamp, tip, hint, creativity, innovation]
++version: "1.0"
++unicode: "ea51"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" />
++  <path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" />
++  <path d="M9.7 17l4.6 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/clipboard-list.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/clipboard-list.svg
+new file mode 100644
+index 0000000..719dc65
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/clipboard-list.svg
+@@ -0,0 +1,24 @@
++<!--
++tags: [list, checklist, todo, tasks, items, inventory, clipboard, paste, document, task, notes]
++category: Document
++version: "1.0"
++unicode: "ea6d"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
++  <path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2" />
++  <path d="M9 12l.01 0" />
++  <path d="M13 12l2 0" />
++  <path d="M9 16l.01 0" />
++  <path d="M13 16l2 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/cloud-download.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/cloud-download.svg
+new file mode 100644
+index 0000000..c5223ac
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/cloud-download.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [download, cloud-download, save, sync, backup, cloud, storage, online, server]
++category: System
++version: "1.0"
++unicode: "ea71"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M19 18a3.5 3.5 0 0 0 0 -7h-1a5 4.5 0 0 0 -11 -2a4.6 4.4 0 0 0 -2.1 8.4" />
++  <path d="M12 13l0 9" />
++  <path d="M9 19l3 3l3 -3" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/cloud-upload.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/cloud-upload.svg
+new file mode 100644
+index 0000000..7dc7cad
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/cloud-upload.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [upload, cloud-upload, sync, backup, publish, cloud, storage, online, server]
++category: System
++version: "1.0"
++unicode: "ea75"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
++  <path d="M9 15l3 -3l3 3" />
++  <path d="M12 12l0 9" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/confetti.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/confetti.svg
+new file mode 100644
+index 0000000..35c665e
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/confetti.svg
+@@ -0,0 +1,28 @@
++<!--
++category: Design
++tags: [confetti, party, celebration, celebrate, party-popper, tada, congratulations, birthday, festive]
++version: "1.39"
++unicode: "ee46"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 5h2" />
++  <path d="M5 4v2" />
++  <path d="M11.5 4l-.5 2" />
++  <path d="M18 5h2" />
++  <path d="M19 4v2" />
++  <path d="M15 9l-1 1" />
++  <path d="M18 13l2 -.5" />
++  <path d="M18 19h2" />
++  <path d="M19 18v2" />
++  <path d="M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/file-zip.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/file-zip.svg
+new file mode 100644
+index 0000000..6526ff2
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/file-zip.svg
+@@ -0,0 +1,26 @@
++<!--
++tags: [zip, archive, compressed, compression, rar, 7z, package, bundle, document, file]
++category: Document
++version: "1.29"
++unicode: "ed4e"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1" />
++  <path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2" />
++  <path d="M11 5l-1 0" />
++  <path d="M13 7l-1 0" />
++  <path d="M11 9l-1 0" />
++  <path d="M13 11l-1 0" />
++  <path d="M11 13l-1 0" />
++  <path d="M13 15l-1 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/help-circle.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/help-circle.svg
+new file mode 100644
+index 0000000..8a809c1
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/help-circle.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [help, question, support, faq, question-mark, circle, info, assistance, unknown]
++category: System
++version: "2.10"
++unicode: "f91d"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
++  <path d="M12 16v.01" />
++  <path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/hourglass.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/hourglass.svg
+new file mode 100644
+index 0000000..5d0e1c2
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/hourglass.svg
+@@ -0,0 +1,22 @@
++<!--
++tags: [hourglass, sand-timer, timer, time, wait, loading, countdown, deadline]
++category: System
++version: "1.47"
++unicode: "ef93"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M6.5 7h11" />
++  <path d="M6.5 17h11" />
++  <path d="M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1" />
++  <path d="M6 4v2a6 6 0 1 0 12 0v-2a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/map-pin.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/map-pin.svg
+new file mode 100644
+index 0000000..7291ed1
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/map-pin.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [pin, marker, location, place, gps, map, point, poi, destination]
++category: Map
++version: "1.0"
++unicode: "eae8"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
++  <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/pencil.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/pencil.svg
+new file mode 100644
+index 0000000..122a4d7
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/pencil.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [edit, write, draw, modify, pen, compose, update, change, rename, sketch, annotate, pencil]
++category: Design
++version: "1.1"
++unicode: "eb04"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
++  <path d="M13.5 6.5l4 4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/player-pause.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/player-pause.svg
+new file mode 100644
+index 0000000..87aace9
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/player-pause.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [pause, media, audio, video, music, hold, controls, button, player]
++category: Media
++version: "1.28"
++unicode: "ed45"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />
++  <path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/player-play.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/player-play.svg
+new file mode 100644
+index 0000000..a40eb41
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/player-play.svg
+@@ -0,0 +1,19 @@
++<!--
++tags: [play, start, run, media, video, audio, music, resume, triangle, controls, button, player]
++category: Media
++version: "1.28"
++unicode: "ed46"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M7 4v16l13 -8l-13 -8" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/receipt-tax.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/receipt-tax.svg
+new file mode 100644
+index 0000000..0183396
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/receipt-tax.svg
+@@ -0,0 +1,22 @@
++<!--
++tags: [tax, vat, percentage, receipt, bill, invoice, payment, finance]
++category: Document
++version: "1.5"
++unicode: "edbd"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M9 14l6 -6" />
++  <path d="M9 8.5a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0" fill="currentColor" />
++  <path d="M14 13.5a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0" fill="currentColor" />
++  <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/rocket.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/rocket.svg
+new file mode 100644
+index 0000000..f7957d0
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/rocket.svg
+@@ -0,0 +1,21 @@
++<!--
++tags: [launch, startup, space, spaceship, deploy, boost, fast, release, rocket]
++category: Map
++version: "1.11"
++unicode: "ec45"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3 -5a9 9 0 0 0 6 -8a3 3 0 0 0 -3 -3a9 9 0 0 0 -8 6a6 6 0 0 0 -5 3" />
++  <path d="M7 14a6 6 0 0 0 -3 6a6 6 0 0 0 6 -3" />
++  <path d="M14 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/shield-check.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/shield-check.svg
+new file mode 100644
+index 0000000..71e4bbd
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/shield-check.svg
+@@ -0,0 +1,20 @@
++<!--
++tags: [security, protection, protect, verified, secured, safe, approved, check, tick, guard, safety, secure, shield]
++category: System
++version: "1.0"
++unicode: "eb22"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06" />
++  <path d="M15 19l2 2l4 -4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/recursos/iconos/user-plus.svg b/Documents/caapd-facturacion/escritorio/recursos/iconos/user-plus.svg
+new file mode 100644
+index 0000000..ec05096
+--- /dev/null
++++ b/Documents/caapd-facturacion/escritorio/recursos/iconos/user-plus.svg
+@@ -0,0 +1,22 @@
++<!--
++tags: [person, account, profile, avatar, member, add, new, invite, follow, register, signup, subscribe, user, plus]
++category: System
++version: "1.0"
++unicode: "eb4b"
++-->
++<svg
++  xmlns="http://www.w3.org/2000/svg"
++  width="24"
++  height="24"
++  viewBox="0 0 24 24"
++  fill="none"
++  stroke="currentColor"
++  stroke-width="2"
++  stroke-linecap="round"
++  stroke-linejoin="round"
++>
++  <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
++  <path d="M16 19h6" />
++  <path d="M19 16v6" />
++  <path d="M6 21v-2a4 4 0 0 1 4 -4h4" />
++</svg>
+diff --git a/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py b/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py
+index c6b4120..e8c3872 100644
+--- a/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py
++++ b/Documents/caapd-facturacion/escritorio/scripts/descargar_iconos.py
+@@ -26,6 +26,10 @@ ICONOS = [
+     # Estados / mensajes
+     "circle-check", "circle-x", "info-circle", "alert-triangle", "alert-octagon",
+     "check", "x", "wifi-off", "arrow-back-up",
++    # Diálogos, pestañas y acciones secundarias
++    "cloud-upload", "cloud-download", "help-circle", "player-pause", "player-play", "bulb",
++    "shield-check", "map-pin", "clipboard-list", "receipt-tax", "bolt", "confetti", "file-zip",
++    "rocket", "pencil", "user-plus", "hourglass",
+ ]
+ 
+ 
+diff --git a/Documents/caapd-facturacion/escritorio/tests/test_ui_lectores.py b/Documents/caapd-facturacion/escritorio/tests/test_ui_lectores.py
+index 6687832..59b1c20 100644
+--- a/Documents/caapd-facturacion/escritorio/tests/test_ui_lectores.py
++++ b/Documents/caapd-facturacion/escritorio/tests/test_ui_lectores.py
+@@ -83,7 +83,7 @@ def test_pagina_lectores_creacion_y_carga(qtbot, servicio_memoria, monkeypatch):
+     assert pagina.btn_accion_editar.isEnabled() is True
+     assert pagina.btn_accion_cambiar_estado.isEnabled() is True
+     assert pagina.btn_accion_eliminar.isEnabled() is True
+-    assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
++    assert pagina.btn_accion_cambiar_estado.text() == "Desactivar"
+ 
+ 
+ def test_pagina_lectores_oculta_registros_sin_correo_sin_borrarlos(qtbot, servicio_memoria):
+@@ -174,14 +174,14 @@ def test_cambio_estado_optimista_instantaneo(qtbot, servicio_memoria):
+ 
+     # Seleccionar fila 0
+     pagina.tabla.selectRow(0)
+-    assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
++    assert pagina.btn_accion_cambiar_estado.text() == "Desactivar"
+ 
+     # Desactivar con actualización optimista (0 ms)
+     pagina._accion_cambiar_estado()
+ 
+     # Inmediatamente debe reflejarse en la UI sin esperar red
+     assert pagina.modelo_base.data(pagina.modelo_base.index(0, 2)) == "Deshabilitado"
+-    assert pagina.btn_accion_cambiar_estado.text() == "▶️ Activar"
++    assert pagina.btn_accion_cambiar_estado.text() == "Activar"
+     assert "desactivada" in pagina.alerta_flash.lbl_mensaje.text()
+ 
+     # Esperar que el worker secundario finalice la sincronización
+@@ -190,7 +190,7 @@ def test_cambio_estado_optimista_instantaneo(qtbot, servicio_memoria):
+     # Reactivar inmediatamente
+     pagina._accion_cambiar_estado()
+     assert pagina.modelo_base.data(pagina.modelo_base.index(0, 2)) == "Activo"
+-    assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
++    assert pagina.btn_accion_cambiar_estado.text() == "Desactivar"
+     assert "activada" in pagina.alerta_flash.lbl_mensaje.text()
+ 
+ 
+diff --git a/Documents/caapd-facturacion/escritorio/tests/test_ui_lecturas.py b/Documents/caapd-facturacion/escritorio/tests/test_ui_lecturas.py
+index 9655c17..ae7fb8f 100644
+--- a/Documents/caapd-facturacion/escritorio/tests/test_ui_lecturas.py
++++ b/Documents/caapd-facturacion/escritorio/tests/test_ui_lecturas.py
+@@ -521,7 +521,7 @@ def test_pantalla_lecturas_sin_filtro_sin_acceso_y_con_registrado_por(qtbot, ser
+ 
+     assert not hasattr(pagina, "btn_filtro_sin_acceso")
+     assert pagina.btn_filtro_todos.text() == "Todos (3)"
+-    assert pagina.btn_filtro_faltan.text() == "⏳ Faltan (2)"
++    assert pagina.btn_filtro_faltan.text() == "Faltan (2)"
+     assert (
+         int(pagina.btn_filtro_todos.text().split("(")[1][:-1])
+         == int(pagina.btn_filtro_faltan.text().split("(")[1][:-1]) + 1
+diff --git a/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py b/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py
+index d1f8528..897a2e9 100644
+--- a/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py
++++ b/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py
+@@ -91,7 +91,7 @@ def test_modelo_usuarios_filas_columnas_y_datos(datos_usuarios_prueba):
+     # Columna 1: DNI (verificar badge pendiente)
+     idx_pend = modelo.index(2, 1)  # 30770349-1
+     assert "30770349-1" in modelo.data(idx_pend, Qt.ItemDataRole.DisplayRole)
+-    assert "⚠️" in modelo.data(idx_pend, Qt.ItemDataRole.DisplayRole)
++    assert not modelo.data(idx_pend, Qt.ItemDataRole.DecorationRole).isNull()
+ 
+     # Columna 7: Estado
+     idx_inactivo = modelo.index(1, 7)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/componentes/barra_progreso_sector.py b/Documents/caapd-facturacion/escritorio/ui/componentes/barra_progreso_sector.py
+index 4c565b7..0a7c2f3 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/componentes/barra_progreso_sector.py
++++ b/Documents/caapd-facturacion/escritorio/ui/componentes/barra_progreso_sector.py
+@@ -46,7 +46,7 @@ class BarraProgresoSector(QFrame):
+         der_layout.setSpacing(2)
+ 
+         # Texto con avance y check
+-        check_str = " ✅" if (leidos == total and total > 0) else ""
++        check_str = "  ✓" if (leidos == total and total > 0) else ""
+         self.lbl_avance = QLabel(f"{leidos} de {total}{check_str}")
+         self.lbl_avance.setObjectName("sector_progreso_txt")
+         self.lbl_avance.setStyleSheet("font-size: 11px;")
+@@ -72,7 +72,7 @@ class BarraProgresoSector(QFrame):
+ 
+     def actualizar(self, total: int, leidos: int) -> None:
+         """Actualiza las cifras y el progreso visual."""
+-        check_str = " ✅" if (leidos == total and total > 0) else ""
++        check_str = "  ✓" if (leidos == total and total > 0) else ""
+         self.lbl_avance.setText(f"{leidos} de {total}{check_str}")
+         pct = int(leidos / total * 100) if total > 0 else 0
+         self.barra.setValue(pct)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_actualizar.py b/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_actualizar.py
+index c810ed6..95dbcf4 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_actualizar.py
++++ b/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_actualizar.py
+@@ -3,9 +3,9 @@ ui/componentes/dialogo_actualizar.py — Centro de Sincronización con Lectores
+ 
+ Flujo en DOS pasos dentro del mismo diálogo:
+   Paso 1 · Elegir acción:
+-      - "Sobreescribe Nube"  → Enviar mes a los lectores (Excel ➔ Nube).
+-      - "Solo agrega"        → Publicar únicamente el mes activo (Excel ➔ Nube).
+-      - "Descarga Espejo"    → Extraer lecturas de los lectores (Nube ➔ Excel).
++      - "Sobreescribe Nube"  → Enviar mes a los lectores (Excel → Nube).
++      - "Solo agrega"        → Publicar únicamente el mes activo (Excel → Nube).
++      - "Descarga Espejo"    → Extraer lecturas de los lectores (Nube → Excel).
+   Paso 2 · Pregunta "¿Está seguro?" con la explicación de lo que hace cada botón:
+       - Sobreescribe Nube: exige escribir la palabra CONFIRMAR (Regla 5a) antes de habilitar el botón.
+       - Solo agrega y Descarga Espejo: basta con confirmar; no reemplazan documentos existentes.
+@@ -28,6 +28,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ import rutas
+ 
+ 
+@@ -45,9 +47,9 @@ class DialogoActualizarBaseDatos(QDialog):
+     # Toda la información visual y explicativa de cada botón vive aquí.
+     INFO_ACCIONES: Dict[str, Dict[str, Any]] = {
+         ACCION_SUBIR_FIREBASE: {
+-            "icono": "☁️",
++            "icono": "cloud-upload",
+             "titulo": "Enviar mes a los lectores",
+-            "direccion": "Excel ➔ Nube",
++            "direccion": "Excel → Nube",
+             "badge": "Sobreescribe Nube",
+             "color": "#dc2626",
+             "color_hover": "#b91c1c",
+@@ -65,9 +67,9 @@ class DialogoActualizarBaseDatos(QDialog):
+             "boton": "Sí, enviar a la nube",
+         },
+         ACCION_PUBLICAR_MES_ACTUAL: {
+-            "icono": "📤",
++            "icono": "upload",
+             "titulo": "Publicar solo el mes actual",
+-            "direccion": "Excel ➔ Nube",
++            "direccion": "Excel → Nube",
+             "badge": "Solo agrega",
+             "color": "#15803d",
+             "color_hover": "#166534",
+@@ -84,9 +86,9 @@ class DialogoActualizarBaseDatos(QDialog):
+             "boton": "Sí, publicar solo este mes",
+         },
+         ACCION_DESCARGAR_FIREBASE: {
+-            "icono": "📥",
++            "icono": "cloud-download",
+             "titulo": "Extraer lecturas de los lectores",
+-            "direccion": "Nube ➔ Excel",
++            "direccion": "Nube → Excel",
+             "badge": "Descarga Espejo",
+             "color": "#0369a1",
+             "color_hover": "#075985",
+@@ -250,7 +252,7 @@ class DialogoActualizarBaseDatos(QDialog):
+         lay.setContentsMargins(18, 14, 18, 14)
+         lay.setSpacing(14)
+ 
+-        lbl_icono = QLabel("🔄")
++        lbl_icono = iconos.etiqueta("refresh", "blanco", 30)
+         lbl_icono.setObjectName("cabIcono")
+         lay.addWidget(lbl_icono)
+ 
+@@ -292,11 +294,11 @@ class DialogoActualizarBaseDatos(QDialog):
+         fila_chips = QHBoxLayout()
+         fila_chips.setSpacing(10)
+         fila_chips.addWidget(self._crear_chip(
+-            "📁", f"{n_arch} archivo(s) Excel", "Carpeta 'Base de datos'", nombres_tooltip))
++            "folder", f"{n_arch} archivo(s) Excel", "Carpeta 'Base de datos'", nombres_tooltip))
+         fila_chips.addWidget(self._crear_chip(
+-            "⬆️", str(ts_envio), "Último envío a lectores"))
++            "upload", str(ts_envio), "Último envío a lectores"))
+         fila_chips.addWidget(self._crear_chip(
+-            "⬇️", str(ts_descarga), "Última descarga"))
++            "download", str(ts_descarga), "Última descarga"))
+         lay.addLayout(fila_chips)
+ 
+         lbl_elige = QLabel("¿Qué deseas hacer?")
+@@ -311,7 +313,7 @@ class DialogoActualizarBaseDatos(QDialog):
+             self.ACCION_DESCARGAR_FIREBASE))
+ 
+         lbl_tip = QLabel(
+-            "💡 Al elegir una opción se te preguntará <b>¿Está seguro?</b> y verás exactamente "
++            "Al elegir una opción se te preguntará <b>¿Está seguro?</b> y verás exactamente "
+             "qué hará antes de ejecutar nada."
+         )
+         lbl_tip.setObjectName("lblAyuda")
+@@ -323,7 +325,8 @@ class DialogoActualizarBaseDatos(QDialog):
+ 
+         # Pie: abrir carpeta + cancelar
+         pie = QHBoxLayout()
+-        btn_carpeta = QPushButton("📂 Abrir carpeta 'Base de datos'")
++        btn_carpeta = QPushButton("Abrir carpeta 'Base de datos'")
++        iconos.aplicar(btn_carpeta, "folder-open")
+         btn_carpeta.setObjectName("btnEnlace")
+         btn_carpeta.setCursor(Qt.CursorShape.PointingHandCursor)
+         btn_carpeta.clicked.connect(self._abrir_carpeta_bd)
+@@ -348,7 +351,7 @@ class DialogoActualizarBaseDatos(QDialog):
+         lay.setContentsMargins(12, 8, 12, 8)
+         lay.setSpacing(10)
+ 
+-        lbl_ic = QLabel(icono)
++        lbl_ic = iconos.etiqueta(icono, "primario", 20)
+         lbl_ic.setObjectName("chipIcono")
+         lay.addWidget(lbl_ic)
+ 
+@@ -377,12 +380,13 @@ class DialogoActualizarBaseDatos(QDialog):
+         lay.setSpacing(14)
+ 
+         # Círculo con ícono
+-        lbl_icono = QLabel(info["icono"])
++        lbl_icono = QLabel()
++        lbl_icono.setPixmap(iconos.pixmap(info["icono"], info["texto"], 22))
+         lbl_icono.setFixedSize(48, 48)
+         lbl_icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
+         lbl_icono.setStyleSheet(
+             f"background-color: {info['fondo']}; border: 1px solid {info['borde']}; "
+-            f"border-radius: 24px; font-size: 20px;"
++            f"border-radius: 24px;"
+         )
+         lay.addWidget(lbl_icono, alignment=Qt.AlignmentFlag.AlignTop)
+ 
+@@ -434,7 +438,7 @@ class DialogoActualizarBaseDatos(QDialog):
+         # Encabezado de la pregunta
+         fila = QHBoxLayout()
+         fila.setSpacing(16)
+-        self.lbl_conf_icono = QLabel("☁️")
++        self.lbl_conf_icono = QLabel()
+         self.lbl_conf_icono.setFixedSize(60, 60)
+         self.lbl_conf_icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
+         fila.addWidget(self.lbl_conf_icono,
+@@ -474,8 +478,7 @@ class DialogoActualizarBaseDatos(QDialog):
+         lay_a = QHBoxLayout(self.panel_aviso)
+         lay_a.setContentsMargins(14, 10, 14, 10)
+         lay_a.setSpacing(10)
+-        self.lbl_aviso_icono = QLabel("⚠️")
+-        self.lbl_aviso_icono.setStyleSheet("font-size: 18px;")
++        self.lbl_aviso_icono = iconos.etiqueta("alert-triangle", "aviso", 20)
+         lay_a.addWidget(self.lbl_aviso_icono,
+                         alignment=Qt.AlignmentFlag.AlignTop)
+         self.lbl_aviso = QLabel("")
+@@ -570,10 +573,11 @@ class DialogoActualizarBaseDatos(QDialog):
+ 
+         self.lbl_cab_paso.setText("PASO 2 DE 2")
+ 
+-        self.lbl_conf_icono.setText(info["icono"])
++        self.lbl_conf_icono.setPixmap(
++            iconos.pixmap(info["icono"], info["texto"], 28))
+         self.lbl_conf_icono.setStyleSheet(
+             f"background-color: {info['fondo']}; border: 2px solid {info['borde']}; "
+-            f"border-radius: 30px; font-size: 26px;"
++            f"border-radius: 30px;"
+         )
+         self.lbl_conf_sub.setText(
+             f"Estás a punto de ejecutar <b>{info['titulo']}</b> "
+@@ -585,7 +589,9 @@ class DialogoActualizarBaseDatos(QDialog):
+         self.panel_aviso.setStyleSheet(
+             f"QFrame#panelAviso {{ background-color: {info['fondo']}; border: 1px solid {info['borde']}; border-radius: 12px; }}"
+         )
+-        self.lbl_aviso_icono.setText("⚠️" if es_subir else "🛡️")
++        iconos.poner_en_etiqueta(
++            self.lbl_aviso_icono,
++            "alert-triangle" if es_subir else "shield-check", info["texto"], 20)
+         self.lbl_aviso.setText(info["aviso"])
+         self.lbl_aviso.setStyleSheet(
+             f"font-size: 12px; font-weight: 600; color: {info['texto']};")
+@@ -634,7 +640,7 @@ class DialogoActualizarBaseDatos(QDialog):
+         texto = self.txt_confirmar.text().strip()
+         if texto != self.PALABRA_CLAVE:
+             self.lbl_error_confirmar.setText(
+-                f"✖ Debes escribir exactamente {self.PALABRA_CLAVE} (en mayúsculas). "
++                f"Debes escribir exactamente {self.PALABRA_CLAVE} (en mayúsculas). "
+                 "El envío a Firebase no se ha realizado."
+             )
+             self.lbl_error_confirmar.show()
+diff --git a/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_confirmar.py b/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_confirmar.py
+index 1a442fb..11c3c8a 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_confirmar.py
++++ b/Documents/caapd-facturacion/escritorio/ui/componentes/dialogo_confirmar.py
+@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ 
+ class DialogoConfirmacion(QDialog):
+     """Diálogo modal personalizado de confirmación con diseño estilizado y legible."""
+@@ -53,8 +55,13 @@ class DialogoConfirmacion(QDialog):
+         fila_cuerpo.setAlignment(Qt.AlignmentFlag.AlignTop)
+ 
+         # Icono visual
+-        lbl_icono = QLabel("🗑️" if es_peligro else "⏸️" if "desactivar" in titulo.lower() else "❓")
+-        lbl_icono.setStyleSheet("font-size: 28px;")
++        if es_peligro:
++            nombre_icono, color_icono = "trash", "peligro"
++        elif "desactivar" in titulo.lower():
++            nombre_icono, color_icono = "player-pause", "aviso"
++        else:
++            nombre_icono, color_icono = "help-circle", "primario"
++        lbl_icono = iconos.etiqueta(nombre_icono, color_icono, 32)
+         fila_cuerpo.addWidget(lbl_icono)
+ 
+         col_textos = QVBoxLayout()
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/asistente_recibos.py b/Documents/caapd-facturacion/escritorio/ui/paginas/asistente_recibos.py
+index 4c3fe55..cc7941b 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/asistente_recibos.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/asistente_recibos.py
+@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ import rutas
+ from servicios.datos import ServicioDatos
+ from ui.hilos import Worker, mostrar_dialogo_error
+@@ -97,7 +99,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+ 
+         self.fila_botones.addStretch(1)
+ 
+-        self.btn_siguiente = QPushButton("Continuar a Generación ➔")
++        self.btn_siguiente = QPushButton("Continuar a Generación →")
+         self.btn_siguiente.setProperty(
+             "class", "boton boton_primario boton_grande")
+         self.btn_siguiente.setCursor(Qt.CursorShape.PointingHandCursor)
+@@ -153,7 +155,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+         """)
+         lay_banner = QHBoxLayout(self.banner_faltantes)
+         self.lbl_banner_faltantes = QLabel(
+-            "⚠️ Existen conexiones con lecturas pendientes.")
++            "Existen conexiones con lecturas pendientes.")
+         self.lbl_banner_faltantes.setStyleSheet(
+             "color: #92400e; font-size: 13px; font-weight: 500;")
+         lay_banner.addWidget(self.lbl_banner_faltantes)
+@@ -177,7 +179,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+         self.fila_acciones_faltantes.setSpacing(10)
+ 
+         self.btn_estimar_todos = QPushButton(
+-            "⚡ Estimar faltantes con lectura anterior (Consumo 0 m³)")
++            "Estimar faltantes con lectura anterior (Consumo 0 m³)")
++        iconos.aplicar(self.btn_estimar_todos, "bolt")
+         self.btn_estimar_todos.setProperty("class", "boton boton_secundario")
+         self.btn_estimar_todos.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_estimar_todos.clicked.connect(
+@@ -218,7 +221,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+             self.tabla_faltantes.hide()
+             self.fila_acciones_faltantes.setEnabled(False)
+             self.btn_siguiente.setEnabled(True)
+-            self.btn_siguiente.setText("Emitir Recibos Masivos ➔")
++            self.btn_siguiente.setText("Emitir Recibos Masivos →")
+         else:
+             self.banner_faltantes.setStyleSheet("""
+                 QFrame {
+@@ -229,7 +232,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+                 }
+             """)
+             self.lbl_banner_faltantes.setText(
+-                f"⚠️ Hay {len(faltantes)} medidor(es) pendientes. Puedes estimarlos antes de continuar.")
++                f"Hay {len(faltantes)} medidor(es) pendientes. Puedes estimarlos antes de continuar.")
+             self.lbl_banner_faltantes.setStyleSheet(
+                 "color: #92400e; font-size: 13px; font-weight: 500;")
+             self.tabla_faltantes.show()
+@@ -249,7 +252,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+                     str(item.get("lectura_anterior") or 0)))
+ 
+             self.btn_siguiente.setEnabled(True)
+-            self.btn_siguiente.setText("Continuar con Estimación ➔")
++            self.btn_siguiente.setText("Continuar con Estimación →")
+ 
+     def _estimar_faltantes_automatico(self) -> None:
+         """Estima las lecturas pendientes con la lectura anterior."""
+@@ -287,10 +290,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+         lay.setContentsMargins(20, 40, 20, 20)
+         lay.setSpacing(20)
+ 
+-        lbl_icono = QLabel("🧾")
+-        lbl_icono.setStyleSheet("font-size: 48px;")
+-        lbl_icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
+-        lay.addWidget(lbl_icono)
++        lbl_icono = iconos.etiqueta("receipt", "primario", 56)
++        lay.addWidget(lbl_icono, alignment=Qt.AlignmentFlag.AlignCenter)
+ 
+         self.lbl_estado_paso2 = QLabel("Generando recibos del mes...")
+         self.lbl_estado_paso2.setStyleSheet(
+@@ -389,10 +390,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+         lay.setContentsMargins(20, 20, 20, 20)
+         lay.setSpacing(18)
+ 
+-        lbl_exito = QLabel("🎉")
+-        lbl_exito.setStyleSheet("font-size: 48px;")
+-        lbl_exito.setAlignment(Qt.AlignmentFlag.AlignCenter)
+-        lay.addWidget(lbl_exito)
++        lbl_exito = iconos.etiqueta("confetti", "exito", 56)
++        lay.addWidget(lbl_exito, alignment=Qt.AlignmentFlag.AlignCenter)
+ 
+         self.lbl_titulo_paso3 = QLabel("¡Recibos emitidos exitosamente!")
+         self.lbl_titulo_paso3.setStyleSheet(
+@@ -433,13 +432,15 @@ class DialogoAsistenteEmitirRecibos(QDialog):
+         fila_docs = QHBoxLayout()
+         fila_docs.setSpacing(14)
+ 
+-        btn_zip = QPushButton("📦 Descargar ZIP de Recibos")
++        btn_zip = QPushButton("Descargar ZIP de Recibos")
++        iconos.aplicar(btn_zip, "file-zip", "blanco")
+         btn_zip.setProperty("class", "boton boton_primario")
+         btn_zip.setCursor(Qt.CursorShape.PointingHandCursor)
+         btn_zip.clicked.connect(self._descargar_zip_completo)
+         fila_docs.addWidget(btn_zip)
+ 
+-        btn_carpeta = QPushButton("📂 Abrir Carpeta de Recibos")
++        btn_carpeta = QPushButton("Abrir Carpeta de Recibos")
++        iconos.aplicar(btn_carpeta, "folder-open")
+         btn_carpeta.setProperty("class", "boton boton_secundario")
+         btn_carpeta.setCursor(Qt.CursorShape.PointingHandCursor)
+         btn_carpeta.clicked.connect(self._abrir_carpeta_recibos)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py b/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py
+index 2c4e9a6..a156d1b 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/cobros.py
+@@ -465,7 +465,8 @@ class PaginaCobros(QWidget):
+         self.btn_ver_recibo.clicked.connect(self._accion_ver_recibo)
+         lay.addWidget(self.btn_ver_recibo)
+ 
+-        self.btn_anular_cobro = QPushButton("↩️ Anular cobro")
++        self.btn_anular_cobro = QPushButton("Anular cobro")
++        iconos.aplicar(self.btn_anular_cobro, "arrow-back-up", "blanco")
+         self.btn_anular_cobro.setProperty("class", "boton boton_peligro")
+         self.btn_anular_cobro.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_anular_cobro.clicked.connect(self._accion_anular_cobro)
+@@ -511,7 +512,7 @@ class PaginaCobros(QWidget):
+         """Indica carga en el propio botón Actualizar (sin barra ni texto adicional en pantalla)."""
+         self.btn_actualizar.setEnabled(not activo)
+         self.btn_actualizar.setText(
+-            f"⏳ {texto}" if activo else self.TEXTO_BTN_ACTUALIZAR)
++            f"{texto}" if activo else self.TEXTO_BTN_ACTUALIZAR)
+ 
+     # -----------------------------------------------------------------------
+     # Carga Asíncrona de Datos
+@@ -591,7 +592,7 @@ class PaginaCobros(QWidget):
+         self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+         self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+         self.btn_actualizar_excel.setEnabled(False)
+-        self.btn_actualizar_excel.setText("⏳ Actualizando…")
++        self.btn_actualizar_excel.setText("Actualizando…")
+ 
+         ventana = self.window()
+         if hasattr(ventana, "mostrar_progreso"):
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/configuracion.py b/Documents/caapd-facturacion/escritorio/ui/paginas/configuracion.py
+index a54f3ce..0d11ae9 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/configuracion.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/configuracion.py
+@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
+     QVBoxLayout,
+     QWidget,
+ )
++
++from ui import iconos
+ from servicios.datos import ServicioDatos
+ from ui.componentes.alerta import AlertaWidget
+ from ui.componentes.indicador_carga import IndicadorCarga
+@@ -136,7 +138,8 @@ class PaginaConfiguracion(QWidget):
+         fila_encabezado.addWidget(self.indicador_carga)
+ 
+         # Botón Reestablecer
+-        self.btn_recargar = QPushButton("🔄 Reestablecer")
++        self.btn_recargar = QPushButton("Reestablecer")
++        iconos.aplicar(self.btn_recargar, "refresh")
+         self.btn_recargar.setProperty("class", "boton boton_secundario")
+         self.btn_recargar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_recargar.clicked.connect(
+@@ -144,7 +147,8 @@ class PaginaConfiguracion(QWidget):
+         fila_encabezado.addWidget(self.btn_recargar)
+ 
+         # Botón Guardar
+-        self.btn_guardar = QPushButton("💾 Guardar Configuración")
++        self.btn_guardar = QPushButton("Guardar Configuración")
++        iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
+         self.btn_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_guardar.setStyleSheet("""
+             QPushButton {
+@@ -204,18 +208,20 @@ class PaginaConfiguracion(QWidget):
+         self.widget_tab_empresa = self._crear_tab_empresa()
+ 
+         # Pestaña 1: Tarifas y Categorías
+-        self.tabs.addTab(self._crear_tab_tarifas(), "💧 Tarifas y Categorías")
++        self.tabs.addTab(self._crear_tab_tarifas(),
++                         iconos.icono("droplet", "primario"), "Tarifas y Categorías")
+ 
+         # Pestaña 2: Impuestos y Mora
+         self.tabs.addTab(self._crear_tab_impuestos(),
+-                         "💰 Impuestos (IGV) y Mora")
++                         iconos.icono("receipt-tax", "primario"), "Impuestos (IGV) y Mora")
+ 
+         # Pestaña 3: Sectores
+-        self.tabs.addTab(self._crear_tab_sectores(), "📍 Sectores / Barrios")
++        self.tabs.addTab(self._crear_tab_sectores(),
++                         iconos.icono("map-pin", "primario"), "Sectores / Barrios")
+ 
+         # Pestaña 4: Observaciones de Medidor
+         self.tabs.addTab(self._crear_tab_observaciones(),
+-                         "📋 Catálogo de Novedades")
++                         iconos.icono("clipboard-list", "primario"), "Catálogo de Novedades")
+ 
+         layout_principal.addWidget(self.tabs, stretch=1)
+ 
+@@ -288,7 +294,7 @@ class PaginaConfiguracion(QWidget):
+         f_fact.addRow("Último N° de Recibo:", self.spin_ultimo_recibo)
+ 
+         lbl_aviso_correlativo = QLabel(
+-            "⚠️ <i>Los nuevos recibos que emita el sistema continuarán automáticamente a partir de este número + 1.</i>"
++            "<i>Los nuevos recibos que emita el sistema continuarán automáticamente a partir de este número + 1.</i>"
+         )
+         lbl_aviso_correlativo.setStyleSheet("color: #64748b; font-size: 11px;")
+         f_fact.addRow("", lbl_aviso_correlativo)
+@@ -370,13 +376,15 @@ class PaginaConfiguracion(QWidget):
+         lay_r.setSpacing(10)
+ 
+         fila_btn_r = QHBoxLayout()
+-        self.btn_agregar_rango = QPushButton("➕ Agregar Rango")
++        self.btn_agregar_rango = QPushButton("Agregar Rango")
++        iconos.aplicar(self.btn_agregar_rango, "plus")
+         self.btn_agregar_rango.setProperty("class", "boton boton_secundario")
+         self.btn_agregar_rango.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_agregar_rango.clicked.connect(self._accion_agregar_rango)
+         fila_btn_r.addWidget(self.btn_agregar_rango)
+ 
+-        self.btn_eliminar_rango = QPushButton("🗑️ Eliminar Rango Seleccionado")
++        self.btn_eliminar_rango = QPushButton("Eliminar Rango Seleccionado")
++        iconos.aplicar(self.btn_eliminar_rango, "trash", "blanco")
+         self.btn_eliminar_rango.setProperty("class", "boton boton_peligro")
+         self.btn_eliminar_rango.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_eliminar_rango.clicked.connect(self._accion_eliminar_rango)
+@@ -529,13 +537,15 @@ class PaginaConfiguracion(QWidget):
+         lay.addWidget(lbl_desc)
+ 
+         fila_btn = QHBoxLayout()
+-        self.btn_agregar_sector = QPushButton("➕ Agregar Sector")
++        self.btn_agregar_sector = QPushButton("Agregar Sector")
++        iconos.aplicar(self.btn_agregar_sector, "plus")
+         self.btn_agregar_sector.setProperty("class", "boton boton_secundario")
+         self.btn_agregar_sector.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_agregar_sector.clicked.connect(self._accion_agregar_sector)
+         fila_btn.addWidget(self.btn_agregar_sector)
+ 
+-        self.btn_eliminar_sector = QPushButton("🗑️ Eliminar Sector")
++        self.btn_eliminar_sector = QPushButton("Eliminar Sector")
++        iconos.aplicar(self.btn_eliminar_sector, "trash", "blanco")
+         self.btn_eliminar_sector.setProperty("class", "boton boton_peligro")
+         self.btn_eliminar_sector.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_eliminar_sector.clicked.connect(self._accion_eliminar_sector)
+@@ -588,13 +598,15 @@ class PaginaConfiguracion(QWidget):
+         lay.addWidget(lbl_desc)
+ 
+         fila_btn = QHBoxLayout()
+-        self.btn_agregar_obs = QPushButton("➕ Agregar Novedad")
++        self.btn_agregar_obs = QPushButton("Agregar Novedad")
++        iconos.aplicar(self.btn_agregar_obs, "plus")
+         self.btn_agregar_obs.setProperty("class", "boton boton_secundario")
+         self.btn_agregar_obs.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_agregar_obs.clicked.connect(self._accion_agregar_observacion)
+         fila_btn.addWidget(self.btn_agregar_obs)
+ 
+-        self.btn_eliminar_obs = QPushButton("🗑️ Eliminar Novedad")
++        self.btn_eliminar_obs = QPushButton("Eliminar Novedad")
++        iconos.aplicar(self.btn_eliminar_obs, "trash", "blanco")
+         self.btn_eliminar_obs.setProperty("class", "boton boton_peligro")
+         self.btn_eliminar_obs.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_eliminar_obs.clicked.connect(
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py b/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py
+index 722a80a..8e271cb 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/inicio.py
+@@ -271,7 +271,7 @@ class PaginaInicio(QWidget):
+             f"Meses: {', '.join(periodos)}\n\n"
+             f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote:\n{detalle_meses}\n"
+             f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
+-            f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
++            f"• Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
+         )
+         # 2) Después, refrescar estadísticas desde la MEMORIA (el servicio ya guardó el Excel).
+         #    limpiar_cache=False: NO se vuelven a leer todos los Excel del disco.
+@@ -288,7 +288,7 @@ class PaginaInicio(QWidget):
+             f"El periodo {res.get('periodo', '')} quedó disponible para los lectores.\n\n"
+             f"• {res.get('usuarios_subidos', 0)} documentos creados en Firebase.\n"
+             f"• No se reemplazaron ni eliminaron documentos de otros meses.\n"
+-            f"• ⏱️ Tiempo total: {res.get('tiempo_segundos', 0)} s.",
++            f"• Tiempo total: {res.get('tiempo_segundos', 0)} s.",
+         )
+         self.cargar_datos_asincrono(limpiar_cache=False)
+ 
+@@ -321,7 +321,7 @@ class PaginaInicio(QWidget):
+             "Descarga de Lecturas Completada",
+             f"¡Descarga finalizada con éxito!\n\n"
+             f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
+-            f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
++            f"• Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+             f"{info_extra}",
+         )
+         self.cargar_datos_asincrono(limpiar_cache=False)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/lectores.py b/Documents/caapd-facturacion/escritorio/ui/paginas/lectores.py
+index eee3bb6..4f7e593 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/lectores.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/lectores.py
+@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ from servicios.datos import ServicioDatos
+ from ui.componentes.alerta import AlertaWidget
+ from ui.componentes.dialogo_confirmar import pedir_confirmacion
+@@ -65,7 +67,7 @@ class PaginaLectores(QWidget):
+         col_titulos = QVBoxLayout()
+         col_titulos.setSpacing(4)
+ 
+-        lbl_titulo = QLabel("📱 Lectores Móviles")
++        lbl_titulo = QLabel("Lectores Móviles")
+         lbl_titulo.setObjectName("encabezado_titulo")
+         col_titulos.addWidget(lbl_titulo)
+ 
+@@ -78,13 +80,15 @@ class PaginaLectores(QWidget):
+         fila_encabezado.addLayout(col_titulos)
+         fila_encabezado.addStretch(1)
+ 
+-        self.btn_nuevo = QPushButton("➕ Nuevo Lector")
++        self.btn_nuevo = QPushButton("Nuevo Lector")
++        iconos.aplicar(self.btn_nuevo, "user-plus", "blanco")
+         self.btn_nuevo.setProperty("class", "boton boton_primario")
+         self.btn_nuevo.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_nuevo.clicked.connect(self.abrir_modal_nuevo)
+         fila_encabezado.addWidget(self.btn_nuevo)
+ 
+-        self.btn_actualizar = QPushButton("🔄 Actualizar")
++        self.btn_actualizar = QPushButton("Actualizar")
++        iconos.aplicar(self.btn_actualizar, "refresh")
+         self.btn_actualizar.setProperty("class", "boton boton_secundario")
+         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_actualizar.setToolTip(
+@@ -120,7 +124,8 @@ class PaginaLectores(QWidget):
+             self._al_cambiar_texto_busqueda)
+         fila_busqueda.addWidget(self.campo_busqueda, stretch=1)
+ 
+-        self.btn_limpiar_busqueda = QPushButton("✖ Limpiar")
++        self.btn_limpiar_busqueda = QPushButton("Limpiar")
++        iconos.aplicar(self.btn_limpiar_busqueda, "x")
+         self.btn_limpiar_busqueda.setProperty(
+             "class", "boton boton_secundario")
+         self.btn_limpiar_busqueda.setCursor(Qt.CursorShape.PointingHandCursor)
+@@ -193,13 +198,15 @@ class PaginaLectores(QWidget):
+         fila_inferior = QHBoxLayout()
+         fila_inferior.setSpacing(10)
+ 
+-        self.btn_accion_editar = QPushButton("✏️ Editar Lector")
++        self.btn_accion_editar = QPushButton("Editar Lector")
++        iconos.aplicar(self.btn_accion_editar, "pencil")
+         self.btn_accion_editar.setProperty("class", "boton boton_secundario")
+         self.btn_accion_editar.setEnabled(False)
+         self.btn_accion_editar.clicked.connect(self._accion_editar)
+         fila_inferior.addWidget(self.btn_accion_editar)
+ 
+-        self.btn_accion_cambiar_estado = QPushButton("⏸️ Desactivar")
++        self.btn_accion_cambiar_estado = QPushButton("Desactivar")
++        iconos.aplicar(self.btn_accion_cambiar_estado, "player-pause")
+         self.btn_accion_cambiar_estado.setProperty(
+             "class", "boton boton_secundario")
+         self.btn_accion_cambiar_estado.setEnabled(False)
+@@ -214,7 +221,8 @@ class PaginaLectores(QWidget):
+ 
+         fila_inferior.addStretch(1)
+ 
+-        self.btn_accion_eliminar = QPushButton("🗑️ Eliminar Lector")
++        self.btn_accion_eliminar = QPushButton("Eliminar Lector")
++        iconos.aplicar(self.btn_accion_eliminar, "trash", "blanco")
+         self.btn_accion_eliminar.setProperty("class", "boton boton_peligro")
+         self.btn_accion_eliminar.setEnabled(False)
+         self.btn_accion_eliminar.clicked.connect(self._accion_eliminar)
+@@ -358,9 +366,12 @@ class PaginaLectores(QWidget):
+             if lector:
+                 esta_deshabilitado = bool(lector.get("disabled", False))
+                 self.btn_accion_cambiar_estado.setText(
+-                    "▶️ Activar" if esta_deshabilitado else "⏸️ Desactivar")
++                    "Activar" if esta_deshabilitado else "Desactivar")
++                iconos.aplicar(self.btn_accion_cambiar_estado,
++                               "player-play" if esta_deshabilitado else "player-pause")
+         else:
+-            self.btn_accion_cambiar_estado.setText("⏸️ Desactivar")
++            self.btn_accion_cambiar_estado.setText("Desactivar")
++            iconos.aplicar(self.btn_accion_cambiar_estado, "player-pause")
+ 
+     def _obtener_lector_seleccionado(self) -> Optional[Dict[str, Any]]:
+         indexes = self.tabla.selectionModel().selectedRows()
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/lectores_dialogos.py b/Documents/caapd-facturacion/escritorio/ui/paginas/lectores_dialogos.py
+index 5f062c9..32c0d35 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/lectores_dialogos.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/lectores_dialogos.py
+@@ -49,9 +49,9 @@ class DialogoLector(QDialog):
+ 
+         # Encabezado
+         texto_titulo = (
+-            f"✏️ Editar Lector: {self.lector.get('display_name') or self.lector.get('email', '')}"
++            f"Editar Lector: {self.lector.get('display_name') or self.lector.get('email', '')}"
+             if self.es_edicion
+-            else "➕ Registrar Nuevo Lector"
++            else "Registrar Nuevo Lector"
+         )
+         lbl_titulo = QLabel(texto_titulo)
+         lbl_titulo.setObjectName("dialogo_titulo")
+@@ -176,7 +176,7 @@ class DialogoLector(QDialog):
+         self.txt_confirm_pass.setEchoMode(modo)
+ 
+     def _mostrar_error(self, mensaje: str) -> None:
+-        self.lbl_error.setText(f"⚠️ {mensaje}")
++        self.lbl_error.setText(mensaje)
+         self.lbl_error.show()
+ 
+     def _guardar(self) -> None:
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas.py b/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas.py
+index 07aad9f..a97a5a7 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas.py
+@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ import codigos
+ from servicios.datos import ServicioDatos
+ from ui.componentes.alerta import AlertaWidget
+@@ -90,21 +92,24 @@ class PaginaLecturas(QWidget):
+         fila_encabezado.addWidget(self.indicador_carga)
+ 
+         # Botón Cerrar / Reabrir lecturas
+-        self.btn_estado_mes = QPushButton("🔒 Cerrar lecturas")
++        self.btn_estado_mes = QPushButton("Cerrar lecturas")
++        iconos.aplicar(self.btn_estado_mes, "lock")
+         self.btn_estado_mes.setProperty("class", "boton boton_secundario")
+         self.btn_estado_mes.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_estado_mes.clicked.connect(self._alternar_estado_lecturas)
+         fila_encabezado.addWidget(self.btn_estado_mes)
+ 
+         # Botón Abrir mes nuevo
+-        self.btn_abrir_mes = QPushButton("📅 Abrir mes nuevo")
++        self.btn_abrir_mes = QPushButton("Abrir mes nuevo")
++        iconos.aplicar(self.btn_abrir_mes, "calendar-plus", "blanco")
+         self.btn_abrir_mes.setProperty("class", "boton boton_exito")
+         self.btn_abrir_mes.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_abrir_mes.clicked.connect(self._abrir_modal_mes)
+         fila_encabezado.addWidget(self.btn_abrir_mes)
+ 
+         # Botón Actualizar
+-        self.btn_actualizar = QPushButton("🔄 Actualizar")
++        self.btn_actualizar = QPushButton("Actualizar")
++        iconos.aplicar(self.btn_actualizar, "refresh")
+         self.btn_actualizar.setProperty("class", "boton boton_secundario")
+         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_actualizar.clicked.connect(self.actualizar_datos)
+@@ -151,7 +156,9 @@ class PaginaLecturas(QWidget):
+         self.campo_busqueda = QLineEdit()
+         self.campo_busqueda.setObjectName("campo_busqueda")
+         self.campo_busqueda.setPlaceholderText(
+-            "🔍 Buscar por medidor, conexión, DNI o nombre...")
++            "Buscar por medidor, conexión, DNI o nombre...")
++        self.campo_busqueda.addAction(
++            iconos.icono("search", "gris"), QLineEdit.ActionPosition.LeadingPosition)
+         self.campo_busqueda.setClearButtonEnabled(True)
+         self.campo_busqueda.setMinimumWidth(320)
+         self.campo_busqueda.textChanged.connect(self._al_cambiar_busqueda)
+@@ -160,9 +167,11 @@ class PaginaLecturas(QWidget):
+         # Filtros rápidos por estado
+         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
+         self.btn_filtro_faltan = self._crear_boton_filtro(
+-            "⏳ Faltan (0)", "faltan")
++            "Faltan (0)", "faltan")
++        iconos.aplicar(self.btn_filtro_faltan, "hourglass", "gris", 15)
+         self.btn_filtro_observados = self._crear_boton_filtro(
+-            "⚠️ Con observación (0)", "con_observacion")
++            "Con observación (0)", "con_observacion")
++        iconos.aplicar(self.btn_filtro_observados, "alert-triangle", "aviso", 15)
+ 
+         # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
+         self.btn_actualizar_excel = QPushButton("Actualizar Excel")
+@@ -222,7 +231,8 @@ class PaginaLecturas(QWidget):
+ 
+         fila_acciones.addStretch(1)
+ 
+-        self.btn_accion_editar = QPushButton("✏️ Corregir lectura")
++        self.btn_accion_editar = QPushButton("Corregir lectura")
++        iconos.aplicar(self.btn_accion_editar, "pencil", "blanco")
+         self.btn_accion_editar.setProperty("class", "boton boton_primario")
+         self.btn_accion_editar.setEnabled(False)
+         self.btn_accion_editar.clicked.connect(self._editar_seleccionado)
+@@ -323,7 +333,7 @@ class PaginaLecturas(QWidget):
+         self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+         self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+         self.btn_actualizar_excel.setEnabled(False)
+-        self.btn_actualizar_excel.setText("⏳ Actualizando…")
++        self.btn_actualizar_excel.setText("Actualizando…")
+ 
+         ventana = self.window()
+         if hasattr(ventana, "mostrar_progreso"):
+@@ -417,7 +427,7 @@ class PaginaLecturas(QWidget):
+             f"Meses: {', '.join(periodos)}\n\n"
+             f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote.\n"
+             f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
+-            f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
++            f"• Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
+         )
+         self.cargar_datos_asincrono(forzar=True)
+ 
+@@ -432,7 +442,7 @@ class PaginaLecturas(QWidget):
+             f"El periodo {res.get('periodo', '')} quedó disponible para los lectores.\n\n"
+             f"• {res.get('usuarios_subidos', 0)} documentos creados en Firebase.\n"
+             f"• No se reemplazaron ni eliminaron documentos de otros meses.\n"
+-            f"• ⏱️ Tiempo total: {res.get('tiempo_segundos', 0)} s.",
++            f"• Tiempo total: {res.get('tiempo_segundos', 0)} s.",
+         )
+         self.cargar_datos_asincrono(forzar=True)
+ 
+@@ -444,7 +454,7 @@ class PaginaLecturas(QWidget):
+         info_extra = ""
+         if conflictos:
+             info_extra = (
+-                f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
++                f"\n\nSe detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                 + "\n".join(
+                     f"  • {c['nombre']} (Medidor {c['nro_medidor']}): "
+                     f"ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)"
+@@ -456,7 +466,7 @@ class PaginaLecturas(QWidget):
+             "Descarga de Lecturas Completada",
+             f"¡Descarga finalizada con éxito!\n\n"
+             f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
+-            f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
++            f"• Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+             f"{info_extra}",
+         )
+         self.cargar_datos_asincrono(forzar=True)
+@@ -482,7 +492,7 @@ class PaginaLecturas(QWidget):
+             # No hay mes activo o está vacío
+             self._establecer_estado_banner("sin_mes")
+             self.lbl_info_mes.setText(
+-                "⚠️ <b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
++                "<b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
+             self.lbl_avance_total.setText("")
+             self.btn_estado_mes.setEnabled(False)
+             puede_abrir, motivo, _ = self.servicio.verificar_puede_abrir_mes()
+@@ -508,10 +518,12 @@ class PaginaLecturas(QWidget):
+ 
+         # Botón de estado del mes
+         if self.estado_mes == "ABIERTO":
+-            self.btn_estado_mes.setText("🔒 Cerrar lecturas")
++            self.btn_estado_mes.setText("Cerrar lecturas")
++            iconos.aplicar(self.btn_estado_mes, "lock")
+             self.btn_estado_mes.setEnabled(True)
+         elif self.estado_mes == "CERRADO":
+-            self.btn_estado_mes.setText("🔓 Reabrir lecturas")
++            self.btn_estado_mes.setText("Reabrir lecturas")
++            iconos.aplicar(self.btn_estado_mes, "lock-open")
+             self.btn_estado_mes.setEnabled(True)
+         else:
+             self.btn_estado_mes.setText("Mes facturado")
+@@ -641,8 +653,10 @@ class PaginaLecturas(QWidget):
+             base = "filtro_btn filtro_btn_aviso" if c == "con_observacion" else "filtro_btn"
+             if c == clave:
+                 btn.setProperty("class", f"{base} filtro_btn_activo")
++                iconos.recolorear(btn, "blanco")
+             else:
+                 btn.setProperty("class", base)
++                iconos.recolorear(btn, "aviso" if c == "con_observacion" else "gris")
+             btn.style().unpolish(btn)
+             btn.style().polish(btn)
+ 
+@@ -662,8 +676,8 @@ class PaginaLecturas(QWidget):
+         )
+ 
+         self.btn_filtro_todos.setText(f"Todos ({total})")
+-        self.btn_filtro_faltan.setText(f"⏳ Faltan ({faltan})")
+-        self.btn_filtro_observados.setText(f"⚠️ Con observación ({obs})")
++        self.btn_filtro_faltan.setText(f"Faltan ({faltan})")
++        self.btn_filtro_observados.setText(f"Con observación ({obs})")
+ 
+     def _al_cambiar_busqueda(self, texto: str) -> None:
+         self.timer_busqueda.start()
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_dialogo.py b/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_dialogo.py
+index aa8bcd6..d276cde 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_dialogo.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_dialogo.py
+@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ import calculos
+ from servicios.datos import ServicioDatos
+ from ui.componentes.indicador_carga import IndicadorCarga
+@@ -80,7 +82,7 @@ class DialogoLectura(QDialog):
+         layout_card = QHBoxLayout(card_medidor)
+         layout_card.setContentsMargins(12, 8, 12, 8)
+ 
+-        lbl_med = QLabel(f"💧 Medidor: <b>{self.item.get('nro_medidor')}</b>")
++        lbl_med = QLabel(f"Medidor: <b>{self.item.get('nro_medidor')}</b>")
+         lbl_med.setStyleSheet("font-size: 13px; color: #0369a1;")
+         layout_card.addWidget(lbl_med)
+ 
+@@ -186,7 +188,8 @@ class DialogoLectura(QDialog):
+         self.btn_cancelar.clicked.connect(self.reject)
+         fila_btns.addWidget(self.btn_cancelar)
+ 
+-        self.btn_guardar = QPushButton("💾 Guardar lectura")
++        self.btn_guardar = QPushButton("Guardar lectura")
++        iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
+         self.btn_guardar.setProperty("class", "boton boton_primario")
+         self.btn_guardar.clicked.connect(self._ejecutar_guardado)
+         fila_btns.addWidget(self.btn_guardar)
+@@ -207,7 +210,7 @@ class DialogoLectura(QDialog):
+             return
+ 
+         if not texto.isdigit():
+-            self.lbl_feedback_consumo.setText("⚠️ Ingrese solo números enteros.")
++            self.lbl_feedback_consumo.setText("Ingrese solo números enteros.")
+             self.lbl_feedback_consumo.setStyleSheet("color: #dc2626;")
+             self.lbl_alerta.hide()
+             return
+@@ -221,7 +224,7 @@ class DialogoLectura(QDialog):
+             self.lbl_feedback_consumo.setText(f"Consumo negativo: {act - ant} m³")
+             self.lbl_feedback_consumo.setStyleSheet("color: #dc2626; font-weight: bold;")
+             self.lbl_alerta.setText(
+-                "⚠️ La lectura actual es menor que la anterior. "
++                "La lectura actual es menor que la anterior. "
+                 "Si el medidor fue reemplazado, seleccione 'Cambio de medidor' en Novedad."
+             )
+             self.lbl_alerta.show()
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_modelo.py b/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_modelo.py
+index 6c43b83..6a4699d 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_modelo.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/lecturas_modelo.py
+@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Set
+ from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
+ from PySide6.QtGui import QColor, QFont
+ 
++from ui import iconos
++
+ import codigos
+ from ui.estilos.paleta import PALETA
+ 
+@@ -50,6 +52,14 @@ class ModeloLecturas(QAbstractTableModel):
+         row = self._datos[index.row()]
+         col = index.column()
+ 
++        if role == Qt.ItemDataRole.DecorationRole:
++            # Marca visual de DNI pendiente (col 1) y gota en el medidor (col 4)
++            if col == 1 and row.get("es_pendiente"):
++                return iconos.icono("alert-triangle", "aviso")
++            if col == 4:
++                return iconos.icono("droplet", "primario")
++            return None
++
+         if role == Qt.ItemDataRole.ToolTipRole:
+             return self.data(index, Qt.ItemDataRole.DisplayRole)
+ 
+@@ -58,15 +68,13 @@ class ModeloLecturas(QAbstractTableModel):
+                 return str(row.get("nro_conexion") or "—")
+             elif col == 1:
+                 uid = str(row.get("id_usuario") or "—")
+-                if row.get("es_pendiente"):
+-                    return f"{uid}  ⚠️"
+                 return uid
+             elif col == 2:
+                 return str(row.get("nombre") or "").upper()
+             elif col == 3:
+                 return str(row.get("sector") or "")
+             elif col == 4:
+-                return f"💧 {row.get('nro_medidor') or '—'}"
++                return str(row.get('nro_medidor') or '—')
+             elif col == 5:
+                 ant = row.get("lectura_anterior")
+                 return str(ant) if ant is not None else "0"
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/mes_dialogo.py b/Documents/caapd-facturacion/escritorio/ui/paginas/mes_dialogo.py
+index f28ccf6..8cea596 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/mes_dialogo.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/mes_dialogo.py
+@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ from servicios.datos import ServicioDatos
+ from ui.componentes.alerta import AlertaWidget
+ from ui.componentes.indicador_carga import IndicadorCarga
+@@ -52,7 +54,7 @@ class DialogoAbrirMes(QDialog):
+         layout.setSpacing(18)
+ 
+         # Encabezado
+-        lbl_titulo = QLabel("📅 Apertura de Mes Operativo")
++        lbl_titulo = QLabel("Apertura de Mes Operativo")
+         lbl_titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #0f172a;")
+         lbl_sub = QLabel(
+             "Crea la base de lecturas para todos los usuarios activos y habilita el registro de consumo."
+@@ -130,7 +132,7 @@ class DialogoAbrirMes(QDialog):
+         layout_form.addLayout(fila_venc)
+ 
+         # Nota informativa
+-        lbl_info = QLabel("💡 Las lecturas anteriores se copiarán del mes pasado o de la semilla inicial.")
++        lbl_info = QLabel("Las lecturas anteriores se copiarán del mes pasado o de la semilla inicial.")
+         lbl_info.setStyleSheet("font-size: 12px; color: #0369a1; font-style: italic;")
+         layout_form.addWidget(lbl_info)
+ 
+@@ -149,7 +151,8 @@ class DialogoAbrirMes(QDialog):
+         self.btn_cancelar.clicked.connect(self.reject)
+         fila_botones.addWidget(self.btn_cancelar)
+ 
+-        self.btn_abrir = QPushButton("🚀 Abrir mes ahora")
++        self.btn_abrir = QPushButton("Abrir mes ahora")
++        iconos.aplicar(self.btn_abrir, "rocket", "blanco", 18)
+         self.btn_abrir.setProperty("class", "boton boton_exito boton_grande")
+         self.btn_abrir.clicked.connect(self._ejecutar_apertura)
+         fila_botones.addWidget(self.btn_abrir)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios.py b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios.py
+index f442b74..1f7cdb1 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios.py
+@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ import codigos
+ from servicios.datos import ServicioDatos
+ from ui.componentes.alerta import AlertaWidget
+@@ -78,7 +80,8 @@ class PaginaUsuarios(QWidget):
+         fila_encabezado.addWidget(self.indicador_carga)
+ 
+         # Botón de cabecera
+-        self.btn_nuevo = QPushButton("➕ Nuevo Usuario")
++        self.btn_nuevo = QPushButton("Nuevo Usuario")
++        iconos.aplicar(self.btn_nuevo, "user-plus", "blanco")
+         self.btn_nuevo.setProperty("class", "boton boton_primario")
+         self.btn_nuevo.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_nuevo.clicked.connect(self.abrir_modal_nuevo)
+@@ -110,7 +113,8 @@ class PaginaUsuarios(QWidget):
+         self.campo_busqueda.textChanged.connect(self._al_cambiar_texto_busqueda)
+         fila_busqueda.addWidget(self.campo_busqueda, stretch=1)
+ 
+-        self.btn_limpiar_busqueda = QPushButton("✖ Limpiar")
++        self.btn_limpiar_busqueda = QPushButton("Limpiar")
++        iconos.aplicar(self.btn_limpiar_busqueda, "x")
+         self.btn_limpiar_busqueda.setProperty("class", "boton boton_secundario")
+         self.btn_limpiar_busqueda.setCursor(Qt.CursorShape.PointingHandCursor)
+         self.btn_limpiar_busqueda.clicked.connect(self.limpiar_busqueda)
+@@ -126,7 +130,8 @@ class PaginaUsuarios(QWidget):
+         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
+         self.btn_filtro_activos = self._crear_boton_filtro("Activos (0)", "activos")
+         self.btn_filtro_inactivos = self._crear_boton_filtro("Inactivos (0)", "inactivos")
+-        self.btn_filtro_pendientes = self._crear_boton_filtro("⚠️ Pendientes de DNI (0)", "pendientes")
++        self.btn_filtro_pendientes = self._crear_boton_filtro("Pendientes de DNI (0)", "pendientes")
++        iconos.aplicar(self.btn_filtro_pendientes, "alert-triangle", "aviso", 15)
+ 
+         # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
+         self.btn_actualizar_excel = QPushButton("Actualizar Excel")
+@@ -191,13 +196,15 @@ class PaginaUsuarios(QWidget):
+         fila_acciones = QHBoxLayout()
+         fila_acciones.setSpacing(8)
+ 
+-        self.btn_accion_editar = QPushButton("✏️ Editar Usuario")
++        self.btn_accion_editar = QPushButton("Editar Usuario")
++        iconos.aplicar(self.btn_accion_editar, "pencil")
+         self.btn_accion_editar.setProperty("class", "boton boton_secundario")
+         self.btn_accion_editar.setEnabled(False)
+         self.btn_accion_editar.clicked.connect(self._accion_editar)
+         fila_acciones.addWidget(self.btn_accion_editar)
+ 
+-        self.btn_accion_estado = QPushButton("⏸️ Desactivar")
++        self.btn_accion_estado = QPushButton("Desactivar")
++        iconos.aplicar(self.btn_accion_estado, "player-pause")
+         self.btn_accion_estado.setProperty("class", "boton boton_secundario")
+         self.btn_accion_estado.setEnabled(False)
+         self.btn_accion_estado.clicked.connect(self._accion_cambiar_estado)
+@@ -246,7 +253,7 @@ class PaginaUsuarios(QWidget):
+         self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
+         self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
+         self.btn_actualizar_excel.setEnabled(False)
+-        self.btn_actualizar_excel.setText("⏳ Actualizando…")
++        self.btn_actualizar_excel.setText("Actualizando…")
+ 
+         ventana = self.window()
+         if hasattr(ventana, "mostrar_progreso"):
+@@ -355,7 +362,7 @@ class PaginaUsuarios(QWidget):
+         self.btn_filtro_todos.setText(f"Todos ({total})")
+         self.btn_filtro_activos.setText(f"Activos ({activos})")
+         self.btn_filtro_inactivos.setText(f"Inactivos ({inactivos})")
+-        self.btn_filtro_pendientes.setText(f"⚠️ Pendientes de DNI ({pendientes})")
++        self.btn_filtro_pendientes.setText(f"Pendientes de DNI ({pendientes})")
+ 
+         if pendientes > 0:
+             self.btn_filtro_pendientes.setProperty("class", "filtro_btn filtro_btn_aviso")
+@@ -374,6 +381,7 @@ class PaginaUsuarios(QWidget):
+         for c, btn in botones:
+             activo_val = "true" if c == clave else "false"
+             btn.setProperty("activo", activo_val)
++            iconos.recolorear(btn, "blanco" if c == clave else "aviso")
+             btn.style().unpolish(btn)
+             btn.style().polish(btn)
+ 
+@@ -421,7 +429,9 @@ class PaginaUsuarios(QWidget):
+             if u:
+                 es_act = bool(u.get("activo", True))
+                 self.btn_accion_estado.setEnabled(True)
+-                self.btn_accion_estado.setText("⏸️ Desactivar" if es_act else "▶️ Activar")
++                self.btn_accion_estado.setText("Desactivar" if es_act else "Activar")
++                iconos.aplicar(self.btn_accion_estado,
++                               "player-pause" if es_act else "player-play")
+                 return
+ 
+         self.btn_accion_estado.setEnabled(False)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py
+index bd74b86..ff3d59c 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py
+@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
+     QWidget,
+ )
+ 
++from ui import iconos
++
+ import codigos
+ from servicios.datos import ServicioDatos
+ from ui.hilos import mostrar_dialogo_aviso, mostrar_dialogo_error
+@@ -63,7 +65,7 @@ class DialogoUsuario(QDialog):
+         layout_principal.setSpacing(14)
+ 
+         # Encabezado del diálogo
+-        titulo_txt = f"✏️ Editar Usuario: {self.usuario.get('nombre', '')}" if self.es_edicion else "➕ Registrar Nuevo Usuario"
++        titulo_txt = f"Editar Usuario: {self.usuario.get('nombre', '')}" if self.es_edicion else "Registrar Nuevo Usuario"
+         lbl_titulo = QLabel(titulo_txt)
+         lbl_titulo.setObjectName("dialogo_titulo")
+         layout_principal.addWidget(lbl_titulo)
+@@ -210,7 +212,8 @@ class DialogoUsuario(QDialog):
+         self.campo_nuevo_medidor.returnPressed.connect(self._agregar_medidor)
+         fila_add_med.addWidget(self.campo_nuevo_medidor, stretch=1)
+ 
+-        btn_add_med = QPushButton("➕ Añadir")
++        btn_add_med = QPushButton("Añadir")
++        iconos.aplicar(btn_add_med, "plus")
+         btn_add_med.setProperty("class", "boton boton_secundario")
+         btn_add_med.clicked.connect(self._agregar_medidor)
+         fila_add_med.addWidget(btn_add_med)
+@@ -236,7 +239,8 @@ class DialogoUsuario(QDialog):
+         btn_cancelar.clicked.connect(self.reject)
+         fila_botones.addWidget(btn_cancelar)
+ 
+-        btn_guardar = QPushButton("💾 Guardar Usuario")
++        btn_guardar = QPushButton("Guardar Usuario")
++        iconos.aplicar(btn_guardar, "device-floppy", "blanco")
+         btn_guardar.setProperty("class", "boton boton_primario")
+         btn_guardar.clicked.connect(self._guardar)
+         fila_botones.addWidget(btn_guardar)
+@@ -326,11 +330,13 @@ class DialogoUsuario(QDialog):
+                 l_chip.setContentsMargins(6, 2, 6, 2)
+                 l_chip.setSpacing(6)
+ 
+-                lbl_m = QLabel(f"💧 {m}")
++                l_chip.addWidget(iconos.etiqueta("droplet", "primario", 14))
++                lbl_m = QLabel(str(m))
+                 lbl_m.setProperty("class", "chip_texto")
+                 l_chip.addWidget(lbl_m)
+ 
+-                btn_del = QPushButton("✕")
++                btn_del = QPushButton("")
++                iconos.aplicar(btn_del, "x", "peligro", 12)
+                 btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
+                 btn_del.setStyleSheet(
+                     "border: none; background: transparent; color: #dc2626; font-weight: bold;")
+@@ -535,7 +541,8 @@ class DialogoCorregirDni(QDialog):
+         btn_cancelar.clicked.connect(self.reject)
+         fila_botones.addWidget(btn_cancelar)
+ 
+-        btn_confirmar = QPushButton("✅ Confirmar y Renombrar DNI")
++        btn_confirmar = QPushButton("Confirmar y Renombrar DNI")
++        iconos.aplicar(btn_confirmar, "circle-check", "blanco")
+         btn_confirmar.setProperty("class", "boton boton_aviso")
+         btn_confirmar.clicked.connect(self._confirmar)
+         fila_botones.addWidget(btn_confirmar)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_modelo.py b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_modelo.py
+index 4ccfecd..43c4325 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_modelo.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_modelo.py
+@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
+ from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
+ from PySide6.QtGui import QColor, QFont
+ 
++from ui import iconos
++
+ import codigos
+ 
+ 
+@@ -43,13 +45,19 @@ class ModeloUsuarios(QAbstractTableModel):
+         u = self._datos[index.row()]
+         col = index.column()
+ 
++        if role == Qt.ItemDataRole.DecorationRole:
++            # Marca visual de DNI pendiente (col 1) y gota si tiene medidor (col 5)
++            if col == 1 and u.get("es_pendiente"):
++                return iconos.icono("alert-triangle", "aviso")
++            if col == 5 and (u.get("medidores") or []):
++                return iconos.icono("droplet", "primario")
++            return None
++
+         if role == Qt.ItemDataRole.DisplayRole:
+             if col == 0:
+                 return str(u.get("nro_conexion") or "—")
+             elif col == 1:
+                 uid = str(u.get("id_usuario") or u.get("_id") or "—")
+-                if u.get("es_pendiente"):
+-                    return f"{uid}  ⚠️"
+                 return uid
+             elif col == 2:
+                 return str(u.get("nombre") or "").upper()
+@@ -61,7 +69,7 @@ class ModeloUsuarios(QAbstractTableModel):
+                 meds = u.get("medidores") or []
+                 meds_str = [m if isinstance(m, str) else m.get("nro_medidor", "") for m in meds]
+                 if meds_str:
+-                    return ", ".join(f"💧 {m}" for m in meds_str if m)
++                    return ", ".join(m for m in meds_str if m)
+                 return "(Sin medidor)"
+             elif col == 6:
+                 return str(u.get("codigo_categoria") or "A")

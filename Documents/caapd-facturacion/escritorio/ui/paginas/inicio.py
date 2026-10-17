@@ -271,7 +271,7 @@ class PaginaInicio(QWidget):
             f"Meses: {', '.join(periodos)}\n\n"
             f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote:\n{detalle_meses}\n"
             f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
-            f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
+            f"• Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
         )
         # 2) Después, refrescar estadísticas desde la MEMORIA (el servicio ya guardó el Excel).
         #    limpiar_cache=False: NO se vuelven a leer todos los Excel del disco.
@@ -288,7 +288,7 @@ class PaginaInicio(QWidget):
             f"El periodo {res.get('periodo', '')} quedó disponible para los lectores.\n\n"
             f"• {res.get('usuarios_subidos', 0)} documentos creados en Firebase.\n"
             f"• No se reemplazaron ni eliminaron documentos de otros meses.\n"
-            f"• ⏱️ Tiempo total: {res.get('tiempo_segundos', 0)} s.",
+            f"• Tiempo total: {res.get('tiempo_segundos', 0)} s.",
         )
         self.cargar_datos_asincrono(limpiar_cache=False)
 
@@ -321,7 +321,7 @@ class PaginaInicio(QWidget):
             "Descarga de Lecturas Completada",
             f"¡Descarga finalizada con éxito!\n\n"
             f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
-            f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+            f"• Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
             f"{info_extra}",
         )
         self.cargar_datos_asincrono(limpiar_cache=False)

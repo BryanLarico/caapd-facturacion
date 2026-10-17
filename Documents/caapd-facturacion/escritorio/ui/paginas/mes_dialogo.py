@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
@@ -52,7 +54,7 @@ class DialogoAbrirMes(QDialog):
         layout.setSpacing(18)
 
         # Encabezado
-        lbl_titulo = QLabel("📅 Apertura de Mes Operativo")
+        lbl_titulo = QLabel("Apertura de Mes Operativo")
         lbl_titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #0f172a;")
         lbl_sub = QLabel(
             "Crea la base de lecturas para todos los usuarios activos y habilita el registro de consumo."
@@ -130,7 +132,7 @@ class DialogoAbrirMes(QDialog):
         layout_form.addLayout(fila_venc)
 
         # Nota informativa
-        lbl_info = QLabel("💡 Las lecturas anteriores se copiarán del mes pasado o de la semilla inicial.")
+        lbl_info = QLabel("Las lecturas anteriores se copiarán del mes pasado o de la semilla inicial.")
         lbl_info.setStyleSheet("font-size: 12px; color: #0369a1; font-style: italic;")
         layout_form.addWidget(lbl_info)
 
@@ -149,7 +151,8 @@ class DialogoAbrirMes(QDialog):
         self.btn_cancelar.clicked.connect(self.reject)
         fila_botones.addWidget(self.btn_cancelar)
 
-        self.btn_abrir = QPushButton("🚀 Abrir mes ahora")
+        self.btn_abrir = QPushButton("Abrir mes ahora")
+        iconos.aplicar(self.btn_abrir, "rocket", "blanco", 18)
         self.btn_abrir.setProperty("class", "boton boton_exito boton_grande")
         self.btn_abrir.clicked.connect(self._ejecutar_apertura)
         fila_botones.addWidget(self.btn_abrir)

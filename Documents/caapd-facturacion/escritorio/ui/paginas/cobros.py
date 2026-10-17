@@ -465,7 +465,8 @@ class PaginaCobros(QWidget):
         self.btn_ver_recibo.clicked.connect(self._accion_ver_recibo)
         lay.addWidget(self.btn_ver_recibo)
 
-        self.btn_anular_cobro = QPushButton("↩️ Anular cobro")
+        self.btn_anular_cobro = QPushButton("Anular cobro")
+        iconos.aplicar(self.btn_anular_cobro, "arrow-back-up", "blanco")
         self.btn_anular_cobro.setProperty("class", "boton boton_peligro")
         self.btn_anular_cobro.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_anular_cobro.clicked.connect(self._accion_anular_cobro)
@@ -511,7 +512,7 @@ class PaginaCobros(QWidget):
         """Indica carga en el propio botón Actualizar (sin barra ni texto adicional en pantalla)."""
         self.btn_actualizar.setEnabled(not activo)
         self.btn_actualizar.setText(
-            f"⏳ {texto}" if activo else self.TEXTO_BTN_ACTUALIZAR)
+            f"{texto}" if activo else self.TEXTO_BTN_ACTUALIZAR)
 
     # -----------------------------------------------------------------------
     # Carga Asíncrona de Datos
@@ -591,7 +592,7 @@ class PaginaCobros(QWidget):
         self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
         self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
         self.btn_actualizar_excel.setEnabled(False)
-        self.btn_actualizar_excel.setText("⏳ Actualizando…")
+        self.btn_actualizar_excel.setText("Actualizando…")
 
         ventana = self.window()
         if hasattr(ventana, "mostrar_progreso"):

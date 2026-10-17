@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 import codigos
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
@@ -90,21 +92,24 @@ class PaginaLecturas(QWidget):
         fila_encabezado.addWidget(self.indicador_carga)
 
         # Botón Cerrar / Reabrir lecturas
-        self.btn_estado_mes = QPushButton("🔒 Cerrar lecturas")
+        self.btn_estado_mes = QPushButton("Cerrar lecturas")
+        iconos.aplicar(self.btn_estado_mes, "lock")
         self.btn_estado_mes.setProperty("class", "boton boton_secundario")
         self.btn_estado_mes.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_estado_mes.clicked.connect(self._alternar_estado_lecturas)
         fila_encabezado.addWidget(self.btn_estado_mes)
 
         # Botón Abrir mes nuevo
-        self.btn_abrir_mes = QPushButton("📅 Abrir mes nuevo")
+        self.btn_abrir_mes = QPushButton("Abrir mes nuevo")
+        iconos.aplicar(self.btn_abrir_mes, "calendar-plus", "blanco")
         self.btn_abrir_mes.setProperty("class", "boton boton_exito")
         self.btn_abrir_mes.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_abrir_mes.clicked.connect(self._abrir_modal_mes)
         fila_encabezado.addWidget(self.btn_abrir_mes)
 
         # Botón Actualizar
-        self.btn_actualizar = QPushButton("🔄 Actualizar")
+        self.btn_actualizar = QPushButton("Actualizar")
+        iconos.aplicar(self.btn_actualizar, "refresh")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_actualizar.clicked.connect(self.actualizar_datos)
@@ -151,7 +156,9 @@ class PaginaLecturas(QWidget):
         self.campo_busqueda = QLineEdit()
         self.campo_busqueda.setObjectName("campo_busqueda")
         self.campo_busqueda.setPlaceholderText(
-            "🔍 Buscar por medidor, conexión, DNI o nombre...")
+            "Buscar por medidor, conexión, DNI o nombre...")
+        self.campo_busqueda.addAction(
+            iconos.icono("search", "gris"), QLineEdit.ActionPosition.LeadingPosition)
         self.campo_busqueda.setClearButtonEnabled(True)
         self.campo_busqueda.setMinimumWidth(320)
         self.campo_busqueda.textChanged.connect(self._al_cambiar_busqueda)
@@ -160,9 +167,11 @@ class PaginaLecturas(QWidget):
         # Filtros rápidos por estado
         self.btn_filtro_todos = self._crear_boton_filtro("Todos (0)", "todos")
         self.btn_filtro_faltan = self._crear_boton_filtro(
-            "⏳ Faltan (0)", "faltan")
+            "Faltan (0)", "faltan")
+        iconos.aplicar(self.btn_filtro_faltan, "hourglass", "gris", 15)
         self.btn_filtro_observados = self._crear_boton_filtro(
-            "⚠️ Con observación (0)", "con_observacion")
+            "Con observación (0)", "con_observacion")
+        iconos.aplicar(self.btn_filtro_observados, "alert-triangle", "aviso", 15)
 
         # Botón Actualizar Excel — recarga modificaciones de la base de datos Excel sin reiniciar la app
         self.btn_actualizar_excel = QPushButton("Actualizar Excel")
@@ -222,7 +231,8 @@ class PaginaLecturas(QWidget):
 
         fila_acciones.addStretch(1)
 
-        self.btn_accion_editar = QPushButton("✏️ Corregir lectura")
+        self.btn_accion_editar = QPushButton("Corregir lectura")
+        iconos.aplicar(self.btn_accion_editar, "pencil", "blanco")
         self.btn_accion_editar.setProperty("class", "boton boton_primario")
         self.btn_accion_editar.setEnabled(False)
         self.btn_accion_editar.clicked.connect(self._editar_seleccionado)
@@ -323,7 +333,7 @@ class PaginaLecturas(QWidget):
         self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
         self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
         self.btn_actualizar_excel.setEnabled(False)
-        self.btn_actualizar_excel.setText("⏳ Actualizando…")
+        self.btn_actualizar_excel.setText("Actualizando…")
 
         ventana = self.window()
         if hasattr(ventana, "mostrar_progreso"):
@@ -417,7 +427,7 @@ class PaginaLecturas(QWidget):
             f"Meses: {', '.join(periodos)}\n\n"
             f"• {res.get('usuarios_subidos', 0)} documentos de usuario subidos en lote.\n"
             f"• {res.get('sobrantes_borrados', 0)} documentos obsoletos/sobrantes eliminados.\n"
-            f"• ⏱️ Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
+            f"• Tiempo total de sincronización: {res.get('tiempo_segundos', 0)} s.",
         )
         self.cargar_datos_asincrono(forzar=True)
 
@@ -432,7 +442,7 @@ class PaginaLecturas(QWidget):
             f"El periodo {res.get('periodo', '')} quedó disponible para los lectores.\n\n"
             f"• {res.get('usuarios_subidos', 0)} documentos creados en Firebase.\n"
             f"• No se reemplazaron ni eliminaron documentos de otros meses.\n"
-            f"• ⏱️ Tiempo total: {res.get('tiempo_segundos', 0)} s.",
+            f"• Tiempo total: {res.get('tiempo_segundos', 0)} s.",
         )
         self.cargar_datos_asincrono(forzar=True)
 
@@ -444,7 +454,7 @@ class PaginaLecturas(QWidget):
         info_extra = ""
         if conflictos:
             info_extra = (
-                f"\n\n⚠️ Se detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
+                f"\n\nSe detectaron {len(conflictos)} conflicto(s) con lecturas de ADMIN:\n"
                 + "\n".join(
                     f"  • {c['nombre']} (Medidor {c['nro_medidor']}): "
                     f"ADMIN={c['lectura_admin']} vs Lector={c['lectura_cloud']} (se mantuvo ADMIN)"
@@ -456,7 +466,7 @@ class PaginaLecturas(QWidget):
             "Descarga de Lecturas Completada",
             f"¡Descarga finalizada con éxito!\n\n"
             f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
-            f"• ⏱️ Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+            f"• Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
             f"{info_extra}",
         )
         self.cargar_datos_asincrono(forzar=True)
@@ -482,7 +492,7 @@ class PaginaLecturas(QWidget):
             # No hay mes activo o está vacío
             self._establecer_estado_banner("sin_mes")
             self.lbl_info_mes.setText(
-                "⚠️ <b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
+                "<b>No hay un mes activo</b>. Haz clic en 'Abrir mes nuevo' para iniciar.")
             self.lbl_avance_total.setText("")
             self.btn_estado_mes.setEnabled(False)
             puede_abrir, motivo, _ = self.servicio.verificar_puede_abrir_mes()
@@ -508,10 +518,12 @@ class PaginaLecturas(QWidget):
 
         # Botón de estado del mes
         if self.estado_mes == "ABIERTO":
-            self.btn_estado_mes.setText("🔒 Cerrar lecturas")
+            self.btn_estado_mes.setText("Cerrar lecturas")
+            iconos.aplicar(self.btn_estado_mes, "lock")
             self.btn_estado_mes.setEnabled(True)
         elif self.estado_mes == "CERRADO":
-            self.btn_estado_mes.setText("🔓 Reabrir lecturas")
+            self.btn_estado_mes.setText("Reabrir lecturas")
+            iconos.aplicar(self.btn_estado_mes, "lock-open")
             self.btn_estado_mes.setEnabled(True)
         else:
             self.btn_estado_mes.setText("Mes facturado")
@@ -641,8 +653,10 @@ class PaginaLecturas(QWidget):
             base = "filtro_btn filtro_btn_aviso" if c == "con_observacion" else "filtro_btn"
             if c == clave:
                 btn.setProperty("class", f"{base} filtro_btn_activo")
+                iconos.recolorear(btn, "blanco")
             else:
                 btn.setProperty("class", base)
+                iconos.recolorear(btn, "aviso" if c == "con_observacion" else "gris")
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
@@ -662,8 +676,8 @@ class PaginaLecturas(QWidget):
         )
 
         self.btn_filtro_todos.setText(f"Todos ({total})")
-        self.btn_filtro_faltan.setText(f"⏳ Faltan ({faltan})")
-        self.btn_filtro_observados.setText(f"⚠️ Con observación ({obs})")
+        self.btn_filtro_faltan.setText(f"Faltan ({faltan})")
+        self.btn_filtro_observados.setText(f"Con observación ({obs})")
 
     def _al_cambiar_busqueda(self, texto: str) -> None:
         self.timer_busqueda.start()

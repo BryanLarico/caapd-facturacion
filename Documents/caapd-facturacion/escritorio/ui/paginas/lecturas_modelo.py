@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Set
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
 from PySide6.QtGui import QColor, QFont
 
+from ui import iconos
+
 import codigos
 from ui.estilos.paleta import PALETA
 
@@ -50,6 +52,14 @@ class ModeloLecturas(QAbstractTableModel):
         row = self._datos[index.row()]
         col = index.column()
 
+        if role == Qt.ItemDataRole.DecorationRole:
+            # Marca visual de DNI pendiente (col 1) y gota en el medidor (col 4)
+            if col == 1 and row.get("es_pendiente"):
+                return iconos.icono("alert-triangle", "aviso")
+            if col == 4:
+                return iconos.icono("droplet", "primario")
+            return None
+
         if role == Qt.ItemDataRole.ToolTipRole:
             return self.data(index, Qt.ItemDataRole.DisplayRole)
 
@@ -58,15 +68,13 @@ class ModeloLecturas(QAbstractTableModel):
                 return str(row.get("nro_conexion") or "—")
             elif col == 1:
                 uid = str(row.get("id_usuario") or "—")
-                if row.get("es_pendiente"):
-                    return f"{uid}  ⚠️"
                 return uid
             elif col == 2:
                 return str(row.get("nombre") or "").upper()
             elif col == 3:
                 return str(row.get("sector") or "")
             elif col == 4:
-                return f"💧 {row.get('nro_medidor') or '—'}"
+                return str(row.get('nro_medidor') or '—')
             elif col == 5:
                 ant = row.get("lectura_anterior")
                 return str(ant) if ant is not None else "0"
