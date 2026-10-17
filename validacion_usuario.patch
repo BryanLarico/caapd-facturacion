@@ -1,0 +1,472 @@
+diff --git a/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py b/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py
+index 897a2e9..79d52d3 100644
+--- a/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py
++++ b/Documents/caapd-facturacion/escritorio/tests/test_ui_usuarios.py
+@@ -71,7 +71,7 @@ def datos_usuarios_prueba():
+     }
+ 
+ 
+-def test_modelo_usuarios_filas_columnas_y_datos(datos_usuarios_prueba):
++def test_modelo_usuarios_filas_columnas_y_datos(qapp, datos_usuarios_prueba):
+     lista = []
+     for uid, u in datos_usuarios_prueba.items():
+         doc = dict(u)
+@@ -211,12 +211,16 @@ def test_dialogo_usuario_creacion_y_validaciones(qtbot, datos_usuarios_prueba):
+     dialogo.chk_sin_dni.setChecked(True)
+     assert dialogo.campo_id.text() == "SD-002"
+ 
+-    # 3. Llenar campos
++    # 3. Llenar campos (Guardar permanece deshabilitado hasta completar lo obligatorio)
++    assert not dialogo.btn_guardar.isEnabled()
+     dialogo.campo_nombre.setText("FLORES MAMANI, PEDRO")
++    dialogo.campo_direccion.setText("CALLE 05 DE AGOSTO S/N")
++    assert not dialogo.btn_guardar.isEnabled()  # aun falta el medidor
+     dialogo.campo_nuevo_medidor.setText("998877")
+     dialogo._agregar_medidor()
+     assert "001000" not in dialogo.medidores_lista
+     assert "998877" in dialogo.medidores_lista
++    assert dialogo.btn_guardar.isEnabled()
+ 
+     # 4. Guardar
+     dialogo._guardar()
+@@ -424,6 +428,9 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
+ 
+     dialogo.campo_id.setText("71234567")
+     dialogo.campo_nombre.setText("GARCIA LOPEZ, ANA")
++    dialogo.campo_direccion.setText("JR. LIMA 123")
++    dialogo.campo_nuevo_medidor.setText("77665544")
++    dialogo._agregar_medidor()
+ 
+     with patch("firebase_client.db", return_value=mock_db):
+         dialogo._guardar()
+diff --git a/Documents/caapd-facturacion/escritorio/ui/estilos/tema.qss b/Documents/caapd-facturacion/escritorio/ui/estilos/tema.qss
+index c5e4c92..312bae4 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/estilos/tema.qss
++++ b/Documents/caapd-facturacion/escritorio/ui/estilos/tema.qss
+@@ -442,6 +442,29 @@ QLineEdit:focus, QTextEdit:focus {
+     background-color: #f8fafc;
+ }
+ 
++/* Campo con error de validacion (propiedad dinamica invalido="true") */
++QLineEdit[invalido="true"] {
++    border-color: #dc2626;
++    background-color: #fef2f2;
++}
++
++QLineEdit[invalido="true"]:focus {
++    border-color: #b91c1c;
++    background-color: #ffffff;
++}
++
++/* Mensajes de ayuda/error bajo los campos de un formulario */
++QLabel.campo_mensaje {
++    font-size: 12px;
++    font-weight: 500;
++    background: transparent;
++    padding: 0 2px;
++}
++
++QLabel.campo_mensaje[nivel="error"] { color: #dc2626; }
++QLabel.campo_mensaje[nivel="aviso"] { color: #b45309; }
++QLabel.campo_mensaje[nivel="info"]  { color: #64748b; font-weight: 400; }
++
+ /* ===================================================================
+    Checkbox y casillas de verificación en tablas/listas
+    (Regla: fondo BLANCO, borde celeste, check azul — nunca fondo morado)
+diff --git a/Documents/caapd-facturacion/escritorio/ui/iconos.py b/Documents/caapd-facturacion/escritorio/ui/iconos.py
+index cd9a75f..707bb94 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/iconos.py
++++ b/Documents/caapd-facturacion/escritorio/ui/iconos.py
+@@ -24,7 +24,7 @@ from pathlib import Path
+ from typing import Optional
+ 
+ from PySide6.QtCore import QByteArray, QRectF, QSize, Qt
+-from PySide6.QtGui import QIcon, QPainter, QPixmap
++from PySide6.QtGui import QGuiApplication, QIcon, QPainter, QPixmap
+ from PySide6.QtSvg import QSvgRenderer
+ from PySide6.QtWidgets import QAbstractButton, QLabel
+ 
+@@ -93,14 +93,24 @@ def pixmap(nombre: str, color: str = "texto", tamano: int = 18, escala: float =
+ 
+ 
+ @lru_cache(maxsize=None)
+-def icono(nombre: str, color: str = "texto") -> QIcon:
+-    """QIcon con varias resoluciones; Qt elige la adecuada según iconSize."""
++def _icono_cacheado(nombre: str, color: str) -> QIcon:
+     ico = QIcon()
+     for t in _TAMANOS_ICONO:
+         ico.addPixmap(pixmap(nombre, color, t, escala=1.0))
+     return ico
+ 
+ 
++def icono(nombre: str, color: str = "texto") -> QIcon:
++    """QIcon con varias resoluciones; Qt elige la adecuada según iconSize.
++
++    Si aún no existe una QGuiApplication (p. ej. pruebas de modelos sin UI)
++    devuelve un QIcon vacío en lugar de abortar el proceso.
++    """
++    if QGuiApplication.instance() is None:
++        return QIcon()
++    return _icono_cacheado(nombre, color)
++
++
+ def aplicar(boton: QAbstractButton, nombre: str, color: str = "texto", tamano: int = 16) -> None:
+     """Pone el ícono a un botón y recuerda su nombre (ver `recolorear`)."""
+     boton.setIcon(icono(nombre, color))
+diff --git a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py
+index ff3d59c..fb5f535 100644
+--- a/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py
++++ b/Documents/caapd-facturacion/escritorio/ui/paginas/usuarios_dialogos.py
+@@ -50,6 +50,10 @@ class DialogoUsuario(QDialog):
+             "_id") or "") if self.es_edicion else ""
+ 
+         self.medidores_lista: List[str] = []
++        # Campos que el usuario ya "toco": solo a esos se les muestra el error
++        # en rojo mientras escribe. Al pulsar Guardar se muestran todos.
++        self._tocados: set = set()
++        self._intento_guardar = False
+ 
+         self.setWindowTitle(
+             "Editar Usuario" if self.es_edicion else "Nuevo Usuario")
+@@ -82,6 +86,8 @@ class DialogoUsuario(QDialog):
+         self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072) o SD-xxx")
+         self.campo_id.setMaxLength(12)
+         layout_id.addWidget(self.campo_id)
++        self.msg_id = self._crear_mensaje_campo()
++        layout_id.addWidget(self.msg_id)
+ 
+         if not self.es_edicion:
+             self.chk_sin_dni = QCheckBox(
+@@ -105,6 +111,8 @@ class DialogoUsuario(QDialog):
+         self.campo_conexion.setPlaceholderText("6 dígitos (ej. 000796)")
+         self.campo_conexion.setMaxLength(6)
+         col_con.addWidget(self.campo_conexion)
++        self.msg_conexion = self._crear_mensaje_campo()
++        col_con.addWidget(self.msg_conexion)
+         fila_con.addLayout(col_con, stretch=1)
+ 
+         layout_principal.addLayout(fila_con)
+@@ -119,6 +127,8 @@ class DialogoUsuario(QDialog):
+         self.campo_nombre.setPlaceholderText(
+             "Ej. CONDORI MAMANI, CARLOS ALBERTO")
+         col_nombre.addWidget(self.campo_nombre)
++        self.msg_nombre = self._crear_mensaje_campo()
++        col_nombre.addWidget(self.msg_nombre)
+         layout_principal.addLayout(col_nombre)
+ 
+         # 3. Sector y Categoría
+@@ -196,6 +206,8 @@ class DialogoUsuario(QDialog):
+         self.campo_direccion = QLineEdit()
+         self.campo_direccion.setPlaceholderText("Ej. CALLE 05 DE AGOSTO S/N")
+         col_dir.addWidget(self.campo_direccion)
++        self.msg_direccion = self._crear_mensaje_campo()
++        col_dir.addWidget(self.msg_direccion)
+         layout_principal.addLayout(col_dir)
+ 
+         # 5. Medidores
+@@ -225,6 +237,8 @@ class DialogoUsuario(QDialog):
+         self.layout_chips.setContentsMargins(0, 4, 0, 4)
+         self.layout_chips.setSpacing(8)
+         col_med.addWidget(self.contenedor_chips)
++        self.msg_medidores = self._crear_mensaje_campo()
++        col_med.addWidget(self.msg_medidores)
+ 
+         layout_principal.addLayout(col_med)
+ 
+@@ -232,21 +246,57 @@ class DialogoUsuario(QDialog):
+ 
+         # Botones de pie
+         fila_botones = QHBoxLayout()
+-        fila_botones.addStretch(1)
++        fila_botones.setSpacing(10)
++
++        # Resumen de lo que falta para poder guardar (gris; rojo tras intentar guardar)
++        self.lbl_resumen = QLabel("")
++        self.lbl_resumen.setProperty("class", "campo_mensaje")
++        self.lbl_resumen.setWordWrap(True)
++        self.lbl_resumen.hide()
++        fila_botones.addWidget(self.lbl_resumen, stretch=1)
+ 
+         btn_cancelar = QPushButton("Cancelar")
+         btn_cancelar.setProperty("class", "boton boton_secundario")
+         btn_cancelar.clicked.connect(self.reject)
+         fila_botones.addWidget(btn_cancelar)
+ 
+-        btn_guardar = QPushButton("Guardar Usuario")
+-        iconos.aplicar(btn_guardar, "device-floppy", "blanco")
+-        btn_guardar.setProperty("class", "boton boton_primario")
+-        btn_guardar.clicked.connect(self._guardar)
+-        fila_botones.addWidget(btn_guardar)
++        self.btn_guardar = QPushButton("Guardar Usuario")
++        iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
++        self.btn_guardar.setProperty("class", "boton boton_primario")
++        self.btn_guardar.clicked.connect(self._guardar)
++        fila_botones.addWidget(self.btn_guardar)
+ 
+         layout_principal.addLayout(fila_botones)
+ 
++        # Validacion en vivo: cada cambio recalcula errores y el estado de Guardar
++        self.campo_id.textEdited.connect(
++            lambda _t: self._marcar_tocado("dni"))
++        self.campo_id.textChanged.connect(lambda _t: self._validar_formulario())
++        self.campo_conexion.textEdited.connect(
++            lambda _t: self._marcar_tocado("conexion"))
++        self.campo_conexion.textChanged.connect(
++            lambda _t: self._validar_formulario())
++        self.campo_nombre.textEdited.connect(
++            lambda _t: self._marcar_tocado("nombre"))
++        self.campo_nombre.textChanged.connect(
++            lambda _t: self._validar_formulario())
++        self.campo_direccion.textEdited.connect(
++            lambda _t: self._marcar_tocado("direccion"))
++        self.campo_direccion.textChanged.connect(
++            lambda _t: self._validar_formulario())
++        self.campo_nuevo_medidor.textChanged.connect(
++            lambda _t: self._validar_formulario())
++        self.campo_nuevo_medidor.editingFinished.connect(
++            lambda: self._marcar_tocado("medidores"))
++        # Al salir de un campo tambien cuenta como "tocado" (aunque no haya escrito)
++        for campo, clave in (
++            (self.campo_id, "dni"),
++            (self.campo_nombre, "nombre"),
++            (self.campo_direccion, "direccion"),
++        ):
++            campo.editingFinished.connect(
++                lambda c=clave: self._marcar_tocado(c))
++
+     def _cargar_datos_iniciales(self) -> None:
+         if self.es_edicion and self.usuario:
+             self.campo_id.setText(str(self.usuario.get(
+@@ -284,6 +334,9 @@ class DialogoUsuario(QDialog):
+             self.campo_conexion.setText(sug_con)
+             self._renderizar_chips_medidores()
+ 
++        # Estado inicial del boton Guardar (sin marcar nada en rojo todavia)
++        self._validar_formulario()
++
+     def _toggle_sin_dni(self, marcado: bool) -> None:
+         if marcado:
+             sug_sd = self.servicio.obtener_siguiente_id_sd()
+@@ -292,6 +345,7 @@ class DialogoUsuario(QDialog):
+         else:
+             self.campo_id.setText("")
+             self.campo_id.setReadOnly(False)
++        self._marcar_tocado("dni")
+ 
+     def _agregar_medidor(self) -> None:
+         txt = self.campo_nuevo_medidor.text().strip()
+@@ -303,11 +357,13 @@ class DialogoUsuario(QDialog):
+             self._renderizar_chips_medidores()
+         self.campo_nuevo_medidor.clear()
+         self.campo_nuevo_medidor.setFocus()
++        self._marcar_tocado("medidores")
+ 
+     def _quitar_medidor(self, medidor: str) -> None:
+         if medidor in self.medidores_lista:
+             self.medidores_lista.remove(medidor)
+             self._renderizar_chips_medidores()
++            self._marcar_tocado("medidores")
+ 
+     def _renderizar_chips_medidores(self) -> None:
+         # Limpiar chips anteriores
+@@ -348,7 +404,191 @@ class DialogoUsuario(QDialog):
+ 
+         self.layout_chips.addStretch(1)
+ 
++    # -------------------------------------------------------------------
++    # Validacion en vivo y feedback visual
++    # -------------------------------------------------------------------
++    CAMPOS_OBLIGATORIOS = ("dni", "nombre", "direccion", "medidores")
++    NOMBRES_CAMPO = {
++        "dni": "DNI",
++        "conexion": "N° de conexión",
++        "nombre": "apellidos y nombres",
++        "direccion": "dirección",
++        "medidores": "al menos un medidor",
++    }
++
++    def _crear_mensaje_campo(self) -> QLabel:
++        """Etiqueta pequeña bajo un campo para mostrar el error/aviso del campo."""
++        lbl = QLabel("")
++        lbl.setProperty("class", "campo_mensaje")
++        lbl.setProperty("nivel", "error")
++        lbl.setWordWrap(True)
++        lbl.hide()
++        return lbl
++
++    @staticmethod
++    def _repintar(widget: QWidget) -> None:
++        widget.style().unpolish(widget)
++        widget.style().polish(widget)
++
++    def _marcar_tocado(self, clave: str) -> None:
++        if clave not in self._tocados:
++            self._tocados.add(clave)
++        self._validar_formulario()
++
++    def _normalizar_id_ingresado(self, texto: str) -> Optional[str]:
++        """Devuelve el ID normalizado o None si el formato no es valido."""
++        if texto.isdigit() and len(texto) in (7, 8):
++            return codigos.normalizar_dni(texto)
++        if texto.startswith("SD-") and len(texto) > 3:
++            return texto
++        return None
++
++    def _calcular_errores(self) -> Dict[str, tuple]:
++        """
++        Devuelve {clave_campo: (mensaje, nivel)} con los problemas actuales.
++        nivel: 'error' bloquea el guardado; 'aviso' solo informa.
++        """
++        errores: Dict[str, tuple] = {}
++
++        # DNI / ID
++        texto_id = self.campo_id.text().strip()
++        sin_dni = bool(getattr(self, "chk_sin_dni", None)
++                       and self.chk_sin_dni.isChecked())
++        if not sin_dni:
++            if not texto_id:
++                errores["dni"] = (
++                    "Ingresa el DNI (8 dígitos) o marca «Persona sin DNI».", "error")
++            else:
++                id_norm = self._normalizar_id_ingresado(texto_id)
++                if id_norm is None:
++                    errores["dni"] = (
++                        "El DNI debe tener 7 u 8 dígitos (o formato SD-xxx).", "error")
++                elif id_norm != self.id_original:
++                    try:
++                        existe = self.servicio.obtener_usuario(id_norm) is not None
++                    except Exception:
++                        existe = False
++                    if existe:
++                        errores["dni"] = (
++                            f"Ya existe un usuario registrado con el DNI {id_norm}.", "error")
++
++        # Conexion (opcional, pero si se escribe debe ser numerica)
++        texto_con = self.campo_conexion.text().strip()
++        if texto_con and not texto_con.isdigit():
++            errores["conexion"] = (
++                "La conexión solo admite números (6 dígitos).", "error")
++
++        # Nombre
++        if len(self.campo_nombre.text().strip()) < 3:
++            errores["nombre"] = (
++                "Ingresa los apellidos y nombres completos.", "error")
++
++        # Direccion
++        if not self.campo_direccion.text().strip():
++            errores["direccion"] = (
++                "Ingresa la dirección o una referencia.", "error")
++
++        # Medidores
++        pendiente = self.campo_nuevo_medidor.text().strip()
++        if not self.medidores_lista:
++            if pendiente:
++                errores["medidores"] = (
++                    f"Pulsa «Añadir» (o Enter) para agregar el medidor {pendiente}.", "aviso_bloqueante")
++            else:
++                errores["medidores"] = (
++                    "Agrega al menos un medidor: escribe el número y pulsa «Añadir».", "error")
++        else:
++            try:
++                valido, err_msg = self.servicio.validar_medidores_unicos(
++                    self.medidores_lista, id_usuario_actual=self.id_original or None)
++            except TypeError:
++                valido, err_msg = self.servicio.validar_medidores_unicos(
++                    self.medidores_lista)
++            except Exception:
++                valido, err_msg = True, None
++            if not valido:
++                errores["medidores"] = (
++                    err_msg or "Uno de los medidores ya está asignado a otra persona.", "error")
++
++        return errores
++
++    def _mostrar_estado_campo(self, campo: Optional[QWidget], lbl: QLabel,
++                              mensaje: Optional[str], nivel: str = "error") -> None:
++        es_error = mensaje is not None and nivel == "error"
++        if campo is not None:
++            if (campo.property("invalido") or "false") != ("true" if es_error else "false"):
++                campo.setProperty("invalido", "true" if es_error else "false")
++                self._repintar(campo)
++        if mensaje:
++            lbl.setText(mensaje)
++            lbl.setProperty("nivel", "error" if nivel == "error" else "aviso")
++            self._repintar(lbl)
++            lbl.show()
++        else:
++            lbl.hide()
++
++    def _validar_formulario(self, mostrar_todo: bool = False) -> bool:
++        """Recalcula errores, pinta los campos y habilita/deshabilita Guardar."""
++        if not hasattr(self, "btn_guardar"):
++            return True  # la UI aun no termino de construirse
++        errores = self._calcular_errores()
++        mostrar_todo = mostrar_todo or self._intento_guardar
++
++        mapa = {
++            "dni": (self.campo_id, self.msg_id),
++            "conexion": (self.campo_conexion, self.msg_conexion),
++            "nombre": (self.campo_nombre, self.msg_nombre),
++            "direccion": (self.campo_direccion, self.msg_direccion),
++            "medidores": (self.campo_nuevo_medidor, self.msg_medidores),
++        }
++        for clave, (campo, lbl) in mapa.items():
++            msg, nivel = errores.get(clave, (None, "error"))
++            # El aviso "pulsa Añadir" se muestra siempre: es una ayuda, no un regaño
++            visible = msg is not None and (
++                mostrar_todo or clave in self._tocados or nivel == "aviso_bloqueante")
++            self._mostrar_estado_campo(
++                campo, lbl, msg if visible else None,
++                "error" if nivel == "error" else "aviso")
++
++        hay_bloqueo = bool(errores)
++        self.btn_guardar.setEnabled(not hay_bloqueo)
++
++        if hay_bloqueo:
++            faltan = [self.NOMBRES_CAMPO[c]
++                      for c in ("dni", "nombre", "direccion", "medidores", "conexion") if c in errores]
++            self.lbl_resumen.setText("Para guardar falta: " + ", ".join(faltan) + ".")
++            self.lbl_resumen.setProperty(
++                "nivel", "error" if mostrar_todo else "info")
++            self._repintar(self.lbl_resumen)
++            self.lbl_resumen.show()
++            self.btn_guardar.setToolTip(
++                "Completa los campos marcados para poder guardar.")
++        else:
++            self.lbl_resumen.hide()
++            self.btn_guardar.setToolTip("")
++        return not hay_bloqueo
++
++    def _enfocar_primer_error(self) -> None:
++        errores = self._calcular_errores()
++        orden = (
++            ("dni", self.campo_id),
++            ("conexion", self.campo_conexion),
++            ("nombre", self.campo_nombre),
++            ("direccion", self.campo_direccion),
++            ("medidores", self.campo_nuevo_medidor),
++        )
++        for clave, campo in orden:
++            if clave in errores:
++                campo.setFocus()
++                return
++
+     def _guardar(self) -> None:
++        # Validacion visual primero: marca en rojo todo lo que falte
++        self._intento_guardar = True
++        if not self._validar_formulario(mostrar_todo=True):
++            self._enfocar_primer_error()
++            return
++
+         nuevo_id = self.campo_id.text().strip()
+         nombre = self.campo_nombre.text().strip().upper()
+         conexion = self.campo_conexion.text().strip()
+@@ -497,7 +737,7 @@ class DialogoCorregirDni(QDialog):
+         layout.setContentsMargins(22, 18, 22, 18)
+         layout.setSpacing(14)
+ 
+-        lbl_titulo = QLabel("🆔 Corregir Documento de Identidad")
++        lbl_titulo = QLabel("Corregir Documento de Identidad")
+         lbl_titulo.setObjectName("dialogo_titulo")
+         layout.addWidget(lbl_titulo)
+ 

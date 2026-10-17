@@ -442,6 +442,29 @@ QLineEdit:focus, QTextEdit:focus {
     background-color: #f8fafc;
 }
 
+/* Campo con error de validacion (propiedad dinamica invalido="true") */
+QLineEdit[invalido="true"] {
+    border-color: #dc2626;
+    background-color: #fef2f2;
+}
+
+QLineEdit[invalido="true"]:focus {
+    border-color: #b91c1c;
+    background-color: #ffffff;
+}
+
+/* Mensajes de ayuda/error bajo los campos de un formulario */
+QLabel.campo_mensaje {
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    padding: 0 2px;
+}
+
+QLabel.campo_mensaje[nivel="error"] { color: #dc2626; }
+QLabel.campo_mensaje[nivel="aviso"] { color: #b45309; }
+QLabel.campo_mensaje[nivel="info"]  { color: #64748b; font-weight: 400; }
+
 /* ===================================================================
    Checkbox y casillas de verificación en tablas/listas
    (Regla: fondo BLANCO, borde celeste, check azul — nunca fondo morado)

@@ -71,7 +71,7 @@ def datos_usuarios_prueba():
     }
 
 
-def test_modelo_usuarios_filas_columnas_y_datos(datos_usuarios_prueba):
+def test_modelo_usuarios_filas_columnas_y_datos(qapp, datos_usuarios_prueba):
     lista = []
     for uid, u in datos_usuarios_prueba.items():
         doc = dict(u)
@@ -211,12 +211,16 @@ def test_dialogo_usuario_creacion_y_validaciones(qtbot, datos_usuarios_prueba):
     dialogo.chk_sin_dni.setChecked(True)
     assert dialogo.campo_id.text() == "SD-002"
 
-    # 3. Llenar campos
+    # 3. Llenar campos (Guardar permanece deshabilitado hasta completar lo obligatorio)
+    assert not dialogo.btn_guardar.isEnabled()
     dialogo.campo_nombre.setText("FLORES MAMANI, PEDRO")
+    dialogo.campo_direccion.setText("CALLE 05 DE AGOSTO S/N")
+    assert not dialogo.btn_guardar.isEnabled()  # aun falta el medidor
     dialogo.campo_nuevo_medidor.setText("998877")
     dialogo._agregar_medidor()
     assert "001000" not in dialogo.medidores_lista
     assert "998877" in dialogo.medidores_lista
+    assert dialogo.btn_guardar.isEnabled()
 
     # 4. Guardar
     dialogo._guardar()
@@ -424,6 +428,9 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
 
     dialogo.campo_id.setText("71234567")
     dialogo.campo_nombre.setText("GARCIA LOPEZ, ANA")
+    dialogo.campo_direccion.setText("JR. LIMA 123")
+    dialogo.campo_nuevo_medidor.setText("77665544")
+    dialogo._agregar_medidor()
 
     with patch("firebase_client.db", return_value=mock_db):
         dialogo._guardar()

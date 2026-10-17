@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QByteArray, QRectF, QSize, Qt
-from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtGui import QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QAbstractButton, QLabel
 
@@ -93,12 +93,22 @@ def pixmap(nombre: str, color: str = "texto", tamano: int = 18, escala: float = 
 
 
 @lru_cache(maxsize=None)
-def icono(nombre: str, color: str = "texto") -> QIcon:
-    """QIcon con varias resoluciones; Qt elige la adecuada según iconSize."""
+def _icono_cacheado(nombre: str, color: str) -> QIcon:
     ico = QIcon()
     for t in _TAMANOS_ICONO:
         ico.addPixmap(pixmap(nombre, color, t, escala=1.0))
     return ico
+
+
+def icono(nombre: str, color: str = "texto") -> QIcon:
+    """QIcon con varias resoluciones; Qt elige la adecuada según iconSize.
+
+    Si aún no existe una QGuiApplication (p. ej. pruebas de modelos sin UI)
+    devuelve un QIcon vacío en lugar de abortar el proceso.
+    """
+    if QGuiApplication.instance() is None:
+        return QIcon()
+    return _icono_cacheado(nombre, color)
 
 
 def aplicar(boton: QAbstractButton, nombre: str, color: str = "texto", tamano: int = 16) -> None:
