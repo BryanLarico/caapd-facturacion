@@ -59,7 +59,7 @@ ALTO_HOJA_CM = 22.0
 # 2) Bordes blancos deseados alrededor del recibo (en cm, sobre la hoja fisica).
 #    Laterales = zona que la impresora no imprime (1.9 cm). Arriba/abajo = 0.5 cm
 #    (mayor que los 0.2 / 0.1 cm que la impresora no toca, asi nunca se recorta).
-MARGEN_IZQUIERDO_CM = 0.0 
+MARGEN_IZQUIERDO_CM = 0.0
 MARGEN_DERECHO_CM = 0.0
 MARGEN_SUPERIOR_CM = 0.0
 MARGEN_INFERIOR_CM = 0.65
@@ -103,8 +103,10 @@ DIBUJAR_MARCO_GUIA = False
 # --- Valores derivados (no tocar) --------------------------------------------
 ANCHO_HOJA = ANCHO_HOJA_CM * cm
 ALTO_HOJA = ALTO_HOJA_CM * cm
-ANCHO_AREA = (ANCHO_HOJA_CM - MARGEN_IZQUIERDO_CM - MARGEN_DERECHO_CM) * cm   # 11.7 cm
-ALTO_AREA = (ALTO_HOJA_CM - MARGEN_SUPERIOR_CM - MARGEN_INFERIOR_CM) * cm    # 21.0 cm
+ANCHO_AREA = (ANCHO_HOJA_CM - MARGEN_IZQUIERDO_CM -
+              MARGEN_DERECHO_CM) * cm   # 11.7 cm
+ALTO_AREA = (ALTO_HOJA_CM - MARGEN_SUPERIOR_CM -
+             MARGEN_INFERIOR_CM) * cm    # 21.0 cm
 ANCHO_DISENO = ANCHO_DISENO_CM * cm
 ALTO_DISENO = ALTO_DISENO_CM * cm
 
@@ -203,7 +205,8 @@ class _Lienzo:
         """`cuadrado=True` mantiene la imagen sin deformar (util para el QR)."""
         w = (width or 0) * self.sx
         h = (height or 0) * (self.sx if cuadrado else self.sy)
-        self.pdf.drawImage(img, self._x(x), self._y(y), width=w, height=h, **kw)
+        self.pdf.drawImage(img, self._x(x), self._y(y),
+                           width=w, height=h, **kw)
 
     # -- todo lo demas pasa directo (setFillColor, setStrokeColor, ...) -----
     def __getattr__(self, nombre):
@@ -220,6 +223,22 @@ MESES_ABREV = [
     "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
     "JUL", "AGO", "SET", "OCT", "NOV", "DIC"
 ]
+
+
+def periodo_desde_deuda(periodo: str, meses_adeudados: int) -> str:
+    """
+    Devuelve el mes/año desde el que arrastra deuda, en formato 'OCT2026'.
+    `meses_adeudados` incluye el mes actual, por eso se retrocede
+    (meses_adeudados - 1) meses; como minimo retrocede 1 (el mes anterior).
+    Ej.: periodo '2026-10' y meses_adeudados 3 -> 'AGO2026'.
+    """
+    try:
+        anio, mes = [int(p) for p in str(periodo).split("-")[:2]]
+    except Exception:
+        return ""
+    atras = max(1, int(meses_adeudados or 1) - 1)
+    indice = (anio * 12 + (mes - 1)) - atras
+    return f"{MESES_ABREV[indice % 12]}{indice // 12}"
 
 
 CONFIG_MORA_DEFAULT = [
@@ -440,7 +459,8 @@ def generar_recibo_pdf(
     # ------------------------------------------------------------------
     # 0. PAGINA = HOJA FISICA (15.5 x 22 cm). Fondo blanco por defecto.
     # ------------------------------------------------------------------
-    pdf_real = canvas.Canvas(str(salida_path), pagesize=(ANCHO_HOJA, ALTO_HOJA))
+    pdf_real = canvas.Canvas(
+        str(salida_path), pagesize=(ANCHO_HOJA, ALTO_HOJA))
     pdf_real.setTitle(f"Recibo {datos.get('numero_recibo', '')}")
 
     # Correccion fina de la impresora: mueve TODO el recibo (fondo + texto).
@@ -460,7 +480,8 @@ def generar_recibo_pdf(
     if DIBUJAR_MARCO_GUIA:
         pdf_real.setStrokeColor(colors.HexColor("#ff00ff"))
         pdf_real.setLineWidth(0.3)
-        pdf_real.rect(geo["ox"], geo["oy"], geo["ancho_fondo"], geo["alto_fondo"], fill=0, stroke=1)
+        pdf_real.rect(geo["ox"], geo["oy"], geo["ancho_fondo"],
+                      geo["alto_fondo"], fill=0, stroke=1)
 
     # ------------------------------------------------------------------
     # 2. A partir de aqui se dibuja con coordenadas de DISENO (13.97 x 21.59)
@@ -538,19 +559,30 @@ def generar_recibo_pdf(
             "consumo": float(datos.get("consumo_total_m3") or 0.0),
         }]
 
-    pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(0.8 * cm, 13.3 * cm, "Medidor")
-    pdf.drawString(2.8 * cm, 13.3 * cm, "L. Anterior")
-    pdf.drawString(4.8 * cm, 13.3 * cm, "Fecha")
-    pdf.drawString(6.8 * cm, 13.3 * cm, "L. Actual")
-    pdf.drawString(8.8 * cm, 13.3 * cm, "Fecha")
-    pdf.drawString(10.8 * cm, 13.3 * cm, "Consumo")
+    # Hasta 4 medidores. La tabla se compacta sola segun la cantidad de filas
+    # para no invadir "DESCRIPCION DE CONCEPTOS" (que sigue fija en 11.9 cm).
+    medidores = medidores[:4]
+    n_med_filas = len(medidores)
+    if n_med_filas <= 2:
+        y_cabecera, paso_fila, fuente_fila = 13.3 * cm, 0.35 * cm, 8
+    elif n_med_filas == 3:
+        y_cabecera, paso_fila, fuente_fila = 13.6 * cm, 0.31 * cm, 7.5
+    else:
+        y_cabecera, paso_fila, fuente_fila = 13.6 * cm, 0.26 * cm, 7
 
-    y_medidor = 13.0 * cm
-    pdf.setFont("Helvetica", 8)
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(0.8 * cm, y_cabecera, "Medidor")
+    pdf.drawString(2.8 * cm, y_cabecera, "L. Anterior")
+    pdf.drawString(4.8 * cm, y_cabecera, "Fecha")
+    pdf.drawString(6.8 * cm, y_cabecera, "L. Actual")
+    pdf.drawString(8.8 * cm, y_cabecera, "Fecha")
+    pdf.drawString(10.8 * cm, y_cabecera, "Consumo")
+
+    y_medidor = y_cabecera - 0.3 * cm
+    pdf.setFont("Helvetica", fuente_fila)
     f_ant_global = "—"
     f_act_global = "—"
-    for m in medidores[:3]:
+    for m in medidores:
         n_med = str(m.get("medidor") or m.get("nro_medidor") or "—")
         l_ant = float(m.get("lectura_anterior") or 0.0)
         f_ant = str(m.get("fecha_anterior") or "—")
@@ -566,9 +598,11 @@ def generar_recibo_pdf(
         pdf.drawString(6.8 * cm, y_medidor, f"{l_act:.2f}")
         pdf.drawString(8.8 * cm, y_medidor, f_act)
         pdf.drawString(10.8 * cm, y_medidor, f"{c_m3:.2f}")
-        y_medidor -= 0.35 * cm
+        y_medidor -= paso_fila
 
-    pdf.drawString(0.5 * cm, 12.6 * cm,
+    # "Periodo / Ciclo" se ubica justo debajo de la ultima fila de medidor
+    pdf.setFont("Helvetica", 8)
+    pdf.drawString(0.5 * cm, y_medidor - 0.05 * cm,
                    f"Periodo / Ciclo del {f_ant_global} al {f_act_global}")
 
     # 9. Conceptos de Cobro
@@ -593,7 +627,16 @@ def generar_recibo_pdf(
     pdf.drawString(1.6 * cm, 10.7 * cm, "CARGO FIJO")
     pdf.drawRightString(X_DERECHA, 10.7 * cm, f"{c_fijo:.2f}")
 
-    leyenda_deuda = "(SIN DEUDA)" if deuda_ant == 0 else "(CON DEUDA)"
+    # Leyenda de la deuda: "(SIN DEUDA)" o "(desde MESAÑO)", ej. "(OCT2026)".
+    # Si el documento trae `deuda_desde` ya calculado se respeta; si no,
+    # se deduce del periodo y de meses_adeudados.
+    if deuda_ant == 0:
+        leyenda_deuda = "(SIN DEUDA)"
+    else:
+        desde = str(datos.get("deuda_desde") or "").strip()
+        if not desde:
+            desde = periodo_desde_deuda(periodo_str, meses_adeudados)
+        leyenda_deuda = f"({desde})" if desde else "(CON DEUDA)"
     pdf.drawString(1.6 * cm, 10.3 * cm, f"DEUDA ANTERIOR {leyenda_deuda}")
     pdf.drawString(8.6 * cm, 10.3 * cm, f"S/. {deuda_ant:.2f}")
 
@@ -781,6 +824,7 @@ def preparar_datos_recibo_desde_doc(
         "cargo_fijo": c_fijo,
         "deuda_anterior": deuda_ant,
         "meses_adeudados": meses_adeudados,
+        "deuda_desde": doc.get("deuda_desde") or "",
         "subtotal": subtotal,
         "igv": igv,
         "redondeo": redondeo,
