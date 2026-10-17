@@ -593,7 +593,8 @@ class PaginaCobros(QWidget):
             self.servicio.limpiar_cache()
             cfg = self.servicio.cargar_config()
             mes_act = cfg.get("mes_actual") or {}
-            periodo = mes_act.get("periodo") or self.periodo_actual or "2026-10"
+            periodo = mes_act.get(
+                "periodo") or self.periodo_actual or "2026-10"
             docs = self.servicio.cargar_mes(periodo)
             return cfg, periodo, docs
 
@@ -853,7 +854,7 @@ class PaginaCobros(QWidget):
         tot = float(doc.get("total_a_pagar") or 0.0)
         pag = float(doc.get("monto_pagado") or 0.0)
         deuda_ant = float(doc.get("deuda_anterior") or 0.0)
-        cargo_fijo = float(doc.get("cargo_fijo") or 1.5)
+        cargo_fijo = float(doc.get("cargo_fijo") or 0.0)
         monto_agua = float(doc.get("monto_agua") or 0.0)
         meses = int(doc.get("meses_adeudados") or 1)
         tiene_recibo = bool(doc.get("nro_recibo"))
