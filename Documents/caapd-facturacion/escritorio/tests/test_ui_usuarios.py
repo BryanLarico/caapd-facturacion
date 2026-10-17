@@ -15,18 +15,26 @@ from PySide6.QtCore import Qt
 import codigos
 from servicios.datos import ServicioDatosMemoria
 from ui.paginas.usuarios import PaginaUsuarios
-from ui.paginas.usuarios_dialogos import DialogoCorregirDni, DialogoUsuario
+from ui.paginas.usuarios_dialogos import (
+    DialogoCorregirDni,
+    DialogoUsuario,
+    DialogoConfirmacionDniDuplicado,
+    DialogoConfirmacionMedidorDuplicado,
+    obtener_siguiente_dni_sugerido,
+)
 from ui.paginas.usuarios_modelo import ModeloUsuarios, ProxyUsuarios
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QSizePolicy
 
 
 @pytest.fixture(autouse=True)
 def mock_message_boxes(monkeypatch):
-    """Evita diálogos bloqueantes de QMessageBox en pruebas."""
+    """Evita diálogos bloqueantes de QMessageBox y confirmaciones en pruebas."""
     monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
     monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
     monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
     monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(DialogoConfirmacionMedidorDuplicado, "exec", lambda self: setattr(self, "confirmado", True) or 1)
+
 
 
 @pytest.fixture
@@ -531,5 +539,125 @@ def test_pagina_usuarios_btn_actualizar_excel(qtbot, datos_usuarios_prueba):
     # Al cambiar de filtro, se desactiva
     pagina._seleccionar_filtro("activos")
     assert pagina.btn_actualizar_excel.property("activo") == "false"
+
+
+def test_obtener_siguiente_dni_sugerido(datos_usuarios_prueba):
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+
+    # 30771072 existe en datos_usuarios_prueba -> siguiente sugerido es 30771072-1
+    sug1 = obtener_siguiente_dni_sugerido(servicio, "30771072")
+    assert sug1 == "30771072-1"
+
+    # 30770349-1 ya existe en datos_usuarios_prueba -> siguiente sugerido es 30770349-2
+    sug2 = obtener_siguiente_dni_sugerido(servicio, "30770349-1")
+    assert sug2 == "30770349-2"
+
+
+def test_dialogo_usuario_validacion_en_vivo_dni_y_medidor(qtbot, datos_usuarios_prueba):
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+    dialogo.show()
+
+    # 1. DNI repetido en vivo
+    dialogo.campo_id.setText("30771072")
+    assert not dialogo.lbl_error_dni.isHidden()
+    assert "DNI registrado" in dialogo.lbl_error_dni.text()
+
+    # DNI no repetido
+    dialogo.campo_id.setText("99887766")
+    assert dialogo.lbl_error_dni.isHidden()
+
+    # 2. Medidor repetido en vivo (003386 ya pertenece a Maribel Alvarez)
+    dialogo.campo_nuevo_medidor.setText("3386")
+    assert not dialogo.lbl_error_medidor.isHidden()
+    assert "Medidor registrado" in dialogo.lbl_error_medidor.text()
+
+    # Medidor único
+    dialogo.campo_nuevo_medidor.setText("778899")
+    assert dialogo.lbl_error_medidor.isHidden()
+
+    # Añadir medidor y verificar advertencia si se intenta agregar el mismo de nuevo
+    dialogo._agregar_medidor()
+    assert "778899" in dialogo.medidores_lista
+    dialogo.campo_nuevo_medidor.setText("778899")
+    assert not dialogo.lbl_error_medidor.isHidden()
+    assert "Medidor ya agregado" in dialogo.lbl_error_medidor.text()
+
+
+def test_dialogo_confirmacion_dni_duplicado_botones_y_acciones(qtbot, datos_usuarios_prueba):
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    usr_existente = servicio.obtener_usuario("30771072")
+
+    dlg = DialogoConfirmacionDniDuplicado(
+        dni="30771072",
+        dni_sugerido="30771072-1",
+        usuario_existente=usr_existente,
+    )
+    qtbot.addWidget(dlg)
+
+    # Verificar que los 3 botones existan y tengan política de expansión igual
+    assert dlg.btn_aceptar.text() == "Aceptar"
+    assert dlg.btn_cancelar.text() == "Cancelar"
+    assert dlg.btn_sugerido.text() == "Guardar 30771072-1"
+
+    assert dlg.btn_aceptar.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dlg.btn_cancelar.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dlg.btn_sugerido.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+
+    # Clic en Sugerido
+    dlg.btn_sugerido.click()
+    assert dlg.accion_elegida == DialogoConfirmacionDniDuplicado.ACCION_SUGERIDO
+
+
+def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monkeypatch):
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+
+    # Mockear el diálogo para simular que el usuario hace clic en "Guardar 30771072-1"
+    monkeypatch.setattr(
+        DialogoConfirmacionDniDuplicado,
+        "exec",
+        lambda self: setattr(self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_SUGERIDO) or 1,
+    )
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+
+    dialogo.campo_id.setText("30771072")
+    dialogo.campo_nombre.setText("QUISPE SEGUNDA CONEXION")
+    dialogo._guardar()
+
+    # Debe haberse guardado con el DNI sugerido con sufijo -1
+    assert "30771072-1" in servicio.usuarios
+    assert servicio.usuarios["30771072-1"]["nombre"] == "QUISPE SEGUNDA CONEXION"
+    # El titular original 30771072 debe permanecer intacto
+    assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
+
+
+def test_dialogo_usuario_guardar_cancelar_mantiene_edicion(qtbot, datos_usuarios_prueba, monkeypatch):
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+
+    # Mockear el diálogo para simular que el usuario hace clic en "Cancelar" (volver a editar)
+    monkeypatch.setattr(
+        DialogoConfirmacionDniDuplicado,
+        "exec",
+        lambda self: setattr(self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_CANCELAR) or 0,
+    )
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+
+    dialogo.campo_id.setText("30771072")
+    dialogo.campo_nombre.setText("INTENTO FALLIDO")
+    dialogo._guardar()
+
+    # No debe haberse guardado nada nuevo
+    assert "30771072-1" not in servicio.usuarios
+    assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
+
 
 
