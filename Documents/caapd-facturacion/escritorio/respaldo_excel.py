@@ -192,13 +192,24 @@ def generar_respaldo_excel(
 
             # Pago = SI o NO
             m_pagado = float(d.get("monto_pagado") or 0.0)
-            if "pago" in d and str(d["pago"]).strip().upper() in ("SI", "NO"):
-                pago_str = str(d["pago"]).strip().upper()
+            pago_field = str(d.get("pago") or "").strip().upper()
+            if m_pagado > 0 and (tot_pagar <= 0 or m_pagado >= tot_pagar):
+                pago_str = "SI"
+            elif m_pagado <= 0:
+                if pago_field == "SI" and tot_pagar <= 0:
+                    pago_str = "SI"
+                else:
+                    pago_str = "NO"
+            elif pago_field in ("SI", "NO"):
+                pago_str = pago_field
             else:
                 pago_str = "SI" if (
                     m_pagado >= tot_pagar and tot_pagar > 0) else "NO"
 
-            meses = int(d.get("meses_adeudados") or 1)
+            if pago_str == "SI":
+                meses = 0
+            else:
+                meses = int(d.get("meses_adeudados") or 1)
             rec_nro = d.get("nro_recibo")
             hist_str = ",".join(str(h) for h in d.get("historial_m3", []))
 
@@ -261,8 +272,8 @@ def generar_respaldo_excel(
                     c_pag.alignment = Alignment(horizontal="center")
                     c_pag.border = borde_fino
 
-                    ws_sec.cell(row=fila_act, column=16, value=str(
-                        d.get("fecha_pago") or "")).border = borde_fino
+                    fecha_pag_val = str(d.get("fecha_pago") or "") if pago_str == "SI" else ""
+                    ws_sec.cell(row=fila_act, column=16, value=fecha_pag_val).border = borde_fino
                 else:
                     for col_c in range(11, 17):
                         ws_sec.cell(row=fila_act, column=col_c,
@@ -408,6 +419,10 @@ def generar_respaldo_excel(
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(destino))
+    try:
+        wb.close()
+    except Exception:
+        pass
     return destino
 
 

@@ -1203,6 +1203,7 @@ class ServicioDatosMemoria(ServicioDatos):
             raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         doc["monto_pagado"] = round(float(monto_pagado), 2)
         doc["fecha_pago"] = fecha_pago or datetime.date.today().isoformat()
+        doc["pago"] = "SI"
         self.ops["escrituras"] += 1
         return doc
 
@@ -1212,6 +1213,7 @@ class ServicioDatosMemoria(ServicioDatos):
             raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         doc["monto_pagado"] = 0.0
         doc["fecha_pago"] = None
+        doc["pago"] = "NO"
         self.ops["escrituras"] += 1
         return doc
 

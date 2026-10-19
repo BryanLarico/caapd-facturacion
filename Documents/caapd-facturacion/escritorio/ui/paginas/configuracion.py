@@ -756,11 +756,11 @@ class PaginaConfiguracion(QWidget):
         self.txt_cat_nombre.setText(
             str(cat_data.get("nombre") or f"Categoría {cat_key}"))
         cargo_fijo_val = cat_data.get("cargo_fijo")
-        self.spin_cat_cargo_fijo.setValue(
-            float(5.00 if cargo_fijo_val is None else cargo_fijo_val))
+        cf_num = float(5.00 if cargo_fijo_val is None else cargo_fijo_val)
+        self.spin_cat_cargo_fijo.setValue(cf_num)
         cargo_fijo_sc_val = cat_data.get("cargo_fijo_sin_consumo")
-        self.spin_cat_cargo_fijo_sin_consumo.setValue(
-            float(cargo_fijo_val if cargo_fijo_sc_val is None else cargo_fijo_sc_val))
+        cf_sc_num = float(cf_num if cargo_fijo_sc_val is None else cargo_fijo_sc_val)
+        self.spin_cat_cargo_fijo_sin_consumo.setValue(cf_sc_num)
         self.spin_cat_tarifa_desague.setValue(
             float(cat_data.get("tarifa_desague") or 0.0))
 

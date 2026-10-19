@@ -188,7 +188,8 @@ class PaginaInicio(QWidget):
         from ui.componentes.dialogo_actualizar import DialogoActualizarBaseDatos
         dlg = DialogoActualizarBaseDatos(self, servicio=self.servicio)
         acceptado = dlg.exec() == QDialog.DialogCode.Accepted
-        dlg.deleteLater()
+        if hasattr(dlg, "deleteLater"):
+            dlg.deleteLater()
         if not acceptado:
             return
 

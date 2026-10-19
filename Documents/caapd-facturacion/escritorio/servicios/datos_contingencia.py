@@ -282,6 +282,7 @@ class ServicioDatosContingencia(ServicioDatos):
         monto = round(float(monto_pagado), 2)
         doc["monto_pagado"] = monto
         doc["fecha_pago"] = fecha
+        doc["pago"] = "SI"
 
         # Encolar para sincronización
         encolar_cambio("pago", {
@@ -299,6 +300,7 @@ class ServicioDatosContingencia(ServicioDatos):
             raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         doc["monto_pagado"] = 0.0
         doc["fecha_pago"] = None
+        doc["pago"] = "NO"
 
         # Encolar para sincronización
         encolar_cambio("anular_pago", {

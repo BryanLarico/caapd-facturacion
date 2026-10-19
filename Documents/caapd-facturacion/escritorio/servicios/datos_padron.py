@@ -237,6 +237,7 @@ class ServicioDatosPadron(ServicioDatos):
         self.es_local_first: bool = True
         self.ops = {"lecturas": 0, "escrituras": 0}
         self.base_dir: Optional[Path] = Path(base_dir) if base_dir else None
+        self.ruta_excel: Optional[Path] = None
         self._archivos_mtime: Dict[str, float] = {}
 
         self.config: Dict[str, Any] = {}
@@ -253,6 +254,8 @@ class ServicioDatosPadron(ServicioDatos):
             res = self.cargar_desde_carpeta_base_datos(dir_bd=self.base_dir)
             cargado_completo = bool(
                 res.get("exito")) and len(self.usuarios) > 0
+            if cargado_completo:
+                self.ruta_excel = archivos_bd[0]
 
         # 2. Si no había bases allí, intentar cargar desde RESPALDO_*.xlsx
         if not cargado_completo:
@@ -572,18 +575,29 @@ class ServicioDatosPadron(ServicioDatos):
         p_obj = periodo or self.periodo or self.config.get(
             "mes_actual", {}).get("periodo") or "2026-10"
 
-        destino = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
-        resultado = respaldo_excel.generar_respaldo_excel(
-            config=self.config,
-            usuarios=self.usuarios,
-            mes_docs=self.mes,
-            periodo=p_obj,
-            ruta_archivo=destino,
-        )
-        self.ruta_excel = destino
-        if destino.exists():
-            self._archivos_mtime[str(destino)] = destino.stat().st_mtime
-        return resultado
+        base_dir = getattr(self, "base_dir", None)
+        if base_dir and base_dir.exists():
+            destino = base_dir / f"PADRON_MES_{p_obj}.xlsx"
+        else:
+            destino = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
+
+        try:
+            resultado = respaldo_excel.generar_respaldo_excel(
+                config=self.config,
+                usuarios=self.usuarios,
+                mes_docs=self.mes,
+                periodo=p_obj,
+                ruta_archivo=destino,
+            )
+            self.ruta_excel = destino
+            if destino.exists():
+                self._archivos_mtime[str(destino)] = destino.stat().st_mtime
+            return resultado
+        except PermissionError as pe:
+            raise PermissionError(
+                f"No se pudo guardar en el Excel '{destino.name}' porque está abierto en otro programa (como Microsoft Excel).\n\n"
+                f"Por favor, CIERRA el archivo en Excel y vuelve a intentar."
+            ) from pe
 
     def _categoria_de(self, doc: Dict[str, Any]) -> Dict[str, Any]:
         """Devuelve la categoría tarifaria del usuario (o una por defecto)."""
@@ -669,21 +683,25 @@ class ServicioDatosPadron(ServicioDatos):
         claves_tocadas = (
             "deuda_anterior", "deuda_actual", "total_a_pagar", "cargo_fijo",
             "monto_agua", "monto_desague", "igv", "consumo_total_m3",
-            "deuda_anterior_manual",
+            "deuda_anterior_manual", "pago", "meses_adeudados",
         )
         valores_anteriores = {k: doc.get(k) for k in claves_tocadas}
+
+        cargos = self._cargos_del_mes(doc)
 
         if campo == "deuda_anterior":
             deuda_anterior = importe
             # marca para que facturar no la pise
             doc["deuda_anterior_manual"] = True
-            cargos = self._cargos_del_mes(doc)
-            deuda_actual = cargos["subtotal_mes"]
+            if doc.get("deuda_actual") is not None:
+                deuda_actual = float(doc.get("deuda_actual") or 0.0)
+            else:
+                deuda_actual = cargos["subtotal_mes"]
         else:  # campo == "deuda_actual": el operador fija a mano lo del mes
             deuda_anterior = float(doc.get("deuda_anterior") or 0.0)
             deuda_actual = importe
-            cargos = self._cargos_del_mes(doc)
 
+        total_nuevo = round(deuda_anterior + deuda_actual, 2)
         doc["deuda_anterior"] = deuda_anterior
         doc["deuda_actual"] = round(deuda_actual, 2)
         doc["cargo_fijo"] = cargos["cargo_fijo"]
@@ -691,7 +709,19 @@ class ServicioDatosPadron(ServicioDatos):
         doc["monto_desague"] = cargos["monto_desague"]
         doc["igv"] = cargos["igv"]
         doc["consumo_total_m3"] = cargos["consumo_total_m3"]
-        doc["total_a_pagar"] = round(deuda_anterior + deuda_actual, 2)
+        doc["total_a_pagar"] = total_nuevo
+
+        # Actualizar estado de pago en función del nuevo total
+        m_pagado = float(doc.get("monto_pagado") or 0.0)
+        if m_pagado > 0 and (total_nuevo <= 0 or m_pagado >= total_nuevo):
+            doc["pago"] = "SI"
+            doc["meses_adeudados"] = 0
+        elif m_pagado < total_nuevo:
+            doc["pago"] = "NO"
+            if deuda_anterior > 0:
+                doc["meses_adeudados"] = max(2, int(doc.get("meses_adeudados") or 1))
+            else:
+                doc["meses_adeudados"] = 1
 
         try:
             self.guardar_en_respaldo_local(periodo)
@@ -2240,9 +2270,13 @@ class ServicioDatosPadron(ServicioDatos):
         monto = round(float(monto_pagado), 2)
         doc["monto_pagado"] = monto
         doc["fecha_pago"] = fecha
+        doc["pago"] = "SI"
+        tot = float(doc.get("total_a_pagar") or 0.0)
+        if monto >= tot and tot > 0:
+            doc["meses_adeudados"] = 0
 
         self.ops["escrituras"] += 1
-        self.guardar_en_respaldo_local()
+        self.guardar_en_respaldo_local(periodo)
 
         encolar_cambio("pago", {
             "periodo": periodo,
@@ -2259,9 +2293,15 @@ class ServicioDatosPadron(ServicioDatos):
                 f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         doc["monto_pagado"] = 0.0
         doc["fecha_pago"] = None
+        doc["pago"] = "NO"
+        deuda_ant = float(doc.get("deuda_anterior") or 0.0)
+        if deuda_ant > 0:
+            doc["meses_adeudados"] = max(2, int(doc.get("meses_adeudados") or 1))
+        else:
+            doc["meses_adeudados"] = 1
 
         self.ops["escrituras"] += 1
-        self.guardar_en_respaldo_local()
+        self.guardar_en_respaldo_local(periodo)
 
         encolar_cambio("anular_pago", {
             "periodo": periodo,
@@ -2434,10 +2474,7 @@ class ServicioDatosPadron(ServicioDatos):
             self.config["ultimo_recibo"] = ultimo_recibo_num
 
         cat_obj = self._categoria_de(doc)
-        deuda_manual = (
-            float(doc.get("deuda_anterior") or 0.0)
-            if doc.get("deuda_anterior_manual") else None
-        )
+        deuda_manual = float(doc.get("deuda_anterior") or 0.0)
 
         calc = calculos.calcular_recibo(
             medidores=doc.get("medidores", []),
@@ -2448,21 +2485,33 @@ class ServicioDatosPadron(ServicioDatos):
             deuda_anterior_manual=deuda_manual,
         )
 
+        subtotal_mes = round(
+            calc["monto_agua"] + calc["monto_desague"] + calc["cargo_fijo"] + calc["igv"], 2
+        )
+        deuda_actual = float(doc.get("deuda_actual") if doc.get("deuda_actual") is not None else subtotal_mes)
+        total_a_pagar = round(deuda_manual + deuda_actual, 2)
+
+        meses_ad = int(doc.get("meses_adeudados") or calc.get("meses_adeudados") or 1)
+        if deuda_manual > 0 and meses_ad < 2:
+            meses_ad = 2
+
         doc.update({
             "consumo_total_m3": calc["consumo_total_m3"],
             "monto_agua": calc["monto_agua"],
             "monto_desague": calc["monto_desague"],
             "cargo_fijo": calc["cargo_fijo"],
-            "deuda_anterior": calc["deuda_anterior"],
+            "deuda_anterior": deuda_manual,
+            "deuda_actual": deuda_actual,
             "igv": calc["igv"],
             "redondeo": calc["redondeo"],
-            "total_a_pagar": calc["total_a_pagar"],
-            "meses_adeudados": calc["meses_adeudados"],
+            "total_a_pagar": total_a_pagar,
+            "meses_adeudados": meses_ad,
         })
         if "monto_pagado" not in doc or doc.get("monto_pagado") is None:
             doc["monto_pagado"] = 0.0
+            doc["pago"] = "NO"
             doc["fecha_pago"] = None
 
         self.mes[id_usuario] = doc
-        self.guardar_en_respaldo_local()
+        self.guardar_en_respaldo_local(periodo)
         return doc

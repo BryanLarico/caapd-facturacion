@@ -709,7 +709,9 @@ class PaginaCobros(QWidget):
                 self.item_seleccionado
                 and str(self.item_seleccionado.get("id_usuario") or self.item_seleccionado.get("_id") or "") == id_usuario
             ):
+                self.item_seleccionado.update(doc_actualizado)
                 self._actualizar_ficha(self.item_seleccionado)
+            self.proxy.refrescar_filtros()
             self._actualizar_kpis_y_chips()
             self.toast.mostrar(
                 "Deuda actualizada y guardada en el padrón.", "exito")
@@ -1005,8 +1007,12 @@ class PaginaCobros(QWidget):
             return
 
         try:
-            self.servicio.registrar_pago(self.periodo_actual, uid, total)
-            self.item_seleccionado["monto_pagado"] = total
+            doc_actualizado = self.servicio.registrar_pago(self.periodo_actual, uid, total)
+            self.item_seleccionado.update(doc_actualizado)
+            for d in self.lista_items_completa:
+                if str(d.get("id_usuario") or d.get("_id") or "") == uid:
+                    d.update(doc_actualizado)
+                    break
             self._actualizar_ficha(self.item_seleccionado)
             self.modelo.notificar_cambio_usuario(uid)
             self.proxy.refrescar_filtros()
@@ -1035,8 +1041,12 @@ class PaginaCobros(QWidget):
             return
 
         try:
-            self.servicio.anular_pago(self.periodo_actual, uid)
-            self.item_seleccionado["monto_pagado"] = 0.0
+            doc_actualizado = self.servicio.anular_pago(self.periodo_actual, uid)
+            self.item_seleccionado.update(doc_actualizado)
+            for d in self.lista_items_completa:
+                if str(d.get("id_usuario") or d.get("_id") or "") == uid:
+                    d.update(doc_actualizado)
+                    break
             self._actualizar_ficha(self.item_seleccionado)
             self.modelo.notificar_cambio_usuario(uid)
             self.proxy.refrescar_filtros()

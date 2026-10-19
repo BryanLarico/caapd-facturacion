@@ -470,3 +470,108 @@ def test_marcar_multiples_pagos_consecutivos_sin_cierre(qtbot, servicio_memoria_
     assert pagina.item_seleccionado is not None
 
 
+def test_marcar_pagado_anular_y_editar_actualizan_excel_inmediatamente(tmp_path, qtbot, monkeypatch):
+    import openpyxl
+    import respaldo_excel
+    from servicios.datos_padron import ServicioDatosPadron
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+
+    # Crear padrón inicial de prueba en directorio temporal
+    dir_bd = tmp_path / "Base de datos"
+    dir_bd.mkdir(parents=True, exist_ok=True)
+    ruta_excel = dir_bd / "PADRON_MES_2026-10.xlsx"
+
+    config = {
+        "ultimo_recibo": 100,
+        "sectores": ["ISPACAS"],
+        "categorias": {
+            "A": {
+                "nombre": "Doméstico",
+                "cargo_fijo": 5.0,
+                "cargo_fijo_sin_consumo": 5.0,
+                "tarifa_desague": 0.0,
+                "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}],
+            }
+        },
+        "mes_actual": {
+            "periodo": "2026-10",
+            "estado": "FACTURADO",
+        },
+    }
+    usuarios = {
+        "12345678": {
+            "id_usuario": "12345678",
+            "nro_conexion": "000101",
+            "nombre": "PEREZ JUAN",
+            "sector": "ISPACAS",
+            "direccion": "CALLE 1",
+            "codigo_categoria": "A",
+            "activo": True,
+            "medidores": [{"nro_medidor": "M01"}],
+        }
+    }
+    mes = {
+        "12345678": {
+            "id_usuario": "12345678",
+            "nro_conexion": "000101",
+            "nombre": "PEREZ JUAN",
+            "sector": "ISPACAS",
+            "direccion": "CALLE 1",
+            "codigo_categoria": "A",
+            "nro_recibo": "000000101",
+            "consumo_total_m3": 0,
+            "total_a_pagar": 25.0,
+            "deuda_anterior": 20.0,
+            "deuda_actual": 5.0,
+            "meses_adeudados": 2,
+            "monto_pagado": 0.0,
+            "pago": "NO",
+            "fecha_pago": None,
+            "medidores": [{"nro_medidor": "M01", "lectura_anterior": 10, "lectura_actual": 10, "novedad": "NORMAL"}],
+        }
+    }
+    respaldo_excel.generar_respaldo_excel(
+        config=config,
+        usuarios=usuarios,
+        mes_docs=mes,
+        periodo="2026-10",
+        ruta_archivo=ruta_excel,
+    )
+
+    servicio = ServicioDatosPadron(base_dir=dir_bd)
+    pagina = PaginaCobros(servicio)
+    qtbot.addWidget(pagina)
+    pagina.cargar_datos_asincrono()
+    qtbot.waitUntil(lambda: pagina.modelo.rowCount() == 1, timeout=3000)
+
+    # 1. Probar que Marcar como Pagado actualiza inmediatamente el Excel a 'SI'
+    pagina.tabla.selectRow(0)
+    pagina._accion_marcar_pagado()
+
+    wb = openpyxl.load_workbook(ruta_excel, data_only=True)
+    ws = wb["ISPACAS"]
+    assert ws.cell(4, 15).value == "SI"
+    assert ws.cell(4, 16).value is not None and str(ws.cell(4, 16).value).strip() != ""
+    assert ws.cell(4, 14).value == 0
+    wb.close()
+
+    # 2. Probar que Anular Pago actualiza inmediatamente el Excel a 'NO'
+    pagina._accion_anular_cobro()
+
+    wb = openpyxl.load_workbook(ruta_excel, data_only=True)
+    ws = wb["ISPACAS"]
+    assert ws.cell(4, 15).value == "NO"
+    assert ws.cell(4, 16).value == "" or ws.cell(4, 16).value is None
+    assert ws.cell(4, 14).value >= 1
+    wb.close()
+
+    # 3. Probar que editar deuda actualiza inmediatamente el Excel
+    pagina._al_cambiar_deuda("12345678", "deuda_anterior", 50.0)
+
+    wb = openpyxl.load_workbook(ruta_excel, data_only=True)
+    ws = wb["ISPACAS"]
+    assert float(ws.cell(4, 12).value) == 50.0
+    wb.close()
+
+
