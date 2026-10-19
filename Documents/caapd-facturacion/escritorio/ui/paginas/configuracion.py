@@ -356,7 +356,21 @@ class PaginaConfiguracion(QWidget):
         self.spin_cat_cargo_fijo.setValue(5.00)
         self.spin_cat_cargo_fijo.setSingleStep(0.50)
         self.spin_cat_cargo_fijo.setPrefix("S/. ")
+        self.spin_cat_cargo_fijo.setToolTip(
+            "Cargo fijo mensual regular cuando el usuario registra consumo de agua"
+        )
         f_cat.addRow("Cargo Fijo Mensual:", self.spin_cat_cargo_fijo)
+
+        self.spin_cat_cargo_fijo_sin_consumo = QDoubleSpinBox()
+        self.spin_cat_cargo_fijo_sin_consumo.setRange(0.0, 999.0)
+        self.spin_cat_cargo_fijo_sin_consumo.setValue(5.00)
+        self.spin_cat_cargo_fijo_sin_consumo.setSingleStep(0.50)
+        self.spin_cat_cargo_fijo_sin_consumo.setPrefix("S/. ")
+        self.spin_cat_cargo_fijo_sin_consumo.setToolTip(
+            "Monto fijo a cobrar cuando el usuario no registre consumo de agua (0 m³)"
+        )
+        f_cat.addRow("Cargo Fijo sin Consumo:",
+                     self.spin_cat_cargo_fijo_sin_consumo)
 
         self.spin_cat_tarifa_desague = QDoubleSpinBox()
         self.spin_cat_tarifa_desague.setRange(0.0, 999.0)
@@ -744,6 +758,9 @@ class PaginaConfiguracion(QWidget):
         cargo_fijo_val = cat_data.get("cargo_fijo")
         self.spin_cat_cargo_fijo.setValue(
             float(5.00 if cargo_fijo_val is None else cargo_fijo_val))
+        cargo_fijo_sc_val = cat_data.get("cargo_fijo_sin_consumo")
+        self.spin_cat_cargo_fijo_sin_consumo.setValue(
+            float(cargo_fijo_val if cargo_fijo_sc_val is None else cargo_fijo_sc_val))
         self.spin_cat_tarifa_desague.setValue(
             float(cat_data.get("tarifa_desague") or 0.0))
 
@@ -851,6 +868,7 @@ class PaginaConfiguracion(QWidget):
         self.config_actual["categorias"][cat_key] = {
             "nombre": self.txt_cat_nombre.text().strip() or f"Categoría {cat_key}",
             "cargo_fijo": round(self.spin_cat_cargo_fijo.value(), 2),
+            "cargo_fijo_sin_consumo": round(self.spin_cat_cargo_fijo_sin_consumo.value(), 2),
             "tarifa_desague": round(self.spin_cat_tarifa_desague.value(), 2),
             # siempre rango único (calculos.py sigue leyendo esta clave)
             "modo_rangos": "unico",
@@ -990,6 +1008,7 @@ class PaginaConfiguracion(QWidget):
             self.spin_ultimo_recibo,
             self.spin_igv_porcentaje,
             self.spin_cat_cargo_fijo,
+            self.spin_cat_cargo_fijo_sin_consumo,
             self.spin_cat_tarifa_desague,
         ):
             w.valueChanged.connect(self._verificar_cambios)

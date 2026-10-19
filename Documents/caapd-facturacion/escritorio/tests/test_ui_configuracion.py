@@ -179,10 +179,14 @@ def test_ui_cambio_de_categoria_conserva_edicion(qtbot, servicio_config_memoria)
     qtbot.waitUntil(lambda: pagina.config_cargada is True, timeout=2000)
 
     pagina.spin_cat_cargo_fijo.setValue(9.75)              # editar categoría A
+    pagina.spin_cat_cargo_fijo_sin_consumo.setValue(7.25)
     pagina.combo_categoria.setCurrentIndex(1)              # pasar a B
     assert pagina.config_actual["categorias"]["A"]["cargo_fijo"] == 9.75
+    assert pagina.config_actual["categorias"]["A"]["cargo_fijo_sin_consumo"] == 7.25
     # sigue habiendo cambios pendientes
     assert pagina.btn_guardar.isEnabled() is True
 
     pagina.combo_categoria.setCurrentIndex(0)              # volver a A
     assert pagina.spin_cat_cargo_fijo.value() == 9.75
+    assert pagina.spin_cat_cargo_fijo_sin_consumo.value() == 7.25
+

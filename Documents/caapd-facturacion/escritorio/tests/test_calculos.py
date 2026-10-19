@@ -490,3 +490,69 @@ class TestTarifasRangoUnicoDefecto:
         assert res["monto_agua"] == 15.75
         assert res["redondeo"] == 0.05
         assert res["total_a_pagar"] == 20.70
+
+
+class TestCargoFijoSinConsumo:
+    """Pruebas para cargo fijo diferenciado con y sin consumo de agua."""
+
+    def test_consumo_cero_aplica_cargo_fijo_sin_consumo(self):
+        cat = {
+            "nombre": "Doméstico",
+            "cargo_fijo": 5.00,
+            "cargo_fijo_sin_consumo": 3.00,
+            "tarifa_desague": 0.00,
+            "modo_rangos": "unico",
+            "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.00}],
+        }
+        res = calcular_recibo(
+            medidores=[{"nro_medidor": "0001", "lectura_anterior": 10, "lectura_actual": 10}],
+            categoria=cat,
+            igv_activo=False,
+            igv_porcentaje=0.18,
+            recibo_anterior=None,
+        )
+        assert res["consumo_total_m3"] == 0
+        assert res["monto_agua"] == 0.0
+        assert res["cargo_fijo"] == 3.00
+        assert res["total_a_pagar"] == 3.00
+
+    def test_consumo_positivo_aplica_cargo_fijo_regular(self):
+        cat = {
+            "nombre": "Doméstico",
+            "cargo_fijo": 5.00,
+            "cargo_fijo_sin_consumo": 3.00,
+            "tarifa_desague": 0.00,
+            "modo_rangos": "unico",
+            "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.00}],
+        }
+        res = calcular_recibo(
+            medidores=[{"nro_medidor": "0001", "lectura_anterior": 10, "lectura_actual": 15}],
+            categoria=cat,
+            igv_activo=False,
+            igv_porcentaje=0.18,
+            recibo_anterior=None,
+        )
+        assert res["consumo_total_m3"] == 5.0
+        assert res["monto_agua"] == 5.00
+        assert res["cargo_fijo"] == 5.00
+        assert res["total_a_pagar"] == 10.00
+
+    def test_sin_campo_especificado_usa_cargo_fijo_regular(self):
+        cat = {
+            "nombre": "Doméstico",
+            "cargo_fijo": 5.00,
+            "tarifa_desague": 0.00,
+            "modo_rangos": "unico",
+            "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.00}],
+        }
+        res = calcular_recibo(
+            medidores=[{"nro_medidor": "0001", "lectura_anterior": 10, "lectura_actual": 10}],
+            categoria=cat,
+            igv_activo=False,
+            igv_porcentaje=0.18,
+            recibo_anterior=None,
+        )
+        assert res["consumo_total_m3"] == 0
+        assert res["cargo_fijo"] == 5.00
+        assert res["total_a_pagar"] == 5.00
+

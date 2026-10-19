@@ -169,7 +169,11 @@ def calcular_recibo(
     monto_agua = calcular_monto_agua(
         consumo_total_m3, rangos, modo_rangos=modo_rangos)
     monto_desague = float(categoria.get("tarifa_desague") or 0.0)
-    cargo_fijo = float(categoria.get("cargo_fijo") or 0.0)
+    cargo_fijo_sc = categoria.get("cargo_fijo_sin_consumo")
+    if consumo_total_m3 <= 0 and cargo_fijo_sc is not None:
+        cargo_fijo = float(cargo_fijo_sc)
+    else:
+        cargo_fijo = float(categoria.get("cargo_fijo") or 0.0)
 
     # --- Deuda anterior ---
     # Prioridad: 1) valor fijado manualmente en la tabla de Cobros,

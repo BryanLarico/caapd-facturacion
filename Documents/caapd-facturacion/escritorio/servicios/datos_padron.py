@@ -288,6 +288,7 @@ class ServicioDatosPadron(ServicioDatos):
             "A": {
                 "nombre": "Doméstico / General",
                 "cargo_fijo": 1.5,
+                "cargo_fijo_sin_consumo": 1.5,
                 "tarifa_desague": 0.0,
                 "rangos": [
                     {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
@@ -298,6 +299,7 @@ class ServicioDatosPadron(ServicioDatos):
             "B": {
                 "nombre": "Comercial",
                 "cargo_fijo": 2.5,
+                "cargo_fijo_sin_consumo": 2.5,
                 "tarifa_desague": 0.0,
                 "rangos": [
                     {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.5},
@@ -308,6 +310,7 @@ class ServicioDatosPadron(ServicioDatos):
             "C": {
                 "nombre": "Estatal / Social",
                 "cargo_fijo": 1.5,
+                "cargo_fijo_sin_consumo": 1.5,
                 "tarifa_desague": 0.0,
                 "rangos": [
                     {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
@@ -372,6 +375,7 @@ class ServicioDatosPadron(ServicioDatos):
                 "A": {
                     "nombre": "Doméstico / General",
                     "cargo_fijo": 1.5,
+                    "cargo_fijo_sin_consumo": 1.5,
                     "tarifa_desague": 0.0,
                     "rangos": [
                         {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
@@ -382,6 +386,7 @@ class ServicioDatosPadron(ServicioDatos):
                 "B": {
                     "nombre": "Comercial",
                     "cargo_fijo": 2.5,
+                    "cargo_fijo_sin_consumo": 2.5,
                     "tarifa_desague": 0.0,
                     "rangos": [
                         {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.5},
@@ -392,6 +397,7 @@ class ServicioDatosPadron(ServicioDatos):
                 "C": {
                     "nombre": "Estatal / Social",
                     "cargo_fijo": 1.5,
+                    "cargo_fijo_sin_consumo": 1.5,
                     "tarifa_desague": 0.0,
                     "rangos": [
                         {"m3_desde": 0, "m3_hasta": 10, "precio_m3": 1.0},
@@ -585,6 +591,7 @@ class ServicioDatosPadron(ServicioDatos):
         cat_cod = doc.get("codigo_categoria", "A")
         return categorias.get(cat_cod) or {
             "cargo_fijo": 1.5,
+            "cargo_fijo_sin_consumo": 1.5,
             "tarifa_desague": 0.0,
             "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}],
         }
@@ -622,10 +629,15 @@ class ServicioDatosPadron(ServicioDatos):
                 ),
             }
 
-        cargo_fijo = float(cat_obj.get("cargo_fijo") or 0.0)
+        consumo_total = doc.get("consumo_total_m3") or 0
+        cargo_fijo_sc = cat_obj.get("cargo_fijo_sin_consumo")
+        if consumo_total <= 0 and cargo_fijo_sc is not None:
+            cargo_fijo = float(cargo_fijo_sc)
+        else:
+            cargo_fijo = float(cat_obj.get("cargo_fijo") or 0.0)
         desague = float(cat_obj.get("tarifa_desague") or 0.0)
         return {
-            "consumo_total_m3": doc.get("consumo_total_m3") or 0,
+            "consumo_total_m3": consumo_total,
             "monto_agua": 0.0,
             "monto_desague": desague,
             "cargo_fijo": cargo_fijo,
