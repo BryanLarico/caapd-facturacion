@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QThreadPool, QTimer, Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -824,7 +825,13 @@ class PaginaCobros(QWidget):
             return
 
         proxy_index = indexes[0]
+        if not proxy_index.isValid():
+            self._limpiar_ficha()
+            return
         source_index = self.proxy.mapToSource(proxy_index)
+        if not source_index.isValid():
+            self._limpiar_ficha()
+            return
         doc = self.modelo.obtener_item(source_index.row())
         if not doc:
             self._limpiar_ficha()
@@ -947,9 +954,9 @@ class PaginaCobros(QWidget):
         if not self.item_seleccionado:
             return
 
-        uid = self.item_seleccionado.get(
-            "id_usuario") or self.item_seleccionado.get("_id")
-        nom = self.item_seleccionado.get("nombre")
+        uid = str(self.item_seleccionado.get(
+            "id_usuario") or self.item_seleccionado.get("_id") or "")
+        nom = self.item_seleccionado.get("nombre") or "Usuario"
         tiene_rec = bool(self.item_seleccionado.get("nro_recibo"))
 
         # Si aún no tiene recibo emitido, ofrecer emitir y cobrar en un solo paso
@@ -974,6 +981,19 @@ class PaginaCobros(QWidget):
 
         total = float(self.item_seleccionado.get("total_a_pagar") or 0.0)
 
+        # Si figura con 0.00 pero tiene cargos del mes o deuda, recalcular automáticamente
+        if total <= 0.0:
+            monto_agua = float(self.item_seleccionado.get("monto_agua") or 0.0)
+            cargo_fijo = float(self.item_seleccionado.get("cargo_fijo") or 0.0)
+            deuda_ant = float(self.item_seleccionado.get("deuda_anterior") or 0.0)
+            if round(monto_agua + cargo_fijo + deuda_ant, 2) > 0.0:
+                try:
+                    doc = self.servicio.generar_recibo_usuario(self.periodo_actual, uid)
+                    self.item_seleccionado.update(doc)
+                    total = float(self.item_seleccionado.get("total_a_pagar") or 0.0)
+                except Exception:
+                    pass
+
         resp = QMessageBox.question(
             self,
             "Confirmar Cobro",
@@ -988,7 +1008,8 @@ class PaginaCobros(QWidget):
             self.servicio.registrar_pago(self.periodo_actual, uid, total)
             self.item_seleccionado["monto_pagado"] = total
             self._actualizar_ficha(self.item_seleccionado)
-            self.modelo.layoutChanged.emit()
+            self.modelo.notificar_cambio_usuario(uid)
+            self.proxy.refrescar_filtros()
             self._actualizar_kpis_y_chips()
             self.toast.mostrar(
                 f"Cobro de S/. {total:,.2f} registrado para {nom}.", "exito")
@@ -999,9 +1020,9 @@ class PaginaCobros(QWidget):
         if not self.item_seleccionado:
             return
 
-        uid = self.item_seleccionado.get(
-            "id_usuario") or self.item_seleccionado.get("_id")
-        nom = self.item_seleccionado.get("nombre")
+        uid = str(self.item_seleccionado.get(
+            "id_usuario") or self.item_seleccionado.get("_id") or "")
+        nom = self.item_seleccionado.get("nombre") or "Usuario"
 
         resp = QMessageBox.question(
             self,
@@ -1017,7 +1038,8 @@ class PaginaCobros(QWidget):
             self.servicio.anular_pago(self.periodo_actual, uid)
             self.item_seleccionado["monto_pagado"] = 0.0
             self._actualizar_ficha(self.item_seleccionado)
-            self.modelo.layoutChanged.emit()
+            self.modelo.notificar_cambio_usuario(uid)
+            self.proxy.refrescar_filtros()
             self._actualizar_kpis_y_chips()
             self.toast.mostrar(
                 f"Pago anulado. {nom} vuelve a estado pendiente.", "aviso")
@@ -1034,8 +1056,8 @@ class PaginaCobros(QWidget):
             )
             return
 
-        uid = self.item_seleccionado.get(
-            "id_usuario") or self.item_seleccionado.get("_id")
+        uid = str(self.item_seleccionado.get(
+            "id_usuario") or self.item_seleccionado.get("_id") or "")
         nom = self.item_seleccionado.get("nombre") or "Usuario"
         tiene_rec = bool(self.item_seleccionado.get("nro_recibo"))
 
@@ -1056,7 +1078,8 @@ class PaginaCobros(QWidget):
                     self.periodo_actual, uid)
                 self.item_seleccionado.update(doc)
                 self._actualizar_ficha(self.item_seleccionado)
-                self.modelo.layoutChanged.emit()
+                self.modelo.notificar_cambio_usuario(uid)
+                self.proxy.refrescar_filtros()
                 self._actualizar_kpis_y_chips()
             except Exception as e:
                 mostrar_dialogo_error(
@@ -1086,8 +1109,8 @@ class PaginaCobros(QWidget):
             )
             return
 
-        uid = self.item_seleccionado.get(
-            "id_usuario") or self.item_seleccionado.get("_id")
+        uid = str(self.item_seleccionado.get(
+            "id_usuario") or self.item_seleccionado.get("_id") or "")
         nom = self.item_seleccionado.get("nombre") or "Usuario"
         tiene_rec = bool(self.item_seleccionado.get("nro_recibo"))
 
@@ -1107,7 +1130,8 @@ class PaginaCobros(QWidget):
                     self.periodo_actual, uid)
                 self.item_seleccionado.update(doc)
                 self._actualizar_ficha(self.item_seleccionado)
-                self.modelo.layoutChanged.emit()
+                self.modelo.notificar_cambio_usuario(uid)
+                self.proxy.refrescar_filtros()
                 self._actualizar_kpis_y_chips()
             except Exception as e:
                 mostrar_dialogo_error(self, "Error al generar recibo", str(e))
@@ -1141,16 +1165,17 @@ class PaginaCobros(QWidget):
         if not self.item_seleccionado:
             return
 
-        uid = self.item_seleccionado.get(
-            "id_usuario") or self.item_seleccionado.get("_id")
-        nom = self.item_seleccionado.get("nombre")
+        uid = str(self.item_seleccionado.get(
+            "id_usuario") or self.item_seleccionado.get("_id") or "")
+        nom = self.item_seleccionado.get("nombre") or "Usuario"
 
         try:
             doc = self.servicio.generar_recibo_usuario(
                 self.periodo_actual, uid)
             self.item_seleccionado.update(doc)
             self._actualizar_ficha(self.item_seleccionado)
-            self.modelo.layoutChanged.emit()
+            self.modelo.notificar_cambio_usuario(uid)
+            self.proxy.refrescar_filtros()
             self._actualizar_kpis_y_chips()
             self.toast.mostrar(
                 f"Recibo N° {doc.get('nro_recibo')} emitido para {nom}.", "exito")

@@ -445,3 +445,28 @@ def test_btn_actualizar_excel_flujo(qtbot, servicio_memoria_cobros):
     pagina._al_clic_filtro("alertas")
     assert pagina.btn_actualizar_excel.property("activo") == "false"
 
+
+def test_marcar_multiples_pagos_consecutivos_sin_cierre(qtbot, servicio_memoria_cobros, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    pagina = PaginaCobros(servicio_memoria_cobros)
+    qtbot.addWidget(pagina)
+    pagina.cargar_datos_asincrono()
+    qtbot.waitUntil(lambda: pagina.modelo.rowCount() == 4, timeout=2000)
+
+    # Simular aceptación en todos los diálogos de confirmación
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+
+    # Marcar sucesivamente el primero y luego el segundo usuario
+    for _ in range(2):
+        pagina.tabla.selectRow(0)
+        assert pagina.item_seleccionado is not None
+        pagina._accion_marcar_pagado()
+        qtbot.wait(50)
+
+    # Verificar que el modelo y la interfaz sigan respondiendo y actualizados
+    assert pagina.proxy.rowCount() == 4
+    pagina.tabla.selectRow(1)
+    assert pagina.item_seleccionado is not None
+
+

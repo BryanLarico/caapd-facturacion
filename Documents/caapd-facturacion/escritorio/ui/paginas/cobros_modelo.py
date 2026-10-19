@@ -107,13 +107,16 @@ class DelegadoFilasCobros(QStyledItemDelegate):
             index.row() if index.isValid() else -1)
 
     def eventFilter(self, watched, event) -> bool:
-        if self._vista is not None and watched == self._vista.viewport():
-            if event.type() == QEvent.Type.MouseMove:
-                indice = self._vista.indexAt(event.position().toPoint())
-                fila = indice.row() if indice.isValid() else -1
-                self._actualizar_fila_sobrevolada(fila)
-            elif event.type() == QEvent.Type.Leave:
-                self._actualizar_fila_sobrevolada(-1)
+        try:
+            if self._vista is not None and watched == self._vista.viewport():
+                if event.type() == QEvent.Type.MouseMove:
+                    indice = self._vista.indexAt(event.position().toPoint())
+                    fila = indice.row() if indice.isValid() else -1
+                    self._actualizar_fila_sobrevolada(fila)
+                elif event.type() == QEvent.Type.Leave:
+                    self._actualizar_fila_sobrevolada(-1)
+        except Exception:
+            pass
         return super().eventFilter(watched, event)
 
     def _actualizar_fila_sobrevolada(self, fila: int) -> None:
@@ -123,26 +126,41 @@ class DelegadoFilasCobros(QStyledItemDelegate):
                 self._vista.viewport().update()
 
     def color_fondo_fila(self, index: QModelIndex) -> QColor:
+        if not index.isValid():
+            return QColor()
         brush = index.data(Qt.ItemDataRole.BackgroundRole)
+        col = (
+            brush.color()
+            if isinstance(brush, QBrush)
+            else brush
+            if isinstance(brush, QColor)
+            else QColor()
+        )
         if self._fila_sobrevolada != index.row():
-            return brush.color() if brush is not None else QColor()
-        if brush is not None:
-            return brush.color().lighter(108)
+            return col
+        if col.isValid():
+            return col.lighter(108)
         return QColor(PALETA.PRIMARIO_CLARO)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        color_fondo = self.color_fondo_fila(index)
-        brush = QBrush(color_fondo) if color_fondo.isValid() else None
-        if brush is not None and not (option.state & QStyle.StateFlag.State_Selected):
-            painter.save()
-            painter.fillRect(option.rect, brush)
-            painter.restore()
-        option = QStyleOptionViewItem(option)
-        option.state &= ~QStyle.StateFlag.State_MouseOver
-        if brush is not None:
-            option.features &= ~QStyleOptionViewItem.ViewItemFeature.Alternate
-            option.backgroundBrush = brush
-        super().paint(painter, option, index)
+        try:
+            if not index.isValid():
+                super().paint(painter, option, index)
+                return
+            color_fondo = self.color_fondo_fila(index)
+            brush = QBrush(color_fondo) if color_fondo.isValid() else None
+            if brush is not None and not (option.state & QStyle.StateFlag.State_Selected):
+                painter.save()
+                painter.fillRect(option.rect, brush)
+                painter.restore()
+            option_copy = QStyleOptionViewItem(option)
+            option_copy.state &= ~QStyle.StateFlag.State_MouseOver
+            if brush is not None:
+                option_copy.features &= ~QStyleOptionViewItem.ViewItemFeature.Alternate
+                option_copy.backgroundBrush = brush
+            super().paint(painter, option_copy, index)
+        except Exception:
+            super().paint(painter, option, index)
 
 
 class ModeloCobros(QAbstractTableModel):
@@ -337,13 +355,21 @@ class ModeloCobros(QAbstractTableModel):
         return True
 
     def notificar_cambio_deuda(self, id_usuario: str) -> None:
+        self.notificar_cambio_usuario(id_usuario)
+
+    def notificar_cambio_usuario(self, id_usuario: str) -> None:
         for fila, doc in enumerate(self._datos):
             if str(doc.get("id_usuario") or doc.get("_id") or "") == id_usuario:
                 self.dataChanged.emit(
-                    self.index(fila, 5),
-                    self.index(fila, 8),
-                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
-                        Qt.ItemDataRole.UserRole],
+                    self.index(fila, 0),
+                    self.index(fila, len(COLUMNAS_COBROS) - 1),
+                    [
+                        Qt.ItemDataRole.DisplayRole,
+                        Qt.ItemDataRole.EditRole,
+                        Qt.ItemDataRole.UserRole,
+                        Qt.ItemDataRole.BackgroundRole,
+                        Qt.ItemDataRole.ForegroundRole,
+                    ],
                 )
                 return
 
@@ -380,6 +406,10 @@ class ProxyCobros(QSortFilterProxyModel):
 
     def set_texto_filtro(self, texto: str) -> None:
         self._texto_filtro = (texto or "").strip()
+        self.invalidate()
+
+    def refrescar_filtros(self) -> None:
+        """Refresca el filtrado y ordenamiento sin corromper índices del modelo."""
         self.invalidate()
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:

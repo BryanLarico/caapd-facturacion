@@ -5,10 +5,9 @@ Se muestra en la esquina superior derecha de la página, por encima del contenid
 y desaparece automáticamente después de unos segundos (5 s por defecto).
 """
 from typing import Optional
-from PySide6.QtCore import QPropertyAnimation, Qt, QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QFrame,
-    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -62,11 +61,6 @@ class Toast(QFrame):
         self.btn_cerrar.clicked.connect(self.ocultar)
         lay.addWidget(self.btn_cerrar, alignment=Qt.AlignmentFlag.AlignTop)
 
-        self._efecto = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self._efecto)
-        self._anim = QPropertyAnimation(self._efecto, b"opacity", self)
-        self._anim.setDuration(220)
-
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.ocultar)
@@ -96,11 +90,6 @@ class Toast(QFrame):
         self.reposicionar()
         self.show()
         self.raise_()
-
-        self._anim.stop()
-        self._anim.setStartValue(0.0)
-        self._anim.setEndValue(1.0)
-        self._anim.start()
 
         self._timer.start(
             duracion_ms if duracion_ms is not None else self.DURACION_MS)
