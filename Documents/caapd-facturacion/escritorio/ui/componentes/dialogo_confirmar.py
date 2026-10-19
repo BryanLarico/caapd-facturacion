@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 
 class DialogoConfirmacion(QDialog):
     """Diálogo modal personalizado de confirmación con diseño estilizado y legible."""
@@ -53,8 +55,13 @@ class DialogoConfirmacion(QDialog):
         fila_cuerpo.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Icono visual
-        lbl_icono = QLabel("🗑️" if es_peligro else "⏸️" if "desactivar" in titulo.lower() else "❓")
-        lbl_icono.setStyleSheet("font-size: 28px;")
+        if es_peligro:
+            nombre_icono, color_icono = "trash", "peligro"
+        elif "desactivar" in titulo.lower():
+            nombre_icono, color_icono = "player-pause", "aviso"
+        else:
+            nombre_icono, color_icono = "help-circle", "primario"
+        lbl_icono = iconos.etiqueta(nombre_icono, color_icono, 32)
         fila_cuerpo.addWidget(lbl_icono)
 
         col_textos = QVBoxLayout()

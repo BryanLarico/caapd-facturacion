@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 
 class Toast(QFrame):
     """Aviso flotante que se oculta solo. Tipos: exito, aviso, peligro, info."""
@@ -22,7 +24,6 @@ class Toast(QFrame):
     DURACION_MS = 5000
     MARGEN = 16
 
-    ICONOS = {"exito": "✅", "aviso": "⚠️", "peligro": "❌", "info": "ℹ️"}
     # (fondo, texto, borde)
     COLORES = {
         "exito": ("#dcfce7", "#166534", "#86efac"),
@@ -41,9 +42,7 @@ class Toast(QFrame):
         lay.setContentsMargins(14, 10, 10, 10)
         lay.setSpacing(10)
 
-        self.lbl_icono = QLabel("ℹ️")
-        self.lbl_icono.setStyleSheet(
-            "font-size: 17px; background: transparent; border: none;")
+        self.lbl_icono = iconos.etiqueta("info-circle", "info", 20)
         lay.addWidget(self.lbl_icono, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.lbl_mensaje = QLabel("")
@@ -52,7 +51,8 @@ class Toast(QFrame):
             "background: transparent; border: none; font-size: 13px; font-weight: 600;")
         lay.addWidget(self.lbl_mensaje, stretch=1)
 
-        self.btn_cerrar = QPushButton("✕")
+        self.btn_cerrar = QPushButton("")
+        iconos.aplicar(self.btn_cerrar, "x", "gris", 14)
         self.btn_cerrar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cerrar.setFixedSize(22, 22)
         self.btn_cerrar.setStyleSheet(
@@ -81,7 +81,9 @@ class Toast(QFrame):
             f"QFrame#toast {{ background-color: {fondo}; border: 1px solid {borde}; "
             f"border-left: 5px solid {texto}; border-radius: 8px; }}"
         )
-        self.lbl_icono.setText(self.ICONOS.get(tipo, "ℹ️"))
+        iconos.poner_en_etiqueta(
+            self.lbl_icono, iconos.POR_TIPO.get(tipo, "info-circle"), texto, 20)
+        iconos.recolorear(self.btn_cerrar, texto)
         self.lbl_mensaje.setText(mensaje)
         self.lbl_mensaje.setStyleSheet(
             f"background: transparent; border: none; font-size: 13px; font-weight: 600; color: {texto};"

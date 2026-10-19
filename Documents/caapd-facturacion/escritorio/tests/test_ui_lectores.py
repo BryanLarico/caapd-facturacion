@@ -83,7 +83,7 @@ def test_pagina_lectores_creacion_y_carga(qtbot, servicio_memoria, monkeypatch):
     assert pagina.btn_accion_editar.isEnabled() is True
     assert pagina.btn_accion_cambiar_estado.isEnabled() is True
     assert pagina.btn_accion_eliminar.isEnabled() is True
-    assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
+    assert pagina.btn_accion_cambiar_estado.text() == "Desactivar"
 
 
 def test_pagina_lectores_oculta_registros_sin_correo_sin_borrarlos(qtbot, servicio_memoria):
@@ -174,14 +174,14 @@ def test_cambio_estado_optimista_instantaneo(qtbot, servicio_memoria):
 
     # Seleccionar fila 0
     pagina.tabla.selectRow(0)
-    assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
+    assert pagina.btn_accion_cambiar_estado.text() == "Desactivar"
 
     # Desactivar con actualización optimista (0 ms)
     pagina._accion_cambiar_estado()
 
     # Inmediatamente debe reflejarse en la UI sin esperar red
     assert pagina.modelo_base.data(pagina.modelo_base.index(0, 2)) == "Deshabilitado"
-    assert pagina.btn_accion_cambiar_estado.text() == "▶️ Activar"
+    assert pagina.btn_accion_cambiar_estado.text() == "Activar"
     assert "desactivada" in pagina.alerta_flash.lbl_mensaje.text()
 
     # Esperar que el worker secundario finalice la sincronización
@@ -190,7 +190,7 @@ def test_cambio_estado_optimista_instantaneo(qtbot, servicio_memoria):
     # Reactivar inmediatamente
     pagina._accion_cambiar_estado()
     assert pagina.modelo_base.data(pagina.modelo_base.index(0, 2)) == "Activo"
-    assert pagina.btn_accion_cambiar_estado.text() == "⏸️ Desactivar"
+    assert pagina.btn_accion_cambiar_estado.text() == "Desactivar"
     assert "activada" in pagina.alerta_flash.lbl_mensaje.text()
 
 

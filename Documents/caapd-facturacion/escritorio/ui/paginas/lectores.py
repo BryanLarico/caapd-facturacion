@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.dialogo_confirmar import pedir_confirmacion
@@ -65,7 +67,7 @@ class PaginaLectores(QWidget):
         col_titulos = QVBoxLayout()
         col_titulos.setSpacing(4)
 
-        lbl_titulo = QLabel("📱 Lectores Móviles")
+        lbl_titulo = QLabel("Lectores Móviles")
         lbl_titulo.setObjectName("encabezado_titulo")
         col_titulos.addWidget(lbl_titulo)
 
@@ -78,13 +80,15 @@ class PaginaLectores(QWidget):
         fila_encabezado.addLayout(col_titulos)
         fila_encabezado.addStretch(1)
 
-        self.btn_nuevo = QPushButton("➕ Nuevo Lector")
+        self.btn_nuevo = QPushButton("Nuevo Lector")
+        iconos.aplicar(self.btn_nuevo, "user-plus", "blanco")
         self.btn_nuevo.setProperty("class", "boton boton_primario")
         self.btn_nuevo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_nuevo.clicked.connect(self.abrir_modal_nuevo)
         fila_encabezado.addWidget(self.btn_nuevo)
 
-        self.btn_actualizar = QPushButton("🔄 Actualizar")
+        self.btn_actualizar = QPushButton("Actualizar")
+        iconos.aplicar(self.btn_actualizar, "refresh")
         self.btn_actualizar.setProperty("class", "boton boton_secundario")
         self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_actualizar.setToolTip(
@@ -120,7 +124,8 @@ class PaginaLectores(QWidget):
             self._al_cambiar_texto_busqueda)
         fila_busqueda.addWidget(self.campo_busqueda, stretch=1)
 
-        self.btn_limpiar_busqueda = QPushButton("✖ Limpiar")
+        self.btn_limpiar_busqueda = QPushButton("Limpiar")
+        iconos.aplicar(self.btn_limpiar_busqueda, "x")
         self.btn_limpiar_busqueda.setProperty(
             "class", "boton boton_secundario")
         self.btn_limpiar_busqueda.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -193,13 +198,15 @@ class PaginaLectores(QWidget):
         fila_inferior = QHBoxLayout()
         fila_inferior.setSpacing(10)
 
-        self.btn_accion_editar = QPushButton("✏️ Editar Lector")
+        self.btn_accion_editar = QPushButton("Editar Lector")
+        iconos.aplicar(self.btn_accion_editar, "pencil")
         self.btn_accion_editar.setProperty("class", "boton boton_secundario")
         self.btn_accion_editar.setEnabled(False)
         self.btn_accion_editar.clicked.connect(self._accion_editar)
         fila_inferior.addWidget(self.btn_accion_editar)
 
-        self.btn_accion_cambiar_estado = QPushButton("⏸️ Desactivar")
+        self.btn_accion_cambiar_estado = QPushButton("Desactivar")
+        iconos.aplicar(self.btn_accion_cambiar_estado, "player-pause")
         self.btn_accion_cambiar_estado.setProperty(
             "class", "boton boton_secundario")
         self.btn_accion_cambiar_estado.setEnabled(False)
@@ -214,7 +221,8 @@ class PaginaLectores(QWidget):
 
         fila_inferior.addStretch(1)
 
-        self.btn_accion_eliminar = QPushButton("🗑️ Eliminar Lector")
+        self.btn_accion_eliminar = QPushButton("Eliminar Lector")
+        iconos.aplicar(self.btn_accion_eliminar, "trash", "blanco")
         self.btn_accion_eliminar.setProperty("class", "boton boton_peligro")
         self.btn_accion_eliminar.setEnabled(False)
         self.btn_accion_eliminar.clicked.connect(self._accion_eliminar)
@@ -358,9 +366,12 @@ class PaginaLectores(QWidget):
             if lector:
                 esta_deshabilitado = bool(lector.get("disabled", False))
                 self.btn_accion_cambiar_estado.setText(
-                    "▶️ Activar" if esta_deshabilitado else "⏸️ Desactivar")
+                    "Activar" if esta_deshabilitado else "Desactivar")
+                iconos.aplicar(self.btn_accion_cambiar_estado,
+                               "player-play" if esta_deshabilitado else "player-pause")
         else:
-            self.btn_accion_cambiar_estado.setText("⏸️ Desactivar")
+            self.btn_accion_cambiar_estado.setText("Desactivar")
+            iconos.aplicar(self.btn_accion_cambiar_estado, "player-pause")
 
     def _obtener_lector_seleccionado(self) -> Optional[Dict[str, Any]]:
         indexes = self.tabla.selectionModel().selectedRows()

@@ -79,7 +79,7 @@ def datos_usuarios_prueba():
     }
 
 
-def test_modelo_usuarios_filas_columnas_y_datos(datos_usuarios_prueba):
+def test_modelo_usuarios_filas_columnas_y_datos(qapp, datos_usuarios_prueba):
     lista = []
     for uid, u in datos_usuarios_prueba.items():
         doc = dict(u)
@@ -99,7 +99,7 @@ def test_modelo_usuarios_filas_columnas_y_datos(datos_usuarios_prueba):
     # Columna 1: DNI (verificar badge pendiente)
     idx_pend = modelo.index(2, 1)  # 30770349-1
     assert "30770349-1" in modelo.data(idx_pend, Qt.ItemDataRole.DisplayRole)
-    assert "⚠️" in modelo.data(idx_pend, Qt.ItemDataRole.DisplayRole)
+    assert not modelo.data(idx_pend, Qt.ItemDataRole.DecorationRole).isNull()
 
     # Columna 7: Estado
     idx_inactivo = modelo.index(1, 7)
@@ -219,12 +219,16 @@ def test_dialogo_usuario_creacion_y_validaciones(qtbot, datos_usuarios_prueba):
     dialogo.chk_sin_dni.setChecked(True)
     assert dialogo.campo_id.text() == "SD-002"
 
-    # 3. Llenar campos
+    # 3. Llenar campos (Guardar permanece deshabilitado hasta completar lo obligatorio)
+    assert not dialogo.btn_guardar.isEnabled()
     dialogo.campo_nombre.setText("FLORES MAMANI, PEDRO")
+    dialogo.campo_direccion.setText("CALLE 05 DE AGOSTO S/N")
+    assert not dialogo.btn_guardar.isEnabled()  # aun falta el medidor
     dialogo.campo_nuevo_medidor.setText("998877")
     dialogo._agregar_medidor()
     assert "001000" not in dialogo.medidores_lista
     assert "998877" in dialogo.medidores_lista
+    assert dialogo.btn_guardar.isEnabled()
 
     # 4. Guardar
     dialogo._guardar()
@@ -432,6 +436,9 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
 
     dialogo.campo_id.setText("71234567")
     dialogo.campo_nombre.setText("GARCIA LOPEZ, ANA")
+    dialogo.campo_direccion.setText("JR. LIMA 123")
+    dialogo.campo_nuevo_medidor.setText("77665544")
+    dialogo._agregar_medidor()
 
     with patch("firebase_client.db", return_value=mock_db):
         dialogo._guardar()
@@ -553,6 +560,37 @@ def test_obtener_siguiente_dni_sugerido(datos_usuarios_prueba):
     assert sug2 == "30770349-2"
 
 
+def test_dialogo_usuario_acepta_dni_con_sufijo(qtbot, datos_usuarios_prueba):
+    """Una misma persona puede tener 2 conexiones: 30771072 y 30771072-1 (o -A)."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+    dialogo.campo_nombre.setText("QUISPE CONDORI, JUAN SEGUNDA CONEXION")
+    dialogo.campo_direccion.setText("JR. LIMA 45")
+    dialogo.campo_nuevo_medidor.setText("55443322")
+    dialogo._agregar_medidor()
+
+    # DNI repetido: se bloquea y se sugiere el sufijo libre
+    dialogo.campo_id.setText("30771072")
+    dialogo._marcar_tocado("dni")
+    assert not dialogo.btn_guardar.isEnabled()
+    assert "30771072-1" in dialogo.msg_id.text()
+
+    # Con sufijo numerico o letra se acepta y se normaliza en mayusculas
+    dialogo.campo_id.setText("30771072-1")
+    assert dialogo.btn_guardar.isEnabled()
+    assert dialogo._normalizar_id_ingresado("30771072-a") == "30771072-A"
+    assert dialogo._normalizar_id_ingresado("7646978") == "07646978"
+    assert dialogo._normalizar_id_ingresado("30771072-") is None
+    assert dialogo._normalizar_id_ingresado("3077") is None
+
+    dialogo._guardar()
+    assert "30771072-1" in servicio.usuarios
+    assert "55443322" in servicio.usuarios["30771072-1"]["medidores"]
+
+
 def test_dialogo_usuario_validacion_en_vivo_dni_y_medidor(qtbot, datos_usuarios_prueba):
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
@@ -628,6 +666,9 @@ def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monk
 
     dialogo.campo_id.setText("30771072")
     dialogo.campo_nombre.setText("QUISPE SEGUNDA CONEXION")
+    dialogo.campo_direccion.setText("JR. LIMA 45")
+    dialogo.campo_nuevo_medidor.setText("55443322")
+    dialogo._agregar_medidor()
     dialogo._guardar()
 
     # Debe haberse guardado con el DNI sugerido con sufijo -1
@@ -653,11 +694,12 @@ def test_dialogo_usuario_guardar_cancelar_mantiene_edicion(qtbot, datos_usuarios
 
     dialogo.campo_id.setText("30771072")
     dialogo.campo_nombre.setText("INTENTO FALLIDO")
+    dialogo.campo_direccion.setText("JR. LIMA 45")
+    dialogo.campo_nuevo_medidor.setText("55443322")
+    dialogo._agregar_medidor()
     dialogo._guardar()
 
     # No debe haberse guardado nada nuevo
     assert "30771072-1" not in servicio.usuarios
     assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
-
-
 

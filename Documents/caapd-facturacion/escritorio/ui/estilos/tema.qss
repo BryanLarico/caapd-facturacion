@@ -252,6 +252,23 @@ QPushButton.boton_peligro:hover {
     background-color: #b91c1c;
 }
 
+/* Botón peligro secundario (contorno rojo, fondo blanco, carga color al hover, rojo al presionar) */
+QPushButton.boton_peligro_secundario {
+    background-color: #ffffff;
+    color: #dc2626;
+    border: 1.5px solid #dc2626;
+}
+QPushButton.boton_peligro_secundario:hover {
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border-color: #b91c1c;
+}
+QPushButton.boton_peligro_secundario:pressed {
+    background-color: #dc2626;
+    color: #ffffff;
+    border: 1.5px solid #dc2626;
+}
+
 QPushButton.boton_grande {
     font-size: 15px;
     font-weight: bold;
@@ -441,6 +458,29 @@ QLineEdit:focus, QTextEdit:focus {
     border-color: #0369a1;
     background-color: #f8fafc;
 }
+
+/* Campo con error de validacion (propiedad dinamica invalido="true") */
+QLineEdit[invalido="true"] {
+    border-color: #dc2626;
+    background-color: #fef2f2;
+}
+
+QLineEdit[invalido="true"]:focus {
+    border-color: #b91c1c;
+    background-color: #ffffff;
+}
+
+/* Mensajes de ayuda/error bajo los campos de un formulario */
+QLabel.campo_mensaje {
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    padding: 0 2px;
+}
+
+QLabel.campo_mensaje[nivel="error"] { color: #dc2626; }
+QLabel.campo_mensaje[nivel="aviso"] { color: #b45309; }
+QLabel.campo_mensaje[nivel="info"]  { color: #64748b; font-weight: 400; }
 
 /* ===================================================================
    Checkbox y casillas de verificación en tablas/listas
@@ -844,6 +884,32 @@ QPushButton.filtro_btn_excel:disabled {
     background-color: #f8fafc;
     color: #94a3b8;
     border-color: #cbd5e1;
+}
+
+/* --- Botón Eliminar / Peligro estilo filtro (filtro_btn_peligro) --- */
+/* Sin seleccionar: fondo blanco, bordes rojos suaves, texto rojo */
+QPushButton.filtro_btn_peligro {
+    background-color: #ffffff;
+    color: #dc2626;
+    border: 1.5px solid #fca5a5;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+QPushButton.filtro_btn_peligro:hover {
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border-color: #f87171;
+}
+
+/* Presionado / Activo: rojo sólido con letra blanca */
+QPushButton.filtro_btn_peligro:pressed {
+    background-color: #dc2626;
+    color: #ffffff;
+    border: 1.5px solid #fca5a5;
+    font-weight: 600;
 }
 
 /* --- Chips de Medidores --- */

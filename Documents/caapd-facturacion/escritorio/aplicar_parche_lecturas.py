@@ -15,7 +15,7 @@ NUEVO_METODO = '''    def traer_lecturas_de_lectores(
         callback_progreso: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Acción B: Traer lecturas de los lectores (Nube -> Excel).
+        Acción B: ExExtraer lecturas de los lectores (Nube -> Excel).
         Descarga por la API REST de Firestore (servicios/firestore_rest.py), NO por gRPC.
         La versión anterior usaba `col.select([...]).stream()`, que en Windows podía
         colgarse dentro de gRPC y cerrar el proceso con un «access violation».
@@ -101,7 +101,8 @@ def main() -> None:
     inicio = texto.find("    def traer_lecturas_de_lectores(")
     fin = texto.find("    def sincronizar_desde_firebase(")
     if inicio == -1 or fin == -1 or fin < inicio:
-        raise SystemExit("ERROR: no se encontraron los límites del método. ¿Es el archivo correcto?")
+        raise SystemExit(
+            "ERROR: no se encontraron los límites del método. ¿Es el archivo correcto?")
 
     if "firestore_rest" in texto[inicio:fin]:
         print("El parche ya estaba aplicado. No se hizo nada.")

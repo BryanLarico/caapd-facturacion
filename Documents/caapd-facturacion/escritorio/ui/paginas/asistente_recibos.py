@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 import rutas
 from servicios.datos import ServicioDatos
 from ui.hilos import Worker, mostrar_dialogo_error
@@ -97,7 +99,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
 
         self.fila_botones.addStretch(1)
 
-        self.btn_siguiente = QPushButton("Continuar a Generación ➔")
+        self.btn_siguiente = QPushButton("Continuar a Generación →")
         self.btn_siguiente.setProperty(
             "class", "boton boton_primario boton_grande")
         self.btn_siguiente.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -153,7 +155,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         """)
         lay_banner = QHBoxLayout(self.banner_faltantes)
         self.lbl_banner_faltantes = QLabel(
-            "⚠️ Existen conexiones con lecturas pendientes.")
+            "Existen conexiones con lecturas pendientes.")
         self.lbl_banner_faltantes.setStyleSheet(
             "color: #92400e; font-size: 13px; font-weight: 500;")
         lay_banner.addWidget(self.lbl_banner_faltantes)
@@ -177,7 +179,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         self.fila_acciones_faltantes.setSpacing(10)
 
         self.btn_estimar_todos = QPushButton(
-            "⚡ Estimar faltantes con lectura anterior (Consumo 0 m³)")
+            "Estimar faltantes con lectura anterior (Consumo 0 m³)")
+        iconos.aplicar(self.btn_estimar_todos, "bolt")
         self.btn_estimar_todos.setProperty("class", "boton boton_secundario")
         self.btn_estimar_todos.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_estimar_todos.clicked.connect(
@@ -218,7 +221,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
             self.tabla_faltantes.hide()
             self.fila_acciones_faltantes.setEnabled(False)
             self.btn_siguiente.setEnabled(True)
-            self.btn_siguiente.setText("Emitir Recibos Masivos ➔")
+            self.btn_siguiente.setText("Emitir Recibos Masivos →")
         else:
             self.banner_faltantes.setStyleSheet("""
                 QFrame {
@@ -229,7 +232,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
                 }
             """)
             self.lbl_banner_faltantes.setText(
-                f"⚠️ Hay {len(faltantes)} medidor(es) pendientes. Puedes estimarlos antes de continuar.")
+                f"Hay {len(faltantes)} medidor(es) pendientes. Puedes estimarlos antes de continuar.")
             self.lbl_banner_faltantes.setStyleSheet(
                 "color: #92400e; font-size: 13px; font-weight: 500;")
             self.tabla_faltantes.show()
@@ -249,7 +252,7 @@ class DialogoAsistenteEmitirRecibos(QDialog):
                     str(item.get("lectura_anterior") or 0)))
 
             self.btn_siguiente.setEnabled(True)
-            self.btn_siguiente.setText("Continuar con Estimación ➔")
+            self.btn_siguiente.setText("Continuar con Estimación →")
 
     def _estimar_faltantes_automatico(self) -> None:
         """Estima las lecturas pendientes con la lectura anterior."""
@@ -287,10 +290,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         lay.setContentsMargins(20, 40, 20, 20)
         lay.setSpacing(20)
 
-        lbl_icono = QLabel("🧾")
-        lbl_icono.setStyleSheet("font-size: 48px;")
-        lbl_icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay.addWidget(lbl_icono)
+        lbl_icono = iconos.etiqueta("receipt", "primario", 56)
+        lay.addWidget(lbl_icono, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.lbl_estado_paso2 = QLabel("Generando recibos del mes...")
         self.lbl_estado_paso2.setStyleSheet(
@@ -389,10 +390,8 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         lay.setContentsMargins(20, 20, 20, 20)
         lay.setSpacing(18)
 
-        lbl_exito = QLabel("🎉")
-        lbl_exito.setStyleSheet("font-size: 48px;")
-        lbl_exito.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay.addWidget(lbl_exito)
+        lbl_exito = iconos.etiqueta("confetti", "exito", 56)
+        lay.addWidget(lbl_exito, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.lbl_titulo_paso3 = QLabel("¡Recibos emitidos exitosamente!")
         self.lbl_titulo_paso3.setStyleSheet(
@@ -433,13 +432,15 @@ class DialogoAsistenteEmitirRecibos(QDialog):
         fila_docs = QHBoxLayout()
         fila_docs.setSpacing(14)
 
-        btn_zip = QPushButton("📦 Descargar ZIP de Recibos")
+        btn_zip = QPushButton("Descargar ZIP de Recibos")
+        iconos.aplicar(btn_zip, "file-zip", "blanco")
         btn_zip.setProperty("class", "boton boton_primario")
         btn_zip.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_zip.clicked.connect(self._descargar_zip_completo)
         fila_docs.addWidget(btn_zip)
 
-        btn_carpeta = QPushButton("📂 Abrir Carpeta de Recibos")
+        btn_carpeta = QPushButton("Abrir Carpeta de Recibos")
+        iconos.aplicar(btn_carpeta, "folder-open")
         btn_carpeta.setProperty("class", "boton boton_secundario")
         btn_carpeta.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_carpeta.clicked.connect(self._abrir_carpeta_recibos)

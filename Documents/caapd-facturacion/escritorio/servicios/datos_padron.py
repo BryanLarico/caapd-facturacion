@@ -525,9 +525,11 @@ class ServicioDatosPadron(ServicioDatos):
                 doc["consumo_total_m3"] = 0
                 continue
 
-            cat_cod = doc.get("codigo_categoria", "A")
-            cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [
-                {"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
+            cat_obj = self._categoria_de(doc)
+            deuda_manual = (
+                float(doc.get("deuda_anterior") or 0.0)
+                if doc.get("deuda_anterior_manual") else None
+            )
             try:
                 calc = calculos.calcular_recibo(
                     medidores=doc.get("medidores", []),
@@ -535,6 +537,7 @@ class ServicioDatosPadron(ServicioDatos):
                     igv_activo=False,
                     igv_porcentaje=0.18,
                     recibo_anterior=None,
+                    deuda_anterior_manual=deuda_manual,
                 )
                 ultimo_recibo += 1
                 doc["nro_recibo"] = f"{ultimo_recibo:09d}"
@@ -576,10 +579,64 @@ class ServicioDatosPadron(ServicioDatos):
             self._archivos_mtime[str(destino)] = destino.stat().st_mtime
         return resultado
 
+    def _categoria_de(self, doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Devuelve la categoría tarifaria del usuario (o una por defecto)."""
+        categorias = self.config.get("categorias", {}) or {}
+        cat_cod = doc.get("codigo_categoria", "A")
+        return categorias.get(cat_cod) or {
+            "cargo_fijo": 1.5,
+            "tarifa_desague": 0.0,
+            "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}],
+        }
+
+    def _cargos_del_mes(self, doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Calcula lo que corresponde cobrar ESTE mes (sin la deuda anterior).
+
+        - Si todos los medidores ya tienen lectura, usa calculos.calcular_recibo.
+        - Si faltan lecturas, cobra solo cargo fijo + desagüe (agua = 0 por ahora).
+        """
+        cat_obj = self._categoria_de(doc)
+        medidores = doc.get("medidores") or []
+        lecturas_completas = bool(medidores) and all(
+            isinstance(m, dict) and m.get("lectura_actual") is not None for m in medidores
+        )
+
+        if lecturas_completas:
+            calc = calculos.calcular_recibo(
+                medidores=medidores,
+                categoria=cat_obj,
+                igv_activo=False,
+                igv_porcentaje=0.18,
+                recibo_anterior=None,
+                deuda_anterior_manual=0.0,   # aquí solo queremos el mes
+            )
+            return {
+                "consumo_total_m3": calc["consumo_total_m3"],
+                "monto_agua": calc["monto_agua"],
+                "monto_desague": calc["monto_desague"],
+                "cargo_fijo": calc["cargo_fijo"],
+                "igv": calc["igv"],
+                "subtotal_mes": round(
+                    calc["monto_agua"] + calc["monto_desague"] +
+                    calc["cargo_fijo"] + calc["igv"], 2
+                ),
+            }
+
+        cargo_fijo = float(cat_obj.get("cargo_fijo") or 0.0)
+        desague = float(cat_obj.get("tarifa_desague") or 0.0)
+        return {
+            "consumo_total_m3": doc.get("consumo_total_m3") or 0,
+            "monto_agua": 0.0,
+            "monto_desague": desague,
+            "cargo_fijo": cargo_fijo,
+            "igv": 0.0,
+            "subtotal_mes": round(cargo_fijo + desague, 2),
+        }
+
     def actualizar_deuda(
         self, periodo: str, id_usuario: str, campo: str, valor: float
     ) -> Dict[str, Any]:
-        """Actualiza una deuda y persiste el padrón del periodo antes de confirmar."""
+        """Actualiza una deuda editada a mano y recalcula el total con los cargos del mes."""
         import math
 
         if campo not in ("deuda_anterior", "deuda_actual"):
@@ -597,25 +654,33 @@ class ServicioDatosPadron(ServicioDatos):
             raise ValueError(
                 f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
 
-        valores_anteriores = {
-            clave: doc.get(clave)
-            for clave in ("deuda_anterior", "deuda_actual", "total_a_pagar")
-        }
-        deuda_anterior = importe if campo == "deuda_anterior" else float(
-            doc.get("deuda_anterior") or 0.0)
-        deuda_actual = importe if campo == "deuda_actual" else doc.get(
-            "deuda_actual")
-        if deuda_actual is None:
-            deuda_actual = max(
-                0.0,
-                round(float(doc.get("total_a_pagar") or 0.0) - deuda_anterior, 2),
-            )
+        claves_tocadas = (
+            "deuda_anterior", "deuda_actual", "total_a_pagar", "cargo_fijo",
+            "monto_agua", "monto_desague", "igv", "consumo_total_m3",
+            "deuda_anterior_manual",
+        )
+        valores_anteriores = {k: doc.get(k) for k in claves_tocadas}
+
+        if campo == "deuda_anterior":
+            deuda_anterior = importe
+            # marca para que facturar no la pise
+            doc["deuda_anterior_manual"] = True
+            cargos = self._cargos_del_mes(doc)
+            deuda_actual = cargos["subtotal_mes"]
+        else:  # campo == "deuda_actual": el operador fija a mano lo del mes
+            deuda_anterior = float(doc.get("deuda_anterior") or 0.0)
+            deuda_actual = importe
+            cargos = self._cargos_del_mes(doc)
 
         doc["deuda_anterior"] = deuda_anterior
-        doc["deuda_actual"] = float(deuda_actual or 0.0)
-        doc["total_a_pagar"] = round(
-            deuda_anterior + float(deuda_actual or 0.0), 2
-        )
+        doc["deuda_actual"] = round(deuda_actual, 2)
+        doc["cargo_fijo"] = cargos["cargo_fijo"]
+        doc["monto_agua"] = cargos["monto_agua"]
+        doc["monto_desague"] = cargos["monto_desague"]
+        doc["igv"] = cargos["igv"]
+        doc["consumo_total_m3"] = cargos["consumo_total_m3"]
+        doc["total_a_pagar"] = round(deuda_anterior + deuda_actual, 2)
+
         try:
             self.guardar_en_respaldo_local(periodo)
         except Exception:
@@ -1491,7 +1556,7 @@ class ServicioDatosPadron(ServicioDatos):
         callback_progreso: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Acción B: Traer lecturas de los lectores (Nube -> Excel).
+        Acción B: ExExtraer lecturas de los lectores (Nube -> Excel).
         Descarga por la API REST de Firestore (servicios/firestore_rest.py), NO por gRPC.
         La versión anterior usaba `col.select([...]).stream()`, que en Windows podía
         colgarse dentro de gRPC, congelar la ventana ("No responde") y cerrar el
@@ -1817,7 +1882,7 @@ class ServicioDatosPadron(ServicioDatos):
             raise ValueError("El nuevo ID es igual al ID actual.")
         if id_nuevo in self.usuarios:
             raise ValueError(
-                f"Ya existe un usuario con el ID/DNI '{id_nuevo}'.")
+                f"Ya existe un usuario con el DNI '{id_nuevo}'.")
         if id_viejo not in self.usuarios:
             raise ValueError(f"Usuario {id_viejo} no existe.")
 
@@ -2063,55 +2128,6 @@ class ServicioDatosPadron(ServicioDatos):
             "pagados": pagados,
             "pendientes": len(self.mes) - pagados,
         }
-
-    def generar_recibo_usuario(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
-        if not doc:
-            raise ValueError(
-                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
-
-        for m in doc.get("medidores", []):
-            if m.get("lectura_actual") is None:
-                m["lectura_actual"] = m.get("lectura_anterior") or 0
-                m["estado_lectura"] = "ESTIMADO"
-
-        ultimo_recibo_num = int(self.config.get("ultimo_recibo") or 0)
-        if not doc.get("nro_recibo"):
-            ultimo_recibo_num += 1
-            doc["nro_recibo"] = f"{ultimo_recibo_num:09d}"
-            self.config["ultimo_recibo"] = ultimo_recibo_num
-
-        categorias = self.config.get("categorias", {})
-        cat_cod = doc.get("codigo_categoria", "A")
-        cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [
-            {"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
-
-        calc = calculos.calcular_recibo(
-            medidores=doc.get("medidores", []),
-            categoria=cat_obj,
-            igv_activo=False,
-            igv_porcentaje=0.18,
-            recibo_anterior=None,
-        )
-
-        doc.update({
-            "consumo_total_m3": calc["consumo_total_m3"],
-            "monto_agua": calc["monto_agua"],
-            "monto_desague": calc["monto_desague"],
-            "cargo_fijo": calc["cargo_fijo"],
-            "deuda_anterior": calc["deuda_anterior"],
-            "igv": calc["igv"],
-            "redondeo": calc["redondeo"],
-            "total_a_pagar": calc["total_a_pagar"],
-            "meses_adeudados": calc["meses_adeudados"],
-        })
-        if "monto_pagado" not in doc or doc.get("monto_pagado") is None:
-            doc["monto_pagado"] = 0.0
-            doc["fecha_pago"] = None
-
-        self.mes[id_usuario] = doc
-        self.guardar_en_respaldo_local()
-        return doc
 
     def generar_recibos_mes(
         self,
@@ -2405,10 +2421,11 @@ class ServicioDatosPadron(ServicioDatos):
             doc["nro_recibo"] = f"{ultimo_recibo_num:09d}"
             self.config["ultimo_recibo"] = ultimo_recibo_num
 
-        categorias = self.config.get("categorias", {})
-        cat_cod = doc.get("codigo_categoria", "A")
-        cat_obj = categorias.get(cat_cod) or {"cargo_fijo": 1.5, "tarifa_desague": 0.0, "rangos": [
-            {"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}
+        cat_obj = self._categoria_de(doc)
+        deuda_manual = (
+            float(doc.get("deuda_anterior") or 0.0)
+            if doc.get("deuda_anterior_manual") else None
+        )
 
         calc = calculos.calcular_recibo(
             medidores=doc.get("medidores", []),
@@ -2416,6 +2433,7 @@ class ServicioDatosPadron(ServicioDatos):
             igv_activo=False,
             igv_porcentaje=0.18,
             recibo_anterior=None,
+            deuda_anterior_manual=deuda_manual,
         )
 
         doc.update({
@@ -2436,222 +2454,3 @@ class ServicioDatosPadron(ServicioDatos):
         self.mes[id_usuario] = doc
         self.guardar_en_respaldo_local()
         return doc
-
-    def generar_recibos_mes(
-        self,
-        periodo: Optional[str] = None,
-        callback_progreso: Optional[Any] = None,
-    ) -> Dict[str, Any]:
-        p = periodo or self.periodo
-        total = len(self.mes)
-        procesados = 0
-
-        for uid in list(self.mes.keys()):
-            self.generar_recibo_usuario(p, uid)
-            procesados += 1
-            if callback_progreso:
-                callback_progreso(procesados, total)
-
-        if "mes_actual" in self.config:
-            self.config["mes_actual"]["estado"] = "FACTURADO"
-
-        self.guardar_en_respaldo_local()
-        return {"periodo": p, "total_generados": procesados}
-
-    def _historial_consumos(self, id_usuario: str, periodo: str, n: int = 5) -> List[Optional[float]]:
-        """
-        Reconstruye los consumos (m3) de los `n` meses ANTERIORES a `periodo` usando los
-        padrones ya cargados en memoria desde 'Base de datos/' (self.meses_encontrados).
-        Se usa como respaldo cuando la columna 'Historial m3' del Excel viene vacia.
-        Devuelve la lista en orden cronologico (mas antiguo primero), sin meses iniciales inexistentes.
-        """
-        try:
-            anio, mes = [int(p) for p in periodo.split("-")]
-        except Exception:
-            return []
-        serie: List[Optional[float]] = []
-        for k in range(n, 0, -1):
-            m_i, a_i = mes - k, anio
-            while m_i <= 0:
-                m_i += 12
-                a_i -= 1
-            per = f"{a_i:04d}-{m_i:02d}"
-            docs_per = self.meses_encontrados.get(per)
-            if docs_per is None:
-                # ese mes no existe en Base de datos/
-                serie.append(None)
-                continue
-            d = docs_per.get(id_usuario)
-            if not d:
-                # el usuario aun no existia ese mes (sin dato)
-                serie.append(None)
-                continue
-            v = d.get("consumo_total_m3")
-            try:
-                serie.append(float(v) if v not in (None, "") else None)
-            except (TypeError, ValueError):
-                serie.append(None)
-        # Quitar meses iniciales sin dato; los None intermedios se dibujan como "sin dato"
-        while serie and serie[0] is None:
-            serie.pop(0)
-        return serie
-
-    def _doc_para_pdf(self, doc: Dict[str, Any], id_usuario: str, periodo: str) -> Dict[str, Any]:
-        """Copia del doc con historial_m3 completado desde los padrones previos si esta vacio."""
-        d = dict(doc)
-        if not d.get("historial_m3"):
-            d["historial_m3"] = self._historial_consumos(id_usuario, periodo)
-        return d
-
-    def generar_pdf_recibo(self, periodo: str, id_usuario: str) -> str:
-        doc = self.mes.get(id_usuario)
-        if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado.")
-        from servicios.generador_pdf import generar_recibo_pdf_para_usuario
-        return str(generar_recibo_pdf_para_usuario(self._doc_para_pdf(doc, id_usuario, periodo), self.config, periodo))
-
-    def generar_zip_recibos(self, periodo: str, sector: Optional[str] = None) -> Optional[str]:
-        from servicios.generador_pdf import generar_recibo_pdf_para_usuario, empaquetar_recibos_en_zip
-        for uid, doc in self.mes.items():
-            if sector and doc.get("sector") != sector:
-                continue
-            if doc.get("nro_recibo"):
-                generar_recibo_pdf_para_usuario(self._doc_para_pdf(
-                    doc, uid, periodo), self.config, periodo)
-        ruta_zip = empaquetar_recibos_en_zip(periodo, sector)
-        return str(ruta_zip) if ruta_zip else None
-
-    def registrar_pago(
-        self,
-        periodo: str,
-        id_usuario: str,
-        monto_pagado: float,
-        fecha_pago: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
-        if not doc:
-            raise ValueError(
-                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
-        fecha = fecha_pago or datetime.date.today().isoformat()
-        monto = round(float(monto_pagado), 2)
-        doc["monto_pagado"] = monto
-        doc["fecha_pago"] = fecha
-
-        self.ops["escrituras"] += 1
-        self.guardar_en_respaldo_local()
-
-        encolar_cambio("pago", {
-            "periodo": periodo,
-            "id_usuario": id_usuario,
-            "monto_pagado": monto,
-            "fecha_pago": fecha,
-        })
-        return doc
-
-    def anular_pago(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
-        if not doc:
-            raise ValueError(
-                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
-        doc["monto_pagado"] = 0.0
-        doc["fecha_pago"] = None
-
-        self.ops["escrituras"] += 1
-        self.guardar_en_respaldo_local()
-
-        encolar_cambio("anular_pago", {
-            "periodo": periodo,
-            "id_usuario": id_usuario,
-        })
-        return doc
-
-    def exportar_reporte_morosos_excel(
-        self,
-        periodo: Optional[str] = None,
-        ruta_salida: Optional[str] = None,
-    ) -> str:
-        p = Path(ruta_salida) if ruta_salida else rutas.ruta_salida(
-            f"reporte_morosos_{periodo or self.periodo}.xlsx")
-        p.parent.mkdir(parents=True, exist_ok=True)
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Lista de Corte"
-
-        ws["A1"] = f"CAAPD ISPACAS — LISTA DE USUARIOS CON CORTE DE SERVICIO ({periodo or self.periodo})"
-        ws["A1"].font = Font(name="Arial", size=12, bold=True, color="FFFFFF")
-        ws.merge_cells("A1:G1")
-        for col in range(1, 8):
-            ws.cell(row=1, column=col).fill = PatternFill(
-                start_color="DC2626", end_color="DC2626", fill_type="solid")
-
-        headers = ["Nro Conexión", "DNI", "Titular", "Sector",
-                   "Meses Deuda", "Total Deuda S/.", "Medidor"]
-        for c, h in enumerate(headers, 1):
-            cell = ws.cell(row=3, column=c, value=h)
-            cell.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-            cell.fill = PatternFill(
-                start_color="1E293B", end_color="1E293B", fill_type="solid")
-
-        r_idx = 4
-        for d in self.mes.values():
-            meses = int(d.get("meses_adeudados") or 0)
-            pagado = float(d.get("monto_pagado") or 0)
-            total = float(d.get("total_a_pagar") or 0)
-            if meses >= 3 and pagado < total:
-                med_str = ", ".join(m.get("nro_medidor", "")
-                                    for m in d.get("medidores", []))
-                ws.cell(row=r_idx, column=1, value=d.get("nro_conexion", ""))
-                ws.cell(row=r_idx, column=2, value=d.get("id_usuario", ""))
-                ws.cell(row=r_idx, column=3, value=d.get("nombre", ""))
-                ws.cell(row=r_idx, column=4, value=d.get("sector", ""))
-                ws.cell(row=r_idx, column=5, value=meses)
-                c_tot = ws.cell(row=r_idx, column=6, value=total)
-                c_tot.number_format = '"S/. "#,##0.00'
-                ws.cell(row=r_idx, column=7, value=med_str)
-                r_idx += 1
-
-        wb.save(str(p))
-        return str(p)
-
-    def _servicio_autenticacion_lectores(self) -> ServicioDatos:
-        servicio = getattr(self, "_servicio_auth_lectores", None)
-        if servicio is None:
-            from servicios.datos import ServicioDatosFirebase
-
-            servicio = ServicioDatosFirebase()
-            self._servicio_auth_lectores = servicio
-        return servicio
-
-    def listar_lectores(self) -> List[Dict[str, Any]]:
-        return self._servicio_autenticacion_lectores().listar_lectores()
-
-    def crear_lector(self, email: str, password: str, display_name: Optional[str] = None) -> Dict[str, Any]:
-        return self._servicio_autenticacion_lectores().crear_lector(
-            email, password, display_name
-        )
-
-    def actualizar_lector(
-        self,
-        uid: str,
-        display_name: Optional[str] = None,
-        password: Optional[str] = None,
-        disabled: Optional[bool] = None,
-    ) -> Dict[str, Any]:
-        return self._servicio_autenticacion_lectores().actualizar_lector(
-            uid=uid,
-            display_name=display_name,
-            password=password,
-            disabled=disabled,
-        )
-
-    def eliminar_lector(self, uid: str) -> None:
-        self._servicio_autenticacion_lectores().eliminar_lector(uid)
-
-    def get_ops(self) -> Dict[str, int]:
-        return self.ops
-
-    def hay_aviso_ops(self) -> Dict[str, Optional[str]]:
-        return {"lecturas": None, "escrituras": None}

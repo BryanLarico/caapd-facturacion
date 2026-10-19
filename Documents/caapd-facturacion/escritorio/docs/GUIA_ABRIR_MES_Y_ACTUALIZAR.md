@@ -104,7 +104,7 @@ En modo local-first abre **Sincronización con Lectores Móviles**. Ofrece tres
 acciones: reemplazar la ventana de meses publicada, publicar solo el mes nuevo
 o descargar lecturas desde los teléfonos.
 
-### «Traer lecturas de los lectores» — Nube → Excel
+### «Extraer lecturas de los lectores» — Nube → Excel
 
 1. Lee los documentos de Firebase de la colección `mes_aaaa-mm` del mes activo.
 2. Para cada usuario y medidor correspondiente, incorpora lecturas actuales,
@@ -141,7 +141,7 @@ Al continuar:
 
 **Importante:** el envío reemplaza en Firebase los documentos de los meses que
 publica y puede borrar datos móviles que no se hayan descargado antes. Antes de
-enviar, use «Traer lecturas de los lectores» para conservar lecturas pendientes
+enviar, use «Extraer lecturas de los lectores» para conservar lecturas pendientes
 de los teléfonos. Revise también que los Excel sean los correctos. La
 confirmación escrita reduce errores accidentales, pero no convierte la acción
 en reversible.
@@ -158,7 +158,7 @@ La publicación usa creación exclusiva: si `mes_aaaa-mm` ya contiene cualquier
 documento, se detiene y no reemplaza lecturas existentes. Tampoco elimina
 usuarios, documentos ni colecciones de otros meses. El padrón local no se
 modifica. Si Firebase ya tiene datos del periodo, primero revise la situación y
-use «Traer lecturas de los lectores» cuando corresponda.
+use «Extraer lecturas de los lectores» cuando corresponda.
 
 El envío antiguo revisa las colecciones para buscar documentos obsoletos y
 puede tardar mientras Firebase lista esos documentos. La barra inferior ahora
@@ -240,7 +240,7 @@ sube según su propia configuración.
 1. Confirme que el padrón del último periodo está en `Base de datos/` y revise
    que las lecturas del mes estén completas.
 2. Si las lecturas llegaron desde teléfonos, ejecute primero «Actualizar» →
-   «Traer lecturas de los lectores» y revise el Excel resultante.
+   «Extraer lecturas de los lectores» y revise el Excel resultante.
 3. Use «Abrir mes nuevo», confirme el periodo y las fechas, y espere a que
    termine la operación.
 4. Revise el nuevo `PADRON_MES_aaaa-mm.xlsx`, en especial la lectura anterior,

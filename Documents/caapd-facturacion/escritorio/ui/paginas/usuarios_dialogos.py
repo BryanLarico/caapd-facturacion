@@ -8,7 +8,8 @@ Incluye:
 """
 import re
 from typing import Any, Dict, List, Optional
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRegularExpression
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -25,6 +26,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui import iconos
 
 import codigos
 from servicios.datos import ServicioDatos
@@ -294,10 +297,14 @@ class DialogoUsuario(QDialog):
             "_id") or "") if self.es_edicion else ""
 
         self.medidores_lista: List[str] = []
+        # Campos que el usuario ya "toco": solo a esos se les muestra el error
+        # en rojo mientras escribe. Al pulsar Guardar se muestran todos.
+        self._tocados: set = set()
+        self._intento_guardar = False
 
         self.setWindowTitle(
             "Editar Usuario" if self.es_edicion else "Nuevo Usuario")
-        self.resize(540, 600)
+        self.resize(560, 640)
         self.setMinimumSize(480, 500)
         self.setModal(True)
 
@@ -309,8 +316,8 @@ class DialogoUsuario(QDialog):
         layout_principal.setContentsMargins(20, 16, 20, 16)
         layout_principal.setSpacing(12)
 
-        # Encabezado del diálogo (fijo)
-        titulo_txt = f"✏️ Editar Usuario: {self.usuario.get('nombre', '')}" if self.es_edicion else "➕ Registrar Nuevo Usuario"
+        # Encabezado del diálogo
+        titulo_txt = f"Editar Usuario: {self.usuario.get('nombre', '')}" if self.es_edicion else "Registrar Nuevo Usuario"
         lbl_titulo = QLabel(titulo_txt)
         lbl_titulo.setObjectName("dialogo_titulo")
         lbl_titulo.setWordWrap(True)
@@ -336,9 +343,12 @@ class DialogoUsuario(QDialog):
         col_id.addWidget(lbl_id)
 
         self.campo_id = QLineEdit()
-        self.campo_id.setPlaceholderText("8 dígitos (ej. 30771072) o SD-xxx")
+        self.campo_id.setPlaceholderText(
+            "8 dígitos (ej. 30771072), con sufijo (30771072-1) o SD-xxx")
         self.campo_id.setMaxLength(15)
         col_id.addWidget(self.campo_id)
+        self.msg_id = self._crear_mensaje_campo()
+        col_id.addWidget(self.msg_id)
 
         if not self.es_edicion:
             self.chk_sin_dni = QCheckBox(
@@ -369,7 +379,8 @@ class DialogoUsuario(QDialog):
         self.campo_conexion = QLineEdit()
         self.campo_conexion.setPlaceholderText("6 dígitos (ej. 000796)")
         self.campo_conexion.setMaxLength(6)
-        col_con.addWidget(self.campo_conexion)
+        self.msg_conexion = self._crear_mensaje_campo()
+        col_con.addWidget(self.msg_conexion)
 
         layout_form.addLayout(col_con)
         layout_form.addSpacing(6)
@@ -384,7 +395,15 @@ class DialogoUsuario(QDialog):
         self.campo_nombre = QLineEdit()
         self.campo_nombre.setPlaceholderText(
             "Ej. CONDORI MAMANI, CARLOS ALBERTO")
+        # Solo letras (incluye tildes y Ñ), espacios y signos propios de nombres (, . ' -)
+        self.campo_nombre.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ,.'\-]*"), self.campo_nombre))
+        self.campo_nombre.setMaxLength(120)
+        self.campo_nombre.textEdited.connect(
+            lambda t: self.campo_nombre.setText(t.upper()) if t != t.upper() else None)
         col_nombre.addWidget(self.campo_nombre)
+        self.msg_nombre = self._crear_mensaje_campo()
+        col_nombre.addWidget(self.msg_nombre)
 
         layout_form.addLayout(col_nombre)
         layout_form.addSpacing(6)
@@ -467,6 +486,8 @@ class DialogoUsuario(QDialog):
         self.campo_direccion = QLineEdit()
         self.campo_direccion.setPlaceholderText("Ej. CALLE 05 DE AGOSTO S/N")
         col_dir.addWidget(self.campo_direccion)
+        self.msg_direccion = self._crear_mensaje_campo()
+        col_dir.addWidget(self.msg_direccion)
 
         layout_form.addLayout(col_dir)
         layout_form.addSpacing(6)
@@ -483,10 +504,14 @@ class DialogoUsuario(QDialog):
         self.campo_nuevo_medidor = QLineEdit()
         self.campo_nuevo_medidor.setPlaceholderText(
             "N° de medidor (ej. 22392996)")
+        # Solo dígitos, máximo 12 (los medidores reales tienen entre 6 y 9)
+        self.campo_nuevo_medidor.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r"\d{0,12}"), self.campo_nuevo_medidor))
         self.campo_nuevo_medidor.returnPressed.connect(self._agregar_medidor)
         fila_add_med.addWidget(self.campo_nuevo_medidor, stretch=1)
 
-        btn_add_med = QPushButton("➕ Añadir")
+        btn_add_med = QPushButton("Añadir")
+        iconos.aplicar(btn_add_med, "plus")
         btn_add_med.setProperty("class", "boton boton_secundario")
         btn_add_med.clicked.connect(self._agregar_medidor)
         fila_add_med.addWidget(btn_add_med)
@@ -506,6 +531,8 @@ class DialogoUsuario(QDialog):
         self.layout_chips.setContentsMargins(0, 4, 0, 4)
         self.layout_chips.setSpacing(8)
         col_med.addWidget(self.contenedor_chips)
+        self.msg_medidores = self._crear_mensaje_campo()
+        col_med.addWidget(self.msg_medidores)
 
         layout_form.addLayout(col_med)
         layout_form.addSpacing(6)
@@ -515,8 +542,24 @@ class DialogoUsuario(QDialog):
         scroll_area.setWidget(scroll_widget)
         layout_principal.addWidget(scroll_area, stretch=1)
 
+        # Resumen de lo que falta para poder guardar (gris; rojo tras intentar guardar).
+        # Va en su propia fila, con altura fija para 2 líneas, y reserva el espacio
+        # aunque esté oculto: el diálogo no cambia de tamaño al aparecer/desaparecer.
+        self.lbl_resumen = QLabel("")
+        self.lbl_resumen.setProperty("class", "campo_mensaje")
+        self.lbl_resumen.setWordWrap(True)
+        self.lbl_resumen.setFixedHeight(36)
+        self.lbl_resumen.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        politica_resumen = self.lbl_resumen.sizePolicy()
+        politica_resumen.setRetainSizeWhenHidden(True)
+        self.lbl_resumen.setSizePolicy(politica_resumen)
+        self.lbl_resumen.hide()
+        layout_principal.addWidget(self.lbl_resumen)
+
         # Botones de pie (fijos)
         fila_botones = QHBoxLayout()
+        fila_botones.setSpacing(10)
         fila_botones.addStretch(1)
 
         btn_cancelar = QPushButton("Cancelar")
@@ -525,15 +568,46 @@ class DialogoUsuario(QDialog):
         btn_cancelar.clicked.connect(self.reject)
         fila_botones.addWidget(btn_cancelar)
 
-        btn_guardar = QPushButton("💾 Guardar Usuario")
-        btn_guardar.setProperty("class", "boton boton_primario")
-        btn_guardar.setMinimumHeight(38)
-        btn_guardar.clicked.connect(self._guardar)
-        fila_botones.addWidget(btn_guardar)
+        self.btn_guardar = QPushButton("Guardar Usuario")
+        iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
+        self.btn_guardar.setProperty("class", "boton boton_primario")
+        self.btn_guardar.setMinimumHeight(38)
+        self.btn_guardar.clicked.connect(self._guardar)
+        fila_botones.addWidget(self.btn_guardar)
 
         layout_principal.addLayout(fila_botones)
 
-        # Conectar validaciones en vivo
+        # Validacion en vivo: cada cambio recalcula errores y el estado de Guardar
+        self.campo_id.textEdited.connect(
+            lambda _t: self._marcar_tocado("dni"))
+        self.campo_id.textChanged.connect(
+            lambda _t: self._validar_formulario())
+        self.campo_conexion.textEdited.connect(
+            lambda _t: self._marcar_tocado("conexion"))
+        self.campo_conexion.textChanged.connect(
+            lambda _t: self._validar_formulario())
+        self.campo_nombre.textEdited.connect(
+            lambda _t: self._marcar_tocado("nombre"))
+        self.campo_nombre.textChanged.connect(
+            lambda _t: self._validar_formulario())
+        self.campo_direccion.textEdited.connect(
+            lambda _t: self._marcar_tocado("direccion"))
+        self.campo_direccion.textChanged.connect(
+            lambda _t: self._validar_formulario())
+        self.campo_nuevo_medidor.textChanged.connect(
+            lambda _t: self._validar_formulario())
+        self.campo_nuevo_medidor.editingFinished.connect(
+            lambda: self._marcar_tocado("medidores"))
+        # Al salir de un campo tambien cuenta como "tocado" (aunque no haya escrito)
+        for campo, clave in (
+            (self.campo_id, "dni"),
+            (self.campo_nombre, "nombre"),
+            (self.campo_direccion, "direccion"),
+        ):
+            campo.editingFinished.connect(
+                lambda c=clave: self._marcar_tocado(c))
+
+        # Conectar validaciones en vivo para DNI y medidor duplicados
         self.campo_id.textChanged.connect(self._validar_dni_en_vivo)
         self.campo_nuevo_medidor.textChanged.connect(self._validar_medidor_en_vivo)
 
@@ -574,6 +648,9 @@ class DialogoUsuario(QDialog):
             self.campo_conexion.setText(sug_con)
             self._renderizar_chips_medidores()
 
+        # Estado inicial del boton Guardar (sin marcar nada en rojo todavia)
+        self._validar_formulario()
+
     def _toggle_sin_dni(self, marcado: bool) -> None:
         if marcado:
             sug_sd = self.servicio.obtener_siguiente_id_sd()
@@ -583,6 +660,7 @@ class DialogoUsuario(QDialog):
             self.campo_id.setText("")
             self.campo_id.setReadOnly(False)
         self._validar_dni_en_vivo()
+        self._marcar_tocado("dni")
 
     def _validar_dni_en_vivo(self, texto: str = "") -> None:
         txt = self.campo_id.text().strip()
@@ -638,7 +716,19 @@ class DialogoUsuario(QDialog):
         txt = self.campo_nuevo_medidor.text().strip()
         if not txt:
             return
+        if not txt.isdigit():
+            self._marcar_tocado("medidores")
+            self._mostrar_estado_campo(
+                self.campo_nuevo_medidor, self.msg_medidores,
+                "El número de medidor solo admite dígitos (ej. 22392996).", "error")
+            return
         med_norm = codigos.normalizar_medidor(txt)
+        if med_norm in self.medidores_lista:
+            self._mostrar_estado_campo(
+                self.campo_nuevo_medidor, self.msg_medidores,
+                f"El medidor {med_norm} ya está en la lista.", "aviso")
+            self.campo_nuevo_medidor.selectAll()
+            return
         if med_norm not in self.medidores_lista:
             self.medidores_lista.append(med_norm)
             self._renderizar_chips_medidores()
@@ -646,12 +736,14 @@ class DialogoUsuario(QDialog):
         self.lbl_error_medidor.setText("")
         self.lbl_error_medidor.setVisible(False)
         self.campo_nuevo_medidor.setFocus()
+        self._marcar_tocado("medidores")
 
     def _quitar_medidor(self, medidor: str) -> None:
         if medidor in self.medidores_lista:
             self.medidores_lista.remove(medidor)
             self._renderizar_chips_medidores()
             self._validar_medidor_en_vivo()
+            self._marcar_tocado("medidores")
 
     def _renderizar_chips_medidores(self) -> None:
         # Limpiar chips anteriores
@@ -674,11 +766,13 @@ class DialogoUsuario(QDialog):
                 l_chip.setContentsMargins(6, 2, 6, 2)
                 l_chip.setSpacing(6)
 
-                lbl_m = QLabel(f"💧 {m}")
+                l_chip.addWidget(iconos.etiqueta("droplet", "primario", 14))
+                lbl_m = QLabel(str(m))
                 lbl_m.setProperty("class", "chip_texto")
                 l_chip.addWidget(lbl_m)
 
-                btn_del = QPushButton("✕")
+                btn_del = QPushButton("")
+                iconos.aplicar(btn_del, "x", "peligro", 12)
                 btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_del.setStyleSheet(
                     "border: none; background: transparent; color: #dc2626; font-weight: bold;")
@@ -690,7 +784,257 @@ class DialogoUsuario(QDialog):
 
         self.layout_chips.addStretch(1)
 
+    # -------------------------------------------------------------------
+    # Validacion en vivo y feedback visual
+    # -------------------------------------------------------------------
+    CAMPOS_OBLIGATORIOS = ("dni", "nombre", "direccion", "medidores")
+    NOMBRES_CAMPO = {
+        "dni": "DNI",
+        "conexion": "N° de conexión",
+        "nombre": "apellidos y nombres",
+        "direccion": "dirección",
+        "medidores": "al menos un medidor",
+    }
+
+    def _crear_mensaje_campo(self) -> QLabel:
+        """Etiqueta pequeña bajo un campo para mostrar el error/aviso del campo.
+
+            Reserva su espacio aunque esté oculta y no usa word-wrap: así el diálogo
+            no cambia de altura con cada tecla (evita el aviso QWindowsWindow::setGeometry).
+            """
+        lbl = QLabel("")
+        lbl.setProperty("class", "campo_mensaje")
+        lbl.setProperty("nivel", "error")
+        lbl.setWordWrap(False)
+        lbl.setFixedHeight(18)
+        politica = lbl.sizePolicy()
+        politica.setRetainSizeWhenHidden(True)
+        lbl.setSizePolicy(politica)
+        lbl.hide()
+        return lbl
+
+    @staticmethod
+    def _repintar(widget: QWidget) -> None:
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+
+    def _marcar_tocado(self, clave: str) -> None:
+        if clave not in self._tocados:
+            self._tocados.add(clave)
+        self._validar_formulario()
+
+    # DNI de 7-8 digitos, opcionalmente con sufijo para una misma persona con
+    # varias conexiones: 76469789, 76469789-1, 76469789-A. Tambien SD-xxx.
+    _PATRON_DNI = re.compile(r"^(\d{7,8})(?:-([A-Za-z0-9]{1,2}))?$")
+
+    def _normalizar_id_ingresado(self, texto: str) -> Optional[str]:
+        """Devuelve el ID normalizado o None si el formato no es valido.
+
+        '7646978'      -> '07646978'
+        '76469789-1'   -> '76469789-1'
+        '76469789-a'   -> '76469789-A'
+        'SD-012'       -> 'SD-012'
+        """
+        texto = texto.strip().upper()
+        m = self._PATRON_DNI.match(texto)
+        if m:
+            base = codigos.normalizar_dni(m.group(1))
+            sufijo = m.group(2)
+            return f"{base}-{sufijo}" if sufijo else base
+        if texto.startswith("SD-") and len(texto) > 3:
+            return texto
+        return None
+
+    def _sugerir_sufijo_libre(self, id_norm: str) -> Optional[str]:
+        """Si el DNI ya existe, propone el siguiente ID con sufijo libre (-1, -2, ...)."""
+        base = id_norm.split("-")[0]
+        if not base.isdigit():
+            return None
+        for n in range(1, 10):
+            candidato = f"{base}-{n}"
+            try:
+                if self.servicio.obtener_usuario(candidato) is None:
+                    return candidato
+            except Exception:
+                return None
+        return None
+
+    def _calcular_errores(self) -> Dict[str, tuple]:
+        """
+        Devuelve {clave_campo: (mensaje, nivel)} con los problemas actuales.
+        nivel: 'error' bloquea el guardado; 'aviso' solo informa.
+        """
+        errores: Dict[str, tuple] = {}
+
+        # DNI / ID
+        texto_id = self.campo_id.text().strip()
+        sin_dni = bool(getattr(self, "chk_sin_dni", None)
+                       and self.chk_sin_dni.isChecked())
+        if not sin_dni:
+            if not texto_id:
+                errores["dni"] = (
+                    "Ingresa el DNI (8 dígitos) o marca «Persona sin DNI».", "error")
+            else:
+                id_norm = self._normalizar_id_ingresado(texto_id)
+                if id_norm is None:
+                    errores["dni"] = (
+                        "El DNI debe tener 8 dígitos; si la persona ya tiene otra conexión "
+                        "usa un sufijo: 76469789-1 (o formato SD-xxx).", "error")
+                elif id_norm != self.id_original:
+                    try:
+                        existe = self.servicio.obtener_usuario(
+                            id_norm) is not None
+                    except Exception:
+                        existe = False
+                    if existe:
+                        sugerido = self._sugerir_sufijo_libre(id_norm)
+                        msg = f"Ya existe un usuario con el ID {id_norm}."
+                        if sugerido:
+                            msg += (f" Si es la misma persona con otra conexión, "
+                                    f"regístrala como {sugerido}.")
+                        errores["dni"] = (msg, "error")
+
+        # Conexion (opcional, pero si se escribe debe ser numerica)
+        texto_con = self.campo_conexion.text().strip()
+        if texto_con and not texto_con.isdigit():
+            errores["conexion"] = (
+                "La conexión solo admite números (6 dígitos).", "error")
+
+        # Nombre
+        texto_nombre = self.campo_nombre.text().strip()
+        if not texto_nombre:
+            errores["nombre"] = (
+                "Ingresa los apellidos y nombres completos.", "error")
+        elif re.search(r"\d", texto_nombre):
+            errores["nombre"] = (
+                "El nombre solo admite letras; no puede contener números.", "error")
+        elif not re.fullmatch(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ,.'\-]+", texto_nombre):
+            errores["nombre"] = (
+                "El nombre solo admite letras, espacios, coma, punto y guion.", "error")
+        elif len(re.sub(r"[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]", "", texto_nombre)) < 3:
+            errores["nombre"] = (
+                "Ingresa los apellidos y nombres completos (mínimo 3 letras).", "error")
+        elif len(texto_nombre.split()) < 2:
+            errores["nombre"] = (
+                "Ingresa al menos apellido y nombre (ej. CONDORI MAMANI, CARLOS).", "error")
+
+        # Direccion
+        if not self.campo_direccion.text().strip():
+            errores["direccion"] = (
+                "Ingresa la dirección o una referencia.", "error")
+
+        # Medidores
+        pendiente = self.campo_nuevo_medidor.text().strip()
+        if pendiente and not pendiente.isdigit():
+            errores["medidores"] = (
+                "El número de medidor solo admite dígitos (ej. 22392996).", "error")
+        elif not self.medidores_lista:
+            if pendiente:
+                errores["medidores"] = (
+                    f"Pulsa «Añadir» (o Enter) para agregar el medidor {pendiente}.", "aviso_bloqueante")
+            else:
+                errores["medidores"] = (
+                    "Agrega al menos un medidor: escribe el número y pulsa «Añadir».", "error")
+        else:
+            try:
+                valido, err_msg = self.servicio.validar_medidores_unicos(
+                    self.medidores_lista, id_usuario_actual=self.id_original or None)
+            except TypeError:
+                valido, err_msg = self.servicio.validar_medidores_unicos(
+                    self.medidores_lista)
+            except Exception:
+                valido, err_msg = True, None
+            if not valido:
+                errores["medidores"] = (
+                    err_msg or "Uno de los medidores ya está asignado a otra persona.", "error")
+
+        return errores
+
+    def _mostrar_estado_campo(self, campo: Optional[QWidget], lbl: QLabel,
+                              mensaje: Optional[str], nivel: str = "error") -> None:
+        es_error = mensaje is not None and nivel == "error"
+        if campo is not None:
+            if (campo.property("invalido") or "false") != ("true" if es_error else "false"):
+                campo.setProperty("invalido", "true" if es_error else "false")
+                self._repintar(campo)
+        if mensaje:
+            lbl.setText(mensaje)
+            lbl.setProperty("nivel", "error" if nivel == "error" else "aviso")
+            self._repintar(lbl)
+            lbl.show()
+        else:
+            lbl.hide()
+
+    def _validar_formulario(self, mostrar_todo: bool = False) -> bool:
+        """Recalcula errores, pinta los campos y habilita/deshabilita Guardar."""
+        if not hasattr(self, "btn_guardar"):
+            return True  # la UI aun no termino de construirse
+        errores = self._calcular_errores()
+        mostrar_todo = mostrar_todo or self._intento_guardar
+
+        mapa = {
+            "dni": (self.campo_id, self.msg_id),
+            "conexion": (self.campo_conexion, self.msg_conexion),
+            "nombre": (self.campo_nombre, self.msg_nombre),
+            "direccion": (self.campo_direccion, self.msg_direccion),
+            "medidores": (self.campo_nuevo_medidor, self.msg_medidores),
+        }
+        for clave, (campo, lbl) in mapa.items():
+            msg, nivel = errores.get(clave, (None, "error"))
+            # El aviso "pulsa Añadir" se muestra siempre: es una ayuda, no un regaño
+            visible = msg is not None and (
+                mostrar_todo or clave in self._tocados or nivel == "aviso_bloqueante")
+            self._mostrar_estado_campo(
+                campo, lbl, msg if visible else None,
+                "error" if nivel == "error" else "aviso")
+
+        hay_bloqueo = bool(errores)
+        self.btn_guardar.setEnabled(not hay_bloqueo)
+
+        if hay_bloqueo:
+            faltan = [self.NOMBRES_CAMPO[c]
+                      for c in ("dni", "nombre", "direccion", "medidores", "conexion") if c in errores]
+            self.lbl_resumen.setText(
+                "Para guardar falta: " + ", ".join(faltan) + ".")
+            self.lbl_resumen.setProperty(
+                "nivel", "error" if mostrar_todo else "info")
+            self._repintar(self.lbl_resumen)
+            self.lbl_resumen.show()
+            self.btn_guardar.setToolTip(
+                "Completa los campos marcados para poder guardar.")
+        else:
+            self.lbl_resumen.hide()
+            self.btn_guardar.setToolTip("")
+        return not hay_bloqueo
+
+    def _enfocar_primer_error(self) -> None:
+        errores = self._calcular_errores()
+        orden = (
+            ("dni", self.campo_id),
+            ("conexion", self.campo_conexion),
+            ("nombre", self.campo_nombre),
+            ("direccion", self.campo_direccion),
+            ("medidores", self.campo_nuevo_medidor),
+        )
+        for clave, campo in orden:
+            if clave in errores:
+                campo.setFocus()
+                return
+
     def _guardar(self) -> None:
+        # Validacion visual primero: marca en rojo todo lo que falte
+        self._intento_guardar = True
+        errores = self._calcular_errores()
+        errores_bloqueantes = {
+            k: v for k, v in errores.items()
+            if not (k == "dni" and "Ya existe un usuario con el ID" in v[0])
+            and not (k == "medidores" and "ya está asignado a otra persona" in v[0])
+        }
+        if errores_bloqueantes:
+            self._validar_formulario(mostrar_todo=True)
+            self._enfocar_primer_error()
+            return
+
         nuevo_id = self.campo_id.text().strip()
         nombre = self.campo_nombre.text().strip().upper()
         conexion = self.campo_conexion.text().strip()
@@ -713,9 +1057,11 @@ class DialogoUsuario(QDialog):
             if sin_dni or not nuevo_id:
                 id_final = self.servicio.obtener_siguiente_id_sd()
             else:
-                if not es_formato_id_valido(nuevo_id):
+                if not (es_formato_id_valido(nuevo_id) or (self._normalizar_id_ingresado(nuevo_id) is not None)):
                     QMessageBox.warning(
-                        self, "DNI inválido", "El DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx o sufijo correlativo.")
+                        self, "DNI inválido",
+                        "El DNI debe contener 7 u 8 dígitos (opcionalmente con sufijo, ej. 76469789-1), "
+                        "o tener formato SD-xxx.")
                     self.campo_id.setFocus()
                     return
                 id_final = normalizar_id_completo(nuevo_id)
@@ -742,9 +1088,11 @@ class DialogoUsuario(QDialog):
             # Modo edición: si el usuario cambió el DNI / ID (ej. de SD-001 a DNI real)
             id_final = self.id_original
             if nuevo_id and nuevo_id != self.id_original:
-                if not es_formato_id_valido(nuevo_id):
+                if not (es_formato_id_valido(nuevo_id) or (self._normalizar_id_ingresado(nuevo_id) is not None)):
                     QMessageBox.warning(
-                        self, "DNI inválido", "El nuevo DNI debe contener 7 u 8 dígitos, o tener formato SD-xxx o sufijo correlativo.")
+                        self, "DNI inválido",
+                        "El nuevo DNI debe contener 7 u 8 dígitos (opcionalmente con sufijo, ej. 76469789-1), "
+                        "o tener formato SD-xxx.")
                     self.campo_id.setFocus()
                     return
                 norm_id = normalizar_id_completo(nuevo_id)
@@ -861,7 +1209,7 @@ class DialogoCorregirDni(QDialog):
         layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(14)
 
-        lbl_titulo = QLabel("🆔 Corregir Documento de Identidad")
+        lbl_titulo = QLabel("Corregir Documento de Identidad")
         lbl_titulo.setObjectName("dialogo_titulo")
         layout.addWidget(lbl_titulo)
 
@@ -905,7 +1253,8 @@ class DialogoCorregirDni(QDialog):
         btn_cancelar.clicked.connect(self.reject)
         fila_botones.addWidget(btn_cancelar)
 
-        btn_confirmar = QPushButton("✅ Confirmar y Renombrar DNI")
+        btn_confirmar = QPushButton("Confirmar y Renombrar DNI")
+        iconos.aplicar(btn_confirmar, "circle-check", "blanco")
         btn_confirmar.setProperty("class", "boton boton_aviso")
         btn_confirmar.clicked.connect(self._confirmar)
         fila_botones.addWidget(btn_confirmar)

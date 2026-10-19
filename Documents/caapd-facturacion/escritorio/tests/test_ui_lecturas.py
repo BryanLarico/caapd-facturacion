@@ -521,7 +521,7 @@ def test_pantalla_lecturas_sin_filtro_sin_acceso_y_con_registrado_por(qtbot, ser
 
     assert not hasattr(pagina, "btn_filtro_sin_acceso")
     assert pagina.btn_filtro_todos.text() == "Todos (3)"
-    assert pagina.btn_filtro_faltan.text() == "⏳ Faltan (2)"
+    assert pagina.btn_filtro_faltan.text() == "Faltan (2)"
     assert (
         int(pagina.btn_filtro_todos.text().split("(")[1][:-1])
         == int(pagina.btn_filtro_faltan.text().split("(")[1][:-1]) + 1

@@ -37,7 +37,7 @@ if "--worker-descarga-lecturas" in sys.argv:
 # Importar firebase_admin/gRPC desde el hilo principal poco después de abrir la
 # ventana. Evita que la PRIMERA importación del código nativo de gRPC ocurra dentro
 # de un hilo del QThreadPool (causa de cierres silenciosos en Windows al usar
-# «Traer lecturas de los lectores» / «Enviar mes a los lectores»).
+# «Extraer lecturas de los lectores» / «Enviar mes a los lectores»).
 PRECARGAR_FIREBASE_AL_INICIO = True
 RETARDO_PRECARGA_MS = 1500
 

@@ -16,17 +16,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 
 class AlertaWidget(QFrame):
     """
     Componente de alerta visual con ícono y texto descriptivo.
     """
 
-    ICONOS = {
-        "exito": "✅",
-        "aviso": "⚠️",
-        "peligro": "❌",
-        "info": "ℹ️",
+    # Color del ícono según el tipo (coincide con alerta_texto_* en tema.qss)
+    COLOR_ICONO = {
+        "exito": "exito",
+        "aviso": "aviso",
+        "peligro": "peligro",
+        "info": "info",
     }
 
     def __init__(
@@ -52,14 +55,10 @@ class AlertaWidget(QFrame):
         layout.setSpacing(12)
 
         # Ícono
-        self.lbl_icono = QLabel(self.ICONOS.get(tipo, "ℹ️"))
-        self.lbl_icono.setStyleSheet(
-            "font-size: 18px; background: transparent;")
-        self.lbl_icono.setAlignment(
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.lbl_icono.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        layout.addWidget(self.lbl_icono)
+        self.lbl_icono = iconos.etiqueta(
+            iconos.POR_TIPO.get(tipo, "info-circle"),
+            self.COLOR_ICONO.get(tipo, "info"), 20)
+        layout.addWidget(self.lbl_icono, alignment=Qt.AlignmentFlag.AlignTop)
 
         # Texto del mensaje (se parte en varias líneas y crece en alto según el ancho)
         self.lbl_mensaje = QLabel(mensaje)
@@ -77,7 +76,8 @@ class AlertaWidget(QFrame):
 
         # Botón de cerrar opcional
         if cerrable:
-            self.btn_cerrar = QPushButton("✕")
+            self.btn_cerrar = QPushButton("")
+            iconos.aplicar(self.btn_cerrar, "x", "gris", 14)
             self.btn_cerrar.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_cerrar.setFixedSize(24, 24)
             self.btn_cerrar.setStyleSheet(
@@ -93,7 +93,9 @@ class AlertaWidget(QFrame):
             self.tipo = tipo
             self.setProperty("class", f"alerta alerta_{tipo}")
             self.lbl_mensaje.setProperty("class", f"alerta_texto_{tipo}")
-            self.lbl_icono.setText(self.ICONOS.get(tipo, "ℹ️"))
+            iconos.poner_en_etiqueta(
+                self.lbl_icono, iconos.POR_TIPO.get(tipo, "info-circle"),
+                self.COLOR_ICONO.get(tipo, "info"), 20)
             # Refrescar estilo en Qt
             self.style().unpolish(self)
             self.style().polish(self)

@@ -1196,7 +1196,7 @@ class ServicioDatosPadron(ServicioDatos):
         if next(iter(col_ref.list_documents()), None) is not None:
             raise ValueError(
                 f"Firebase ya contiene documentos para el periodo {periodo}. "
-                "No se modificó la nube; usa «Traer lecturas de los lectores» "
+                "No se modificó la nube; usa «Extraer lecturas de los lectores» "
                 "o revisa el periodo antes de publicar."
             )
 
@@ -1255,7 +1255,7 @@ class ServicioDatosPadron(ServicioDatos):
         callback_progreso: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Acción B: Traer lecturas de los lectores (Nube -> Excel).
+        Acción B: Extraer lecturas de los lectores (Nube -> Excel).
         Descarga exclusivamente las lecturas y medidores desde mes_aaaa-mm.
         - Protege las lecturas registradas por ADMIN (nunca las sobreescribe sin aviso).
         - Recalcula los consumos por medidor y consumo_total_m3 según reglas comunales.
@@ -1538,7 +1538,7 @@ class ServicioDatosPadron(ServicioDatos):
         if id_viejo == id_nuevo:
             raise ValueError("El nuevo ID es igual al ID actual.")
         if id_nuevo in self.usuarios:
-            raise ValueError(f"Ya existe un usuario con el ID/DNI '{id_nuevo}'.")
+            raise ValueError(f"Ya existe un usuario con el DNI '{id_nuevo}'.")
         if id_viejo not in self.usuarios:
             raise ValueError(f"Usuario {id_viejo} no existe.")
 

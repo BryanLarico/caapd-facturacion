@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
 from PySide6.QtGui import QColor, QFont
 
+from ui import iconos
+
 import codigos
 
 
@@ -43,13 +45,19 @@ class ModeloUsuarios(QAbstractTableModel):
         u = self._datos[index.row()]
         col = index.column()
 
+        if role == Qt.ItemDataRole.DecorationRole:
+            # Marca visual de DNI pendiente (col 1) y gota si tiene medidor (col 5)
+            if col == 1 and u.get("es_pendiente"):
+                return iconos.icono("alert-triangle", "aviso")
+            if col == 5 and (u.get("medidores") or []):
+                return iconos.icono("droplet", "primario")
+            return None
+
         if role == Qt.ItemDataRole.DisplayRole:
             if col == 0:
                 return str(u.get("nro_conexion") or "—")
             elif col == 1:
                 uid = str(u.get("id_usuario") or u.get("_id") or "—")
-                if u.get("es_pendiente"):
-                    return f"{uid}  ⚠️"
                 return uid
             elif col == 2:
                 return str(u.get("nombre") or "").upper()
@@ -61,7 +69,7 @@ class ModeloUsuarios(QAbstractTableModel):
                 meds = u.get("medidores") or []
                 meds_str = [m if isinstance(m, str) else m.get("nro_medidor", "") for m in meds]
                 if meds_str:
-                    return ", ".join(f"💧 {m}" for m in meds_str if m)
+                    return ", ".join(m for m in meds_str if m)
                 return "(Sin medidor)"
             elif col == 6:
                 return str(u.get("codigo_categoria") or "A")

@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui import iconos
 from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
@@ -136,7 +138,8 @@ class PaginaConfiguracion(QWidget):
         fila_encabezado.addWidget(self.indicador_carga)
 
         # Botón Reestablecer
-        self.btn_recargar = QPushButton("🔄 Reestablecer")
+        self.btn_recargar = QPushButton("Reestablecer")
+        iconos.aplicar(self.btn_recargar, "refresh")
         self.btn_recargar.setProperty("class", "boton boton_secundario")
         self.btn_recargar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_recargar.clicked.connect(
@@ -144,7 +147,8 @@ class PaginaConfiguracion(QWidget):
         fila_encabezado.addWidget(self.btn_recargar)
 
         # Botón Guardar
-        self.btn_guardar = QPushButton("💾 Guardar Configuración")
+        self.btn_guardar = QPushButton("Guardar Configuración")
+        iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
         self.btn_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_guardar.setStyleSheet("""
             QPushButton {
@@ -204,18 +208,20 @@ class PaginaConfiguracion(QWidget):
         self.widget_tab_empresa = self._crear_tab_empresa()
 
         # Pestaña 1: Tarifas y Categorías
-        self.tabs.addTab(self._crear_tab_tarifas(), "💧 Tarifas y Categorías")
+        self.tabs.addTab(self._crear_tab_tarifas(),
+                         iconos.icono("droplet", "primario"), "Tarifas y Categorías")
 
         # Pestaña 2: Impuestos y Mora
         self.tabs.addTab(self._crear_tab_impuestos(),
-                         "💰 Impuestos (IGV) y Mora")
+                         iconos.icono("receipt-tax", "primario"), "Impuestos (IGV) y Mora")
 
         # Pestaña 3: Sectores
-        self.tabs.addTab(self._crear_tab_sectores(), "📍 Sectores / Barrios")
+        self.tabs.addTab(self._crear_tab_sectores(),
+                         iconos.icono("map-pin", "primario"), "Sectores / Barrios")
 
         # Pestaña 4: Observaciones de Medidor
         self.tabs.addTab(self._crear_tab_observaciones(),
-                         "📋 Catálogo de Novedades")
+                         iconos.icono("clipboard-list", "primario"), "Catálogo de Novedades")
 
         layout_principal.addWidget(self.tabs, stretch=1)
 
@@ -288,7 +294,7 @@ class PaginaConfiguracion(QWidget):
         f_fact.addRow("Último N° de Recibo:", self.spin_ultimo_recibo)
 
         lbl_aviso_correlativo = QLabel(
-            "⚠️ <i>Los nuevos recibos que emita el sistema continuarán automáticamente a partir de este número + 1.</i>"
+            "<i>Los nuevos recibos que emita el sistema continuarán automáticamente a partir de este número + 1.</i>"
         )
         lbl_aviso_correlativo.setStyleSheet("color: #64748b; font-size: 11px;")
         f_fact.addRow("", lbl_aviso_correlativo)
@@ -370,14 +376,16 @@ class PaginaConfiguracion(QWidget):
         lay_r.setSpacing(10)
 
         fila_btn_r = QHBoxLayout()
-        self.btn_agregar_rango = QPushButton("➕ Agregar Rango")
+        self.btn_agregar_rango = QPushButton("Agregar Rango")
+        iconos.aplicar(self.btn_agregar_rango, "plus")
         self.btn_agregar_rango.setProperty("class", "boton boton_secundario")
         self.btn_agregar_rango.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_agregar_rango.clicked.connect(self._accion_agregar_rango)
         fila_btn_r.addWidget(self.btn_agregar_rango)
 
-        self.btn_eliminar_rango = QPushButton("🗑️ Eliminar Rango Seleccionado")
-        self.btn_eliminar_rango.setProperty("class", "boton boton_peligro")
+        self.btn_eliminar_rango = QPushButton("Eliminar Rango Seleccionado")
+        iconos.aplicar(self.btn_eliminar_rango, "trash", "peligro")
+        self.btn_eliminar_rango.setProperty("class", "boton boton_peligro_secundario")
         self.btn_eliminar_rango.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_eliminar_rango.clicked.connect(self._accion_eliminar_rango)
         fila_btn_r.addWidget(self.btn_eliminar_rango)
@@ -529,13 +537,15 @@ class PaginaConfiguracion(QWidget):
         lay.addWidget(lbl_desc)
 
         fila_btn = QHBoxLayout()
-        self.btn_agregar_sector = QPushButton("➕ Agregar Sector")
+        self.btn_agregar_sector = QPushButton("Agregar Sector")
+        iconos.aplicar(self.btn_agregar_sector, "plus")
         self.btn_agregar_sector.setProperty("class", "boton boton_secundario")
         self.btn_agregar_sector.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_agregar_sector.clicked.connect(self._accion_agregar_sector)
         fila_btn.addWidget(self.btn_agregar_sector)
 
-        self.btn_eliminar_sector = QPushButton("🗑️ Eliminar Sector")
+        self.btn_eliminar_sector = QPushButton("Eliminar Sector")
+        iconos.aplicar(self.btn_eliminar_sector, "trash", "blanco")
         self.btn_eliminar_sector.setProperty("class", "boton boton_peligro")
         self.btn_eliminar_sector.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_eliminar_sector.clicked.connect(self._accion_eliminar_sector)
@@ -588,13 +598,15 @@ class PaginaConfiguracion(QWidget):
         lay.addWidget(lbl_desc)
 
         fila_btn = QHBoxLayout()
-        self.btn_agregar_obs = QPushButton("➕ Agregar Novedad")
+        self.btn_agregar_obs = QPushButton("Agregar Novedad")
+        iconos.aplicar(self.btn_agregar_obs, "plus")
         self.btn_agregar_obs.setProperty("class", "boton boton_secundario")
         self.btn_agregar_obs.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_agregar_obs.clicked.connect(self._accion_agregar_observacion)
         fila_btn.addWidget(self.btn_agregar_obs)
 
-        self.btn_eliminar_obs = QPushButton("🗑️ Eliminar Novedad")
+        self.btn_eliminar_obs = QPushButton("Eliminar Novedad")
+        iconos.aplicar(self.btn_eliminar_obs, "trash", "blanco")
         self.btn_eliminar_obs.setProperty("class", "boton boton_peligro")
         self.btn_eliminar_obs.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_eliminar_obs.clicked.connect(

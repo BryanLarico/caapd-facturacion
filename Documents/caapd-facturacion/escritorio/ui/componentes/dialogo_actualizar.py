@@ -3,9 +3,9 @@ ui/componentes/dialogo_actualizar.py — Centro de Sincronización con Lectores 
 
 Flujo en DOS pasos dentro del mismo diálogo:
   Paso 1 · Elegir acción:
-      - "Sobreescribe Nube"  → Enviar mes a los lectores (Excel ➔ Nube).
-      - "Solo agrega"        → Publicar únicamente el mes activo (Excel ➔ Nube).
-      - "Descarga Espejo"    → Traer lecturas de los lectores (Nube ➔ Excel).
+      - "Sobreescribe Nube"  → Enviar mes a los lectores (Excel → Nube).
+      - "Solo agrega"        → Publicar únicamente el mes activo (Excel → Nube).
+      - "Descarga Espejo"    → Extraer lecturas de los lectores (Nube → Excel).
   Paso 2 · Pregunta "¿Está seguro?" con la explicación de lo que hace cada botón:
       - Sobreescribe Nube: exige escribir la palabra CONFIRMAR (Regla 5a) antes de habilitar el botón.
       - Solo agrega y Descarga Espejo: basta con confirmar; no reemplazan documentos existentes.
@@ -28,6 +28,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import iconos
+
 import rutas
 
 
@@ -45,9 +47,9 @@ class DialogoActualizarBaseDatos(QDialog):
     # Toda la información visual y explicativa de cada botón vive aquí.
     INFO_ACCIONES: Dict[str, Dict[str, Any]] = {
         ACCION_SUBIR_FIREBASE: {
-            "icono": "☁️",
+            "icono": "cloud-upload",
             "titulo": "Enviar mes a los lectores",
-            "direccion": "Excel ➔ Nube",
+            "direccion": "Excel → Nube",
             "badge": "Sobreescribe Nube",
             "color": "#dc2626",
             "color_hover": "#b91c1c",
@@ -65,9 +67,9 @@ class DialogoActualizarBaseDatos(QDialog):
             "boton": "Sí, enviar a la nube",
         },
         ACCION_PUBLICAR_MES_ACTUAL: {
-            "icono": "📤",
+            "icono": "upload",
             "titulo": "Publicar solo el mes actual",
-            "direccion": "Excel ➔ Nube",
+            "direccion": "Excel → Nube",
             "badge": "Solo agrega",
             "color": "#15803d",
             "color_hover": "#166534",
@@ -84,9 +86,9 @@ class DialogoActualizarBaseDatos(QDialog):
             "boton": "Sí, publicar solo este mes",
         },
         ACCION_DESCARGAR_FIREBASE: {
-            "icono": "📥",
-            "titulo": "Traer lecturas de los lectores",
-            "direccion": "Nube ➔ Excel",
+            "icono": "cloud-download",
+            "titulo": "Extraer lecturas de los lectores",
+            "direccion": "Nube → Excel",
             "badge": "Descarga Espejo",
             "color": "#0369a1",
             "color_hover": "#075985",
@@ -250,7 +252,7 @@ class DialogoActualizarBaseDatos(QDialog):
         lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(14)
 
-        lbl_icono = QLabel("🔄")
+        lbl_icono = iconos.etiqueta("refresh", "blanco", 30)
         lbl_icono.setObjectName("cabIcono")
         lay.addWidget(lbl_icono)
 
@@ -259,7 +261,8 @@ class DialogoActualizarBaseDatos(QDialog):
         lbl_titulo = QLabel("Sincronización con Lectores Móviles")
         lbl_titulo.setObjectName("cabTitulo")
         col.addWidget(lbl_titulo)
-        lbl_sub = QLabel("Intercambio de padrones y lecturas entre tus Excel locales y la app celular")
+        lbl_sub = QLabel(
+            "Intercambio de padrones y lecturas entre tus Excel locales y la app celular")
         lbl_sub.setObjectName("cabSub")
         lbl_sub.setWordWrap(True)
         col.addWidget(lbl_sub)
@@ -285,25 +288,32 @@ class DialogoActualizarBaseDatos(QDialog):
         ts_descarga = cfg.get("ultima_descarga_lectores") or "No registrada"
 
         n_arch = len(self.archivos_excel)
-        nombres_tooltip = "\n".join(p.name for p in self.archivos_excel) or "Carpeta vacía."
+        nombres_tooltip = "\n".join(
+            p.name for p in self.archivos_excel) or "Carpeta vacía."
 
         fila_chips = QHBoxLayout()
         fila_chips.setSpacing(10)
-        fila_chips.addWidget(self._crear_chip("📁", f"{n_arch} archivo(s) Excel", "Carpeta 'Base de datos'", nombres_tooltip))
-        fila_chips.addWidget(self._crear_chip("⬆️", str(ts_envio), "Último envío a lectores"))
-        fila_chips.addWidget(self._crear_chip("⬇️", str(ts_descarga), "Última descarga"))
+        fila_chips.addWidget(self._crear_chip(
+            "folder", f"{n_arch} archivo(s) Excel", "Carpeta 'Base de datos'", nombres_tooltip))
+        fila_chips.addWidget(self._crear_chip(
+            "upload", str(ts_envio), "Último envío a lectores"))
+        fila_chips.addWidget(self._crear_chip(
+            "download", str(ts_descarga), "Última descarga"))
         lay.addLayout(fila_chips)
 
         lbl_elige = QLabel("¿Qué deseas hacer?")
-        lbl_elige.setStyleSheet("font-size: 13px; font-weight: bold; color: #334155; margin-top: 4px;")
+        lbl_elige.setStyleSheet(
+            "font-size: 13px; font-weight: bold; color: #334155; margin-top: 4px;")
         lay.addWidget(lbl_elige)
 
         lay.addWidget(self._crear_tarjeta_accion(self.ACCION_SUBIR_FIREBASE))
-        lay.addWidget(self._crear_tarjeta_accion(self.ACCION_PUBLICAR_MES_ACTUAL))
-        lay.addWidget(self._crear_tarjeta_accion(self.ACCION_DESCARGAR_FIREBASE))
+        lay.addWidget(self._crear_tarjeta_accion(
+            self.ACCION_PUBLICAR_MES_ACTUAL))
+        lay.addWidget(self._crear_tarjeta_accion(
+            self.ACCION_DESCARGAR_FIREBASE))
 
         lbl_tip = QLabel(
-            "💡 Al elegir una opción se te preguntará <b>¿Está seguro?</b> y verás exactamente "
+            "Al elegir una opción se te preguntará <b>¿Está seguro?</b> y verás exactamente "
             "qué hará antes de ejecutar nada."
         )
         lbl_tip.setObjectName("lblAyuda")
@@ -315,7 +325,8 @@ class DialogoActualizarBaseDatos(QDialog):
 
         # Pie: abrir carpeta + cancelar
         pie = QHBoxLayout()
-        btn_carpeta = QPushButton("📂 Abrir carpeta 'Base de datos'")
+        btn_carpeta = QPushButton("Abrir carpeta 'Base de datos'")
+        iconos.aplicar(btn_carpeta, "folder-open")
         btn_carpeta.setObjectName("btnEnlace")
         btn_carpeta.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_carpeta.clicked.connect(self._abrir_carpeta_bd)
@@ -340,7 +351,7 @@ class DialogoActualizarBaseDatos(QDialog):
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(10)
 
-        lbl_ic = QLabel(icono)
+        lbl_ic = iconos.etiqueta(icono, "primario", 20)
         lbl_ic.setObjectName("chipIcono")
         lay.addWidget(lbl_ic)
 
@@ -369,12 +380,13 @@ class DialogoActualizarBaseDatos(QDialog):
         lay.setSpacing(14)
 
         # Círculo con ícono
-        lbl_icono = QLabel(info["icono"])
+        lbl_icono = QLabel()
+        lbl_icono.setPixmap(iconos.pixmap(info["icono"], info["texto"], 22))
         lbl_icono.setFixedSize(48, 48)
         lbl_icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl_icono.setStyleSheet(
             f"background-color: {info['fondo']}; border: 1px solid {info['borde']}; "
-            f"border-radius: 24px; font-size: 20px;"
+            f"border-radius: 24px;"
         )
         lay.addWidget(lbl_icono, alignment=Qt.AlignmentFlag.AlignTop)
 
@@ -412,7 +424,8 @@ class DialogoActualizarBaseDatos(QDialog):
         lay.addWidget(lbl_chevron, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         # Clic en toda la tarjeta
-        tarjeta.mousePressEvent = lambda event, a=accion: self._mostrar_confirmacion(a)
+        tarjeta.mousePressEvent = lambda event, a=accion: self._mostrar_confirmacion(
+            a)
         return tarjeta
 
     # ---------- Página 1: ¿Está seguro? ----------
@@ -425,10 +438,11 @@ class DialogoActualizarBaseDatos(QDialog):
         # Encabezado de la pregunta
         fila = QHBoxLayout()
         fila.setSpacing(16)
-        self.lbl_conf_icono = QLabel("☁️")
+        self.lbl_conf_icono = QLabel()
         self.lbl_conf_icono.setFixedSize(60, 60)
         self.lbl_conf_icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        fila.addWidget(self.lbl_conf_icono, alignment=Qt.AlignmentFlag.AlignTop)
+        fila.addWidget(self.lbl_conf_icono,
+                       alignment=Qt.AlignmentFlag.AlignTop)
 
         col = QVBoxLayout()
         col.setSpacing(4)
@@ -464,9 +478,9 @@ class DialogoActualizarBaseDatos(QDialog):
         lay_a = QHBoxLayout(self.panel_aviso)
         lay_a.setContentsMargins(14, 10, 14, 10)
         lay_a.setSpacing(10)
-        self.lbl_aviso_icono = QLabel("⚠️")
-        self.lbl_aviso_icono.setStyleSheet("font-size: 18px;")
-        lay_a.addWidget(self.lbl_aviso_icono, alignment=Qt.AlignmentFlag.AlignTop)
+        self.lbl_aviso_icono = iconos.etiqueta("alert-triangle", "aviso", 20)
+        lay_a.addWidget(self.lbl_aviso_icono,
+                        alignment=Qt.AlignmentFlag.AlignTop)
         self.lbl_aviso = QLabel("")
         self.lbl_aviso.setWordWrap(True)
         lay_a.addWidget(self.lbl_aviso, stretch=1)
@@ -559,23 +573,28 @@ class DialogoActualizarBaseDatos(QDialog):
 
         self.lbl_cab_paso.setText("PASO 2 DE 2")
 
-        self.lbl_conf_icono.setText(info["icono"])
+        self.lbl_conf_icono.setPixmap(
+            iconos.pixmap(info["icono"], info["texto"], 28))
         self.lbl_conf_icono.setStyleSheet(
             f"background-color: {info['fondo']}; border: 2px solid {info['borde']}; "
-            f"border-radius: 30px; font-size: 26px;"
+            f"border-radius: 30px;"
         )
         self.lbl_conf_sub.setText(
             f"Estás a punto de ejecutar <b>{info['titulo']}</b> "
             f"<span style='color:{info['texto']}; font-weight:bold;'>({info['badge']} · {info['direccion']})</span>."
         )
-        self.lbl_conf_hace.setText("<br>".join(f"•&nbsp; {linea}" for linea in info["hace"]))
+        self.lbl_conf_hace.setText("<br>".join(
+            f"•&nbsp; {linea}" for linea in info["hace"]))
 
         self.panel_aviso.setStyleSheet(
             f"QFrame#panelAviso {{ background-color: {info['fondo']}; border: 1px solid {info['borde']}; border-radius: 12px; }}"
         )
-        self.lbl_aviso_icono.setText("⚠️" if es_subir else "🛡️")
+        iconos.poner_en_etiqueta(
+            self.lbl_aviso_icono,
+            "alert-triangle" if es_subir else "shield-check", info["texto"], 20)
         self.lbl_aviso.setText(info["aviso"])
-        self.lbl_aviso.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {info['texto']};")
+        self.lbl_aviso.setStyleSheet(
+            f"font-size: 12px; font-weight: 600; color: {info['texto']};")
 
         self.caja_confirmar.setVisible(es_subir)
         self.txt_confirmar.clear()
@@ -621,7 +640,7 @@ class DialogoActualizarBaseDatos(QDialog):
         texto = self.txt_confirmar.text().strip()
         if texto != self.PALABRA_CLAVE:
             self.lbl_error_confirmar.setText(
-                f"✖ Debes escribir exactamente {self.PALABRA_CLAVE} (en mayúsculas). "
+                f"Debes escribir exactamente {self.PALABRA_CLAVE} (en mayúsculas). "
                 "El envío a Firebase no se ha realizado."
             )
             self.lbl_error_confirmar.show()
@@ -666,7 +685,8 @@ class DialogoActualizarBaseDatos(QDialog):
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setWindowTitle("Acceso Denegado por Seguridad")
-        msg.setText("<b>Se detectó un archivo marcado como 'TIPO: ARCHIVO DE PRUEBA':</b>")
+        msg.setText(
+            "<b>Se detectó un archivo marcado como 'TIPO: ARCHIVO DE PRUEBA':</b>")
         msg.setInformativeText(
             "Por seguridad, los archivos de prueba NO se pueden subir al proyecto de producción real.\n\n"
             "Retire esa marca solo después de verificar que el archivo contiene datos reales."

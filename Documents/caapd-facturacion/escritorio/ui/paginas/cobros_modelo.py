@@ -103,7 +103,8 @@ class DelegadoFilasCobros(QStyledItemDelegate):
         self._vista = None
 
     def _al_ingresar_indice(self, index: QModelIndex) -> None:
-        self._actualizar_fila_sobrevolada(index.row() if index.isValid() else -1)
+        self._actualizar_fila_sobrevolada(
+            index.row() if index.isValid() else -1)
 
     def eventFilter(self, watched, event) -> bool:
         if self._vista is not None and watched == self._vista.viewport():
@@ -341,7 +342,8 @@ class ModeloCobros(QAbstractTableModel):
                 self.dataChanged.emit(
                     self.index(fila, 5),
                     self.index(fila, 8),
-                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, Qt.ItemDataRole.UserRole],
+                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
+                        Qt.ItemDataRole.UserRole],
                 )
                 return
 
@@ -414,7 +416,7 @@ class ProxyCobros(QSortFilterProxyModel):
         elif self._filtro_estado == "pagados":
             if not esta_pagado:
                 return False
-        elif self._filtro_estado == "con_alertas":
+        elif self._filtro_estado in ("con_alertas", "alertas"):
             meds = doc.get("medidores") or []
             tiene_alerta = any(
                 str(m.get("novedad") or "").strip(
@@ -510,9 +512,11 @@ class ProxyCobros(QSortFilterProxyModel):
             deuda_actual_left = d_left.get("deuda_actual")
             deuda_actual_right = d_right.get("deuda_actual")
             if deuda_actual_left is None:
-                deuda_actual_left = max(0.0, float(d_left.get("total_a_pagar") or 0.0) - float(d_left.get("deuda_anterior") or 0.0))
+                deuda_actual_left = max(0.0, float(d_left.get(
+                    "total_a_pagar") or 0.0) - float(d_left.get("deuda_anterior") or 0.0))
             if deuda_actual_right is None:
-                deuda_actual_right = max(0.0, float(d_right.get("total_a_pagar") or 0.0) - float(d_right.get("deuda_anterior") or 0.0))
+                deuda_actual_right = max(0.0, float(d_right.get(
+                    "total_a_pagar") or 0.0) - float(d_right.get("deuda_anterior") or 0.0))
             return float(deuda_actual_left) < float(deuda_actual_right)
         elif col == 7:  # Total S/.
             return float(d_left.get("total_a_pagar") or 0.0) < float(d_right.get("total_a_pagar") or 0.0)

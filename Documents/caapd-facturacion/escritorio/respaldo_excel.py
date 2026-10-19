@@ -146,6 +146,7 @@ def generar_respaldo_excel(
         "ID Usuario", "Fecha Anterior", "Consumo Anterior", "Estado Lectura",
         "Registrado Por", "Categoría", "Historial m³", "Consumo Total m³",
         "Monto Agua", "Monto Desagüe", "Cargo Fijo", "IGV", "Redondeo",
+        "Deuda Ant Manual",
     ]
 
     for sec in todos_sectores:
@@ -297,8 +298,10 @@ def generar_respaldo_excel(
                                 11, value=d.get("igv")).border = borde_fino
                     ws_sec.cell(row=fila_act, column=inicio_gris +
                                 12, value=d.get("redondeo")).border = borde_fino
+                    ws_sec.cell(row=fila_act, column=inicio_gris + 13,
+                                value=1 if d.get("deuda_anterior_manual") else 0).border = borde_fino
                 else:
-                    for col_c in range(inicio_gris + 5, inicio_gris + 13):
+                    for col_c in range(inicio_gris + 5, inicio_gris + 14):
                         ws_sec.cell(row=fila_act, column=col_c,
                                     value="").border = borde_fino
 
@@ -572,6 +575,8 @@ def leer_respaldo_excel(ruta_archivo: Path | str) -> Dict[str, Any]:
                 col_map["igv"] = c
             elif h == "redondeo":
                 col_map["redondeo"] = c
+            elif h in ("deuda_ant_manual", "deuda_anterior_manual"):
+                col_map["deuda_ant_manual"] = c
 
         inicio_gris = col_map.get("id_usuario", 17)
 
@@ -704,6 +709,10 @@ def leer_respaldo_excel(ruta_archivo: Path | str) -> Dict[str, Any]:
                     "cargo_fijo": ws_sec.cell(row=r, column=col_map.get("cargo_fijo", inicio_gris + 10)).value,
                     "igv": ws_sec.cell(row=r, column=col_map.get("igv", inicio_gris + 11)).value,
                     "redondeo": ws_sec.cell(row=r, column=col_map.get("redondeo", inicio_gris + 12)).value,
+                    "deuda_anterior_manual": str(
+                        ws_sec.cell(
+                            row=r, column=col_map["deuda_ant_manual"]).value or "0"
+                    ).strip().upper() in ("1", "SI", "TRUE", "1.0") if "deuda_ant_manual" in col_map else False,
                 }
             else:
                 if n_med_str:

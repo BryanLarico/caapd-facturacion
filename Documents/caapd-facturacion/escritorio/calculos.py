@@ -89,7 +89,8 @@ def calcular_monto_agua(
             return float("inf")
 
     if modo_rangos == "tramos":
-        rangos_ord = sorted(rangos, key=lambda r: float(r.get("m3_desde") or 0))
+        rangos_ord = sorted(
+            rangos, key=lambda r: float(r.get("m3_desde") or 0))
         total = 0.0
         for rango in rangos_ord:
             desde = float(rango.get("m3_desde", 0))
@@ -97,7 +98,8 @@ def calcular_monto_agua(
             precio = float(rango.get("precio_m3") or 0.0)
 
             if consumo_m3 > desde:
-                limite_superior = min(consumo_m3, float(hasta)) if (hasta is not None and str(hasta).strip() != "" and str(hasta).lower() != "none") else consumo_m3
+                limite_superior = min(consumo_m3, float(hasta)) if (hasta is not None and str(
+                    hasta).strip() != "" and str(hasta).lower() != "none") else consumo_m3
                 m3_tramo = limite_superior - desde
                 total += m3_tramo * precio
         return round(total, 2)
@@ -133,6 +135,7 @@ def calcular_recibo(
     igv_activo: bool,
     igv_porcentaje: float,
     recibo_anterior: dict | None,
+    deuda_anterior_manual: float | None = None,
 ) -> dict:
     """Calcula todos los campos del recibo.
 
@@ -163,12 +166,17 @@ def calcular_recibo(
     # --- Conceptos de agua y alcantarillado ---
     rangos = categoria.get("rangos", [])
     modo_rangos = categoria.get("modo_rangos", "unico")
-    monto_agua = calcular_monto_agua(consumo_total_m3, rangos, modo_rangos=modo_rangos)
+    monto_agua = calcular_monto_agua(
+        consumo_total_m3, rangos, modo_rangos=modo_rangos)
     monto_desague = float(categoria.get("tarifa_desague") or 0.0)
     cargo_fijo = float(categoria.get("cargo_fijo") or 0.0)
 
     # --- Deuda anterior ---
-    if recibo_anterior:
+    # Prioridad: 1) valor fijado manualmente en la tabla de Cobros,
+    #            2) saldo del recibo anterior, 3) cero.
+    if deuda_anterior_manual is not None:
+        deuda_anterior = max(0.0, round(float(deuda_anterior_manual), 2))
+    elif recibo_anterior:
         tap = float(recibo_anterior.get("total_a_pagar") or 0.0)
         mp = float(recibo_anterior.get("monto_pagado") or 0.0)
         deuda_anterior = max(0.0, round(tap - mp, 2))
@@ -321,7 +329,8 @@ def numero_a_letras(monto: float) -> str:
         1234.00 → 'MIL DOSCIENTOS TREINTA Y CUATRO 00/100 SOLES'
     """
     # Redondeo seguro a centavos usando Decimal para evitar 100/100
-    d_monto = Decimal(str(round(float(monto), 4))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    d_monto = Decimal(str(round(float(monto), 4))).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     if d_monto < 0:
         prefijo = "MENOS "
@@ -342,13 +351,15 @@ def numero_a_letras(monto: float) -> str:
             if resto == 0:
                 parte_entera = "MIL"
             else:
-                parte_entera = "MIL " + _centenas_a_letras(resto, es_miles=False)
+                parte_entera = "MIL " + \
+                    _centenas_a_letras(resto, es_miles=False)
         else:
             miles_txt = _centenas_a_letras(miles, es_miles=True) + " MIL"
             if resto == 0:
                 parte_entera = miles_txt
             else:
-                parte_entera = miles_txt + " " + _centenas_a_letras(resto, es_miles=False)
+                parte_entera = miles_txt + " " + \
+                    _centenas_a_letras(resto, es_miles=False)
 
     return f"{prefijo}{parte_entera} {centavos:02d}/100 SOLES"
 

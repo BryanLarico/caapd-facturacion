@@ -46,7 +46,7 @@ class BarraProgresoSector(QFrame):
         der_layout.setSpacing(2)
 
         # Texto con avance y check
-        check_str = " ✅" if (leidos == total and total > 0) else ""
+        check_str = "  ✓" if (leidos == total and total > 0) else ""
         self.lbl_avance = QLabel(f"{leidos} de {total}{check_str}")
         self.lbl_avance.setObjectName("sector_progreso_txt")
         self.lbl_avance.setStyleSheet("font-size: 11px;")
@@ -72,7 +72,7 @@ class BarraProgresoSector(QFrame):
 
     def actualizar(self, total: int, leidos: int) -> None:
         """Actualiza las cifras y el progreso visual."""
-        check_str = " ✅" if (leidos == total and total > 0) else ""
+        check_str = "  ✓" if (leidos == total and total > 0) else ""
         self.lbl_avance.setText(f"{leidos} de {total}{check_str}")
         pct = int(leidos / total * 100) if total > 0 else 0
         self.barra.setValue(pct)
