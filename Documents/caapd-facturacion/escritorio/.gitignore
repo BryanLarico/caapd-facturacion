@@ -42,3 +42,5 @@ scratch_*.txt
 # ---------------------------------------------------------------------------
 salida/*.pdf
 salida/recibos_muestra/
+
+CAAPD-*.zip

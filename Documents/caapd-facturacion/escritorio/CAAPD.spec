@@ -22,6 +22,7 @@ for package in (
     "google.auth",
     "reportlab",
     "qrcode",
+    "certifi",
 ):
     package_datas, package_binaries, package_hiddenimports = collect_all(package)
     datas += package_datas
