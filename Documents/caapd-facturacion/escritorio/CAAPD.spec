@@ -48,6 +48,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="CAAPD",
+    icon=str(ROOT / "recursos" / "caapd.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

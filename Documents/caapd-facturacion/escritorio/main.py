@@ -108,6 +108,18 @@ def main() -> None:
     if sys.platform == "win32":
         os.environ.setdefault("QT_QPA_PLATFORM", "windows:darkmode=0")
     app = QApplication(sys.argv)
+    # Icono de ventana/barra de tareas
+    ruta_icono = rutas.ruta_recurso("recursos", "caapd.ico")
+    if ruta_icono.exists():
+        app.setWindowIcon(QIcon(str(ruta_icono)))
+    # Hace que Windows agrupe la app con su propio icono en la barra de tareas
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "CAAPD.Ispacas.Facturacion")
+        except Exception:
+            pass
     app.setStyle("Fusion")
     aplicar_paleta_clara(app)
     app.setApplicationName("CAAPD Ispacas Facturación")
