@@ -27,6 +27,9 @@ import rutas
 from servicios.datos import ServicioDatos
 from ui import iconos
 from ui.hilos import Worker, esperar_hilos, mostrar_dialogo_error
+from PySide6.QtCore import QThread  # ya importas QThread; si no, agrégalo
+from servicios import actualizador
+from version import VERSION
 from ui.paginas.cobros import PaginaCobros
 from ui.paginas.configuracion import PaginaConfiguracion
 from ui.paginas.inicio import PaginaInicio
@@ -35,10 +38,35 @@ from ui.paginas.lecturas import PaginaLecturas
 from ui.paginas.usuarios import PaginaUsuarios
 
 
+class _HiloBuscarActualizacion(QThread):
+    encontrada = Signal(object)  # InfoActualizacion o None
+
+    def run(self) -> None:
+        self.encontrada.emit(actualizador.buscar_actualizacion())
+
+
+class _HiloDescargar(QThread):
+    progreso = Signal(int)
+    terminado = Signal(object)   # Path del zip
+    error = Signal(str)
+
+    def __init__(self, info, parent=None):
+        super().__init__(parent)
+        self.info = info
+
+    def run(self) -> None:
+        try:
+            ruta = actualizador.descargar_zip(self.info, self.progreso.emit)
+            self.terminado.emit(ruta)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class VentanaPrincipal(QMainWindow):
     """Ventana principal que gestiona la navegación y el estado global."""
 
-    PAGINAS = ["inicio", "usuarios", "lecturas", "lectores", "cobros", "configuracion"]
+    PAGINAS = ["inicio", "usuarios", "lecturas",
+               "lectores", "cobros", "configuracion"]
 
     # Señales internas para actualizar la barra de progreso de forma segura
     # cuando mostrar_progreso()/ocultar_progreso() se invocan desde un hilo Worker.
@@ -64,8 +92,10 @@ class VentanaPrincipal(QMainWindow):
         self._construir_ui()
 
         # Las señales se procesan en el hilo de la interfaz (conexión en cola).
-        self._senal_progreso.connect(self._mostrar_progreso_ui, Qt.ConnectionType.QueuedConnection)
-        self._senal_ocultar_progreso.connect(self._ocultar_progreso_ui, Qt.ConnectionType.QueuedConnection)
+        self._senal_progreso.connect(
+            self._mostrar_progreso_ui, Qt.ConnectionType.QueuedConnection)
+        self._senal_ocultar_progreso.connect(
+            self._ocultar_progreso_ui, Qt.ConnectionType.QueuedConnection)
 
         self.actualizar_barra_estado()
 
@@ -74,6 +104,9 @@ class VentanaPrincipal(QMainWindow):
         self.timer_archivos.setInterval(15000)
         self.timer_archivos.timeout.connect(self._verificar_archivos_externos)
         self.timer_archivos.start()
+        # Buscar actualización 3 s después de abrir (sin bloquear la UI)
+        self._info_actualizacion = None
+        QTimer.singleShot(3000, self._buscar_actualizacion)
 
     def _construir_ui(self) -> None:
         widget_central = QWidget()
@@ -114,7 +147,7 @@ class VentanaPrincipal(QMainWindow):
         self.stacked_widget.addWidget(self.pagina_lecturas)      # 2
         self.stacked_widget.addWidget(self.pagina_lectores)      # 3
         self.stacked_widget.addWidget(self.pagina_cobros)        # 4
-        self.stacked_widget.addWidget(self.pagina_configuracion) # 5
+        self.stacked_widget.addWidget(self.pagina_configuracion)  # 5
 
         layout_principal.addWidget(self.stacked_widget, stretch=1)
 
@@ -136,13 +169,12 @@ class VentanaPrincipal(QMainWindow):
         """)
         lay = QHBoxLayout(banner)
         lay.setContentsMargins(16, 4, 16, 4)
-        lbl = QLabel("<b>MODO CONTINGENCIA / RESPALDO:</b> Operando sin conexión al servidor desde el archivo Excel. Los cambios se guardarán localmente.")
+        lbl = QLabel(
+            "<b>MODO CONTINGENCIA / RESPALDO:</b> Operando sin conexión al servidor desde el archivo Excel. Los cambios se guardarán localmente.")
         lbl.setStyleSheet("color: #92400e; font-size: 13px;")
         lay.addWidget(lbl)
         lay.addStretch(1)
         return banner
-
-
 
     def _crear_barra_superior(self) -> QFrame:
         nav = QFrame()
@@ -178,7 +210,8 @@ class VentanaPrincipal(QMainWindow):
             btn.setProperty("class", "nav_boton")
             btn.setProperty("activo", "false")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.clicked.connect(lambda checked=False, c=clave: self.navegar_a(c))
+            btn.clicked.connect(lambda checked=False,
+                                c=clave: self.navegar_a(c))
             self.botones_nav[clave] = btn
             layout.addWidget(btn)
 
@@ -196,7 +229,24 @@ class VentanaPrincipal(QMainWindow):
         lbl_copy = QLabel("CAAPD Ispacas © 2026")
         lbl_copy.setObjectName("pie_texto")
         layout.addWidget(lbl_copy)
+        lbl_version = QLabel(f"v{VERSION}")
+        lbl_version.setObjectName("pie_texto")
+        layout.addWidget(lbl_version)
 
+        self.btn_actualizar = QPushButton("Descargar actualización")
+        self.btn_actualizar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_actualizar.setStyleSheet("""
+            QPushButton {
+                background-color: #fff7ed; color: #9a3412;
+                font-size: 11px; font-weight: 700;
+                padding: 3px 10px; border: 1px solid #fdba74; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #ffedd5; }
+        """)
+        self.btn_actualizar.clicked.connect(
+            self._accion_descargar_actualizacion)
+        self.btn_actualizar.hide()
+        layout.addWidget(self.btn_actualizar)
         btn_abrir_bd = QPushButton("Base de datos")
         iconos.aplicar(btn_abrir_bd, "database", "exito", 14)
         btn_abrir_bd.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -213,7 +263,8 @@ class VentanaPrincipal(QMainWindow):
 
         # Barrita de progreso y estado
         self.lbl_estado_progreso = QLabel("")
-        self.lbl_estado_progreso.setStyleSheet("color: #0369a1; font-size: 11px; font-weight: 600;")
+        self.lbl_estado_progreso.setStyleSheet(
+            "color: #0369a1; font-size: 11px; font-weight: 600;")
         self.lbl_estado_progreso.hide()
         layout.addWidget(self.lbl_estado_progreso)
 
@@ -279,7 +330,8 @@ class VentanaPrincipal(QMainWindow):
             if not self.pagina_cobros.lista_items_completa:
                 self.pagina_cobros.cargar_datos_asincrono()
             if abrir_asistente:
-                QTimer.singleShot(150, self.pagina_cobros.abrir_asistente_recibos)
+                QTimer.singleShot(
+                    150, self.pagina_cobros.abrir_asistente_recibos)
         elif clave_pagina == "configuracion" and not getattr(self.pagina_configuracion, "config_cargada", False):
             self.pagina_configuracion.cargar_datos_asincrono()
 
@@ -340,7 +392,8 @@ class VentanaPrincipal(QMainWindow):
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Icon.Question)
         msg.setWindowTitle("Archivos Modificados Externamente")
-        msg.setText("<b>Se detectaron cambios en los archivos de 'Base de datos':</b>")
+        msg.setText(
+            "<b>Se detectaron cambios en los archivos de 'Base de datos':</b>")
         msg.setInformativeText(
             f"Uno o más archivos fueron modificados externamente:\n\n"
             f"  • {arch_str}\n\n"
@@ -356,8 +409,10 @@ class VentanaPrincipal(QMainWindow):
             self.sincronizando = True
             self.mostrar_progreso(30, "Recargando base de datos...")
             worker = Worker(self.servicio.cargar_desde_carpeta_base_datos)
-            worker.signals.resultado.connect(self._al_terminar_recarga_externa, Qt.ConnectionType.QueuedConnection)
-            worker.signals.error.connect(self._al_fallar_recarga_externa, Qt.ConnectionType.QueuedConnection)
+            worker.signals.resultado.connect(
+                self._al_terminar_recarga_externa, Qt.ConnectionType.QueuedConnection)
+            worker.signals.error.connect(
+                self._al_fallar_recarga_externa, Qt.ConnectionType.QueuedConnection)
             QThreadPool.globalInstance().start(worker)
         else:
             self._verificando_archivos = False
@@ -379,7 +434,8 @@ class VentanaPrincipal(QMainWindow):
     def _al_fallar_recarga_externa(self, err_msg: str) -> None:
         self.set_sincronizando(False)
         self.ocultar_progreso("")
-        mostrar_dialogo_error(self, "Error al recargar la base de datos", err_msg)
+        mostrar_dialogo_error(
+            self, "Error al recargar la base de datos", err_msg)
         self._verificando_archivos = False
         self.timer_archivos.start()
 
@@ -462,3 +518,65 @@ class VentanaPrincipal(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             QTimer.singleShot(0, app.quit)
+
+    # ------------------------------------------------------------------
+    # Auto-actualización
+    # ------------------------------------------------------------------
+    def _buscar_actualizacion(self) -> None:
+        self._hilo_buscar = _HiloBuscarActualizacion(self)
+        self._hilo_buscar.encontrada.connect(self._al_encontrar_actualizacion)
+        self._hilo_buscar.start()
+
+    @Slot(object)
+    def _al_encontrar_actualizacion(self, info) -> None:
+        if info is None:
+            return
+        self._info_actualizacion = info
+        self.btn_actualizar.setText(f"Descargar actualización v{info.version}")
+        self.btn_actualizar.show()
+
+    def _accion_descargar_actualizacion(self) -> None:
+        info = self._info_actualizacion
+        if info is None:
+            return
+        notas = info.notas.strip() or "Mejoras y correcciones."
+        resp = QMessageBox.question(
+            self,
+            f"Actualizar a v{info.version}",
+            f"Hay una nueva versión disponible (v{info.version}).\n\n"
+            f"Novedades:\n{notas[:800]}\n\n"
+            "La aplicación se cerrará, se actualizará y volverá a abrirse.\n"
+            "Sus datos, respaldos y credenciales NO se modifican.\n\n¿Continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if resp != QMessageBox.StandardButton.Yes:
+            return
+
+        self.btn_actualizar.setEnabled(False)
+        self.mostrar_progreso(0, "Descargando actualización…")
+        self._hilo_descarga = _HiloDescargar(info, self)
+        self._hilo_descarga.progreso.connect(
+            lambda p: self.mostrar_progreso(p, f"Descargando actualización… {p}%"))
+        self._hilo_descarga.terminado.connect(self._al_terminar_descarga)
+        self._hilo_descarga.error.connect(self._al_fallar_descarga)
+        self._hilo_descarga.start()
+
+    @Slot(object)
+    def _al_terminar_descarga(self, ruta_zip) -> None:
+        self.ocultar_progreso("Actualización descargada")
+        try:
+            actualizador.aplicar_y_reiniciar(ruta_zip)
+        except Exception as e:
+            QMessageBox.critical(self, "Error al actualizar", str(e))
+            self.btn_actualizar.setEnabled(True)
+            return
+        # Cerrar limpio: el .bat espera a que este proceso termine y relanza
+        esperar_hilos(5000)
+        QApplication.quit()
+
+    @Slot(str)
+    def _al_fallar_descarga(self, msg: str) -> None:
+        self.ocultar_progreso("")
+        self.btn_actualizar.setEnabled(True)
+        QMessageBox.warning(self, "No se pudo descargar",
+                            f"Error al descargar la actualización:\n{msg}\n\nIntente más tarde.")

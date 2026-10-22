@@ -11,7 +11,7 @@ datas = [
     (str(ROOT / "ui" / "estilos" / "fuentes" / "Inter-Variable.ttf"), "ui/estilos/fuentes"),
     (str(ROOT / "ui" / "estilos" / "fuentes" / "OFL.txt"), "ui/estilos/fuentes"),
 ]
-datas += Tree(str(ROOT / "recursos"), prefix="recursos", excludes=["__pycache__"])
+datas.append((str(ROOT / "recursos"), "recursos"))
 binaries = []
 hiddenimports = []
 
