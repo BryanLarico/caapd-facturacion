@@ -1373,12 +1373,6 @@ class ServicioDatosPadron(ServicioDatos):
         if not documentos:
             raise ValueError(
                 f"El padrón local del periodo {periodo} no contiene usuarios.")
-        if len(documentos) > 499:
-            raise ValueError(
-                "El mes tiene más de 499 usuarios y no se puede publicar de forma "
-                "atómica en una sola operación segura."
-            )
-
         if callback_progreso:
             callback_progreso(15, f"Preparando el padrón local {periodo}...")
 
@@ -1413,16 +1407,33 @@ class ServicioDatosPadron(ServicioDatos):
             "periodos_disponibles": sorted(periodos_disponibles),
         }
 
-        if callback_progreso:
-            callback_progreso(
-                55, f"Publicando {len(documentos)} usuarios del mes {periodo}...")
+        batch_size = 300
+        items_subir = list(documentos.items())
+        total_items = len(items_subir)
+        chunks_subir = [
+            items_subir[i:i + batch_size]
+            for i in range(0, total_items, batch_size)
+        ]
+        total_chunks = len(chunks_subir)
+        subidos_acum = 0
 
-        batch = db.batch()
-        for uid, datos in documentos.items():
-            batch.create(col_ref.document(uid), datos)
-        batch.set(config_ref, datos_config, merge=True)
-        batch.commit()
-        self.ops["escrituras"] += len(documentos) + 1
+        for idx, chunk in enumerate(chunks_subir, start=1):
+            batch = db.batch()
+            for uid, datos in chunk:
+                batch.create(col_ref.document(uid), datos)
+            es_ultimo = (idx == total_chunks)
+            if es_ultimo:
+                batch.set(config_ref, datos_config, merge=True)
+            batch.commit()
+            subidos_acum += len(chunk)
+            self.ops["escrituras"] += len(chunk) + (1 if es_ultimo else 0)
+
+            if callback_progreso:
+                pct = 40 + int((subidos_acum / max(1, total_items)) * 55)
+                callback_progreso(
+                    pct,
+                    f"Publicando usuarios {periodo} ({subidos_acum}/{total_items}) - lote {idx}/{total_chunks}...",
+                )
 
         duracion = time.perf_counter() - t_inicio
         if callback_progreso:

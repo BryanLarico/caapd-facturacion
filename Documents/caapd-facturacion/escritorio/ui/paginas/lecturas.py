@@ -382,10 +382,29 @@ class PaginaLecturas(QWidget):
     # ------------------------------------------------------------------
     # Sincronización con Firebase (un solo Worker, slots reales de QObject)
     # ------------------------------------------------------------------
+    def _bloquear_interaccion(self, bloquear: bool) -> None:
+        """Bloquea o desbloquea controles de la página durante la sincronización."""
+        self.btn_actualizar.setEnabled(not bloquear)
+        if hasattr(self, "btn_actualizar_excel"):
+            self.btn_actualizar_excel.setEnabled(not bloquear)
+        if hasattr(self, "tabla"):
+            self.tabla.setEnabled(not bloquear)
+        if hasattr(self, "input_buscar"):
+            self.input_buscar.setEnabled(not bloquear)
+        if hasattr(self, "btn_filtro_todos"):
+            self.btn_filtro_todos.setEnabled(not bloquear)
+        if hasattr(self, "btn_filtro_faltan"):
+            self.btn_filtro_faltan.setEnabled(not bloquear)
+        if hasattr(self, "btn_filtro_observados"):
+            self.btn_filtro_observados.setEnabled(not bloquear)
+        if hasattr(self, "btn_accion_editar"):
+            tiene_sel = bool(self.tabla.selectionModel().hasSelection()) if hasattr(self, "tabla") and self.tabla.selectionModel() else False
+            self.btn_accion_editar.setEnabled(not bloquear and tiene_sel)
+
     def _lanzar_sincronizacion(self, texto: str, funcion_servicio: Any, slot_exito: Any) -> None:
         ventana = self.window()
         self.indicador_carga.iniciar(texto)
-        self.btn_actualizar.setEnabled(False)
+        self._bloquear_interaccion(True)
         if hasattr(ventana, "set_sincronizando"):
             ventana.set_sincronizando(True)
 
@@ -413,7 +432,7 @@ class PaginaLecturas(QWidget):
         if hasattr(ventana, "set_sincronizando"):
             ventana.set_sincronizando(False)
         self.indicador_carga.detener()
-        self.btn_actualizar.setEnabled(True)
+        self._bloquear_interaccion(False)
 
     @Slot(object)
     def _al_terminar_subida(self, res: Any) -> None:

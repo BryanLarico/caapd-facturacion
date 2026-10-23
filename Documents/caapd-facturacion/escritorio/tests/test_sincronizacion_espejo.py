@@ -445,6 +445,79 @@ def test_publicar_mes_actual_se_detiene_si_ya_hay_documentos(servicio_prueba):
     mock_db.collections.assert_not_called()
 
 
+def test_publicar_mes_actual_lotes_de_300_con_786_usuarios(servicio_prueba):
+    mock_db = MagicMock()
+    batches_creados = []
+
+    def crear_batch():
+        b = MagicMock()
+        batches_creados.append(b)
+        return b
+
+    mock_db.batch.side_effect = crear_batch
+
+    col_mes = MagicMock()
+    config_ref = MagicMock()
+    config_snapshot = MagicMock()
+    config_snapshot.to_dict.return_value = {
+        "mes_actual": {"periodo": "2026-08", "estado": "CERRADO"},
+        "periodos_disponibles": ["2026-08"],
+    }
+    config_ref.get.return_value = config_snapshot
+
+    def obtener_coleccion(nombre):
+        if nombre == "mes_2026-09":
+            return col_mes
+        if nombre == "config":
+            c = MagicMock()
+            c.document.return_value = config_ref
+            return c
+        pytest.fail(f"Colección no esperada: {nombre}")
+
+    mock_db.collection.side_effect = obtener_coleccion
+
+    # Simulamos 786 usuarios
+    servicio_prueba.mes = {
+        f"USR_{i:04d}": {
+            "id_usuario": f"USR_{i:04d}",
+            "nombre": f"USUARIO {i}",
+            "medidores": [{"nro_medidor": f"MED_{i}", "lectura_anterior": 100}],
+        }
+        for i in range(786)
+    }
+
+    reportes_progreso = []
+
+    def callback_prog(pct, txt):
+        reportes_progreso.append((pct, txt))
+
+    with patch("firebase_client.db", return_value=mock_db):
+        res = servicio_prueba.publicar_mes_actual_a_lectores(
+            callback_progreso=callback_prog
+        )
+
+    assert res["exito"] is True
+    assert res["usuarios_subidos"] == 786
+    # 786 usuarios en lotes de 300 -> 3 lotes: 300, 300, 186
+    assert len(batches_creados) == 3
+    assert batches_creados[0].create.call_count == 300
+    assert batches_creados[1].create.call_count == 300
+    assert batches_creados[2].create.call_count == 186
+    # El último lote debe haber configurado config_ref
+    assert batches_creados[0].set.call_count == 0
+    assert batches_creados[1].set.call_count == 0
+    assert batches_creados[2].set.call_count == 1
+    # Todos los lotes deben haber llamado commit()
+    for b in batches_creados:
+        b.commit.assert_called_once()
+    # Verificamos que los reportes de progreso informaron los 3 lotes
+    assert any("1/3" in txt for _, txt in reportes_progreso)
+    assert any("2/3" in txt for _, txt in reportes_progreso)
+    assert any("3/3" in txt for _, txt in reportes_progreso)
+    assert reportes_progreso[-1][0] == 100
+
+
+
 def test_accion_b_traer_lecturas_y_recalcular_consumo(servicio_prueba):
     """Acción B: Descarga lecturas de lectores móviles y recalcula consumo."""
     servicio_prueba.mes["30771152"]["medidores"][0]["lectura_actual"] = None

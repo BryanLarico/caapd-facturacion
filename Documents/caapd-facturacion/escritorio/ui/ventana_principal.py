@@ -306,6 +306,9 @@ class VentanaPrincipal(QMainWindow):
 
     def navegar_a(self, clave_pagina: str) -> None:
         """Cambia la página actual y actualiza el estado de los botones de navegación."""
+        if self.sincronizando:
+            return
+
         abrir_asistente = False
         if clave_pagina == "recibos":
             clave_pagina = "cobros"
