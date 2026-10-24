@@ -181,14 +181,9 @@ class PaginaUsuarios(QWidget):
 
         # Ajuste inicial de anchos de columna (Responsive interactivo)
         h_header = self.tabla.horizontalHeader()
-        h_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)  # Conexión
-        h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)  # DNI
-        h_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)  # Apellidos y Nombres (Responsive)
-        h_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)  # Sector
-        h_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Dirección
-        h_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)  # Medidores (Responsive)
-        h_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)  # Cat.
-        h_header.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)  # Estado
+        for col in range(8):
+            h_header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+        self._ajustar_anchos_columnas()
 
         layout_principal.addWidget(self.tabla, stretch=1)
 
@@ -330,16 +325,22 @@ class PaginaUsuarios(QWidget):
     def _ajustar_anchos_columnas(self) -> None:
         """Ajusta la tabla al ancho disponible, sin crear desplazamiento horizontal."""
         ancho = max(0, self.tabla.viewport().width())
-        self.tabla.setColumnWidth(0, 68)
-        self.tabla.setColumnWidth(1, 96)
-        self.tabla.setColumnWidth(6, 46)
-        self.tabla.setColumnWidth(7, 76)
+        w_conexion = 105
+        w_dni = 130
+        w_cat = 55
+        w_estado = 85
 
-        restante = max(0, ancho - 68 - 96 - 46 - 76)
-        w_sector = int(restante * 0.14)
-        w_direccion = int(restante * 0.18)
-        w_medidores = int(restante * 0.22)
-        w_nombre = restante - w_sector - w_direccion - w_medidores
+        self.tabla.setColumnWidth(0, w_conexion)
+        self.tabla.setColumnWidth(1, w_dni)
+        self.tabla.setColumnWidth(6, w_cat)
+        self.tabla.setColumnWidth(7, w_estado)
+
+        w_fijos = w_conexion + w_dni + w_cat + w_estado
+        restante = max(0, ancho - w_fijos)
+        w_sector = int(restante * 0.18)
+        w_direccion = int(restante * 0.24)
+        w_medidores = int(restante * 0.24)
+        w_nombre = max(0, restante - w_sector - w_direccion - w_medidores)
 
         self.tabla.setColumnWidth(2, w_nombre)
         self.tabla.setColumnWidth(3, w_sector)
