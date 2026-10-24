@@ -202,6 +202,10 @@ class ServicioDatos:
     def actualizar_usuario(self, id_usuario: str, cambios: Dict[str, Any]) -> None:
         raise NotImplementedError
 
+    def eliminar_usuario(self, id_usuario: str) -> Dict[str, Any]:
+        """Elimina definitivamente un usuario del padrón. Devuelve un resumen."""
+        raise NotImplementedError
+
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
         raise NotImplementedError
 
@@ -395,6 +399,14 @@ class ServicioDatosFirebase(ServicioDatos):
         fb = self._get_fb()
         fb.actualizar_usuario(id_usuario, cambios)
         on_datos_cambiados("usuario_estado", {"id_usuario": id_usuario, **cambios})
+
+    def eliminar_usuario(self, id_usuario: str) -> Dict[str, Any]:
+        from respaldo import on_datos_cambiados
+
+        fb = self._get_fb()
+        resumen = fb.eliminar_usuario(id_usuario)
+        on_datos_cambiados("usuario_eliminado", {"id_usuario": id_usuario})
+        return resumen
 
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
         from respaldo import on_datos_cambiados
@@ -679,6 +691,12 @@ class ServicioDatosMemoria(ServicioDatos):
     def actualizar_usuario(self, id_usuario: str, cambios: Dict[str, Any]) -> None:
         if id_usuario in self.usuarios:
             self.usuarios[id_usuario].update(cambios)
+
+    def eliminar_usuario(self, id_usuario: str) -> Dict[str, Any]:
+        existia = id_usuario in self.usuarios
+        self.usuarios.pop(id_usuario, None)
+        self.mes.pop(id_usuario, None)
+        return {"id_usuario": id_usuario, "eliminado": existia, "firebase": True, "error": None}
 
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
         if id_viejo == id_nuevo:

@@ -1263,6 +1263,128 @@ class DialogoUsuario(QDialog):
                                   f"No se pudo guardar el usuario:\n{e}")
 
 
+class DialogoEliminarUsuario(QDialog):
+    """
+    Confirmación reforzada para eliminar un usuario del padrón.
+
+    El botón "Eliminar definitivamente" solo se habilita cuando la secretaria
+    escribe la palabra BORRAR (en mayúsculas) en el campo de confirmación.
+    """
+
+    PALABRA_CLAVE = "BORRAR"
+
+    def __init__(
+        self,
+        usuario: Dict[str, Any],
+        tiene_movimientos_mes: bool = False,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self.usuario = usuario
+        self.tiene_movimientos_mes = tiene_movimientos_mes
+        self.confirmado = False
+
+        self.setWindowTitle("Eliminar Usuario")
+        self.setModal(True)
+        self.setMinimumWidth(520)
+        self.resize(560, 360)
+        self._construir_ui()
+
+    def _construir_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
+
+        titulo = QLabel("Eliminar usuario del padrón")
+        titulo.setStyleSheet(
+            "font-size: 18px; font-weight: 700; color: #b91c1c;")
+        layout.addWidget(titulo)
+
+        nombre = str(self.usuario.get("nombre") or "")
+        id_usuario = str(self.usuario.get("id_usuario")
+                         or self.usuario.get("_id") or "")
+        conexion = str(self.usuario.get("nro_conexion") or "")
+        sector = str(self.usuario.get("sector") or "")
+
+        tarjeta = QFrame()
+        tarjeta.setStyleSheet(
+            "QFrame { background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; }"
+            "QLabel { background: transparent; border: none; color: #1f2937; font-size: 13px; }")
+        lay_t = QVBoxLayout(tarjeta)
+        lay_t.setContentsMargins(14, 10, 14, 10)
+        lay_t.setSpacing(4)
+        lbl_nombre = QLabel(nombre or "(sin nombre)")
+        lbl_nombre.setStyleSheet("font-weight: 700; font-size: 14px;")
+        lay_t.addWidget(lbl_nombre)
+        lay_t.addWidget(QLabel(f"DNI / ID: {id_usuario}    •    N° de conexión: {conexion or '—'}"))
+        if sector:
+            lay_t.addWidget(QLabel(f"Sector: {sector}"))
+        layout.addWidget(tarjeta)
+
+        aviso = (
+            "Esta acción es <b>definitiva</b>: el usuario se quitará del padrón y del mes actual, "
+            "y dejará de aparecer en la aplicación de los lectores. "
+            "Los recibos de meses anteriores se conservan."
+        )
+        if self.tiene_movimientos_mes:
+            aviso += (
+                "<br><br><b style='color:#b91c1c;'>Atención:</b> este usuario ya tiene lecturas, "
+                "recibo o pagos registrados en el mes actual; también se eliminarán de este mes."
+            )
+        lbl_aviso = QLabel(aviso)
+        lbl_aviso.setWordWrap(True)
+        lbl_aviso.setStyleSheet("color: #374151; font-size: 13px;")
+        layout.addWidget(lbl_aviso)
+
+        lbl_instr = QLabel(
+            f"Para confirmar, escriba <b>{self.PALABRA_CLAVE}</b> en el cuadro:")
+        lbl_instr.setStyleSheet("font-weight: 500; color: #111827;")
+        layout.addWidget(lbl_instr)
+
+        self.campo_confirmar = QLineEdit()
+        self.campo_confirmar.setPlaceholderText(self.PALABRA_CLAVE)
+        self.campo_confirmar.setMaxLength(len(self.PALABRA_CLAVE) + 2)
+        self.campo_confirmar.textChanged.connect(self._al_escribir)
+        layout.addWidget(self.campo_confirmar)
+
+        layout.addStretch(1)
+
+        fila = QHBoxLayout()
+        fila.setSpacing(10)
+        fila.addStretch(1)
+        self.btn_cancelar = QPushButton("Cancelar")
+        self.btn_cancelar.setProperty("class", "boton boton_secundario")
+        self.btn_cancelar.setMinimumHeight(38)
+        self.btn_cancelar.clicked.connect(self.reject)
+        self.btn_cancelar.setDefault(True)
+        fila.addWidget(self.btn_cancelar)
+
+        self.btn_eliminar = QPushButton("Eliminar definitivamente")
+        iconos.aplicar(self.btn_eliminar, "trash", "blanco")
+        self.btn_eliminar.setProperty("class", "boton boton_peligro")
+        self.btn_eliminar.setMinimumHeight(38)
+        self.btn_eliminar.setEnabled(False)
+        self.btn_eliminar.setToolTip(
+            f"Escriba {self.PALABRA_CLAVE} para habilitar este botón")
+        self.btn_eliminar.clicked.connect(self._on_eliminar)
+        fila.addWidget(self.btn_eliminar)
+        layout.addLayout(fila)
+
+        self.campo_confirmar.setFocus()
+
+    def _al_escribir(self, texto: str) -> None:
+        ok = texto.strip().upper() == self.PALABRA_CLAVE
+        self.btn_eliminar.setEnabled(ok)
+        self.btn_eliminar.setToolTip(
+            "" if ok else f"Escriba {self.PALABRA_CLAVE} para habilitar este botón")
+
+    def _on_eliminar(self) -> None:
+        if self.campo_confirmar.text().strip().upper() != self.PALABRA_CLAVE:
+            return
+        self.confirmado = True
+        self.accept()
+
+
 class DialogoCorregirDni(QDialog):
     """Diálogo modal para reemplazar un ID provisional por el DNI definitivo de 8 dígitos."""
 

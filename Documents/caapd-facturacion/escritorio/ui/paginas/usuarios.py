@@ -31,7 +31,11 @@ from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
 from ui.componentes.toast import Toast
 from ui.hilos import Worker, mostrar_dialogo_error
-from ui.paginas.usuarios_dialogos import DialogoCorregirDni, DialogoUsuario
+from ui.paginas.usuarios_dialogos import (
+    DialogoCorregirDni,
+    DialogoEliminarUsuario,
+    DialogoUsuario,
+)
 from ui.paginas.usuarios_modelo import ModeloUsuarios, ProxyUsuarios
 
 
@@ -206,6 +210,17 @@ class PaginaUsuarios(QWidget):
         fila_acciones.addWidget(self.btn_accion_estado)
 
         fila_acciones.addStretch(1)
+
+        # Eliminar: a la derecha, separado de las acciones habituales, y con
+        # confirmación reforzada (hay que escribir BORRAR).
+        self.btn_accion_eliminar = QPushButton("Eliminar Usuario")
+        iconos.aplicar(self.btn_accion_eliminar, "trash", "peligro")
+        self.btn_accion_eliminar.setProperty("class", "boton boton_peligro_secundario")
+        self.btn_accion_eliminar.setEnabled(False)
+        self.btn_accion_eliminar.setToolTip("Seleccione un usuario de la tabla")
+        self.btn_accion_eliminar.clicked.connect(self._accion_eliminar)
+        fila_acciones.addWidget(self.btn_accion_eliminar)
+
         layout_principal.addLayout(fila_acciones)
 
         # Toast flotante para avisos de recarga
@@ -422,6 +437,10 @@ class PaginaUsuarios(QWidget):
         seleccion = self.tabla.selectionModel().selectedRows()
         hay_sel = len(seleccion) > 0
         self.btn_accion_editar.setEnabled(hay_sel)
+        self.btn_accion_eliminar.setEnabled(hay_sel)
+        self.btn_accion_eliminar.setToolTip(
+            "Eliminar definitivamente al usuario seleccionado" if hay_sel
+            else "Seleccione un usuario de la tabla")
 
         if hay_sel:
             proxy_idx = seleccion[0]
@@ -479,6 +498,51 @@ class PaginaUsuarios(QWidget):
         u = self._obtener_usuario_seleccionado()
         if u:
             self._abrir_modal_editar(u)
+
+    def _usuario_tiene_movimientos_en_mes(self, id_usuario: str) -> bool:
+        """True si el usuario ya tiene lecturas, recibo o pago en el mes actual."""
+        try:
+            mes = getattr(self.servicio, "mes", None) or {}
+            doc = mes.get(id_usuario) or {}
+            if doc.get("nro_recibo") or float(doc.get("monto_pagado") or 0) > 0:
+                return True
+            for m in doc.get("medidores") or []:
+                if isinstance(m, dict) and m.get("lectura_actual") is not None:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _accion_eliminar(self) -> None:
+        u = self._obtener_usuario_seleccionado()
+        if not u:
+            return
+        id_usuario = str(u.get("id_usuario") or u.get("_id", ""))
+        nombre = u.get("nombre", "")
+
+        dialogo = DialogoEliminarUsuario(
+            usuario=u,
+            tiene_movimientos_mes=self._usuario_tiene_movimientos_en_mes(id_usuario),
+            parent=self,
+        )
+        if dialogo.exec() != DialogoEliminarUsuario.DialogCode.Accepted or not dialogo.confirmado:
+            return
+
+        try:
+            resumen = self.servicio.eliminar_usuario(id_usuario) or {}
+        except Exception as e:
+            mostrar_dialogo_error(self, "Error al eliminar usuario", str(e))
+            return
+
+        if resumen.get("firebase", True):
+            self.alerta_flash.set_mensaje(
+                f"Usuario '{nombre}' eliminado definitivamente del padrón.", "info")
+        else:
+            self.alerta_flash.set_mensaje(
+                f"Usuario '{nombre}' eliminado del padrón local. No se pudo quitar de Firebase "
+                f"({resumen.get('error') or 'sin conexión'}); vuelva a sincronizar más tarde.",
+                "aviso")
+        self.cargar_datos_asincrono(forzar=True)
 
     def _accion_cambiar_estado(self) -> None:
         u = self._obtener_usuario_seleccionado()

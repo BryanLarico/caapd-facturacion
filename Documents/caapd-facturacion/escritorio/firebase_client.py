@@ -113,6 +113,12 @@ _cache: dict = {
 
 def _contar(tipo: str, n: int = 1):
     _cache["ops"][tipo] += n
+    # Contador diario persistente (pie de página de la ventana principal)
+    try:
+        from servicios import contador_ops
+        contador_ops.registrar(tipo, n)
+    except Exception:
+        pass
 
 
 def get_ops() -> dict:
@@ -274,6 +280,22 @@ def borrar_usuario(id_usuario: str):
     _contar("escrituras", 1)
     if _cache["usuarios"] is not None:
         _cache["usuarios"].pop(id_usuario, None)
+
+
+def eliminar_usuario(id_usuario: str) -> dict:
+    """Elimina el usuario del padrón y su documento del mes actual (si existe)."""
+    db().collection("usuarios").document(id_usuario).delete()
+    _contar("escrituras", 1)
+    if _cache["usuarios"] is not None:
+        _cache["usuarios"].pop(id_usuario, None)
+    periodo = _cache.get("periodo_cargado") or (
+        ((_cache.get("config") or {}).get("mes_actual") or {}).get("periodo"))
+    if periodo:
+        db().collection(f"mes_{periodo}").document(id_usuario).delete()
+        _contar("escrituras", 1)
+        if _cache["mes"] is not None:
+            _cache["mes"].pop(id_usuario, None)
+    return {"id_usuario": id_usuario, "eliminado": True, "firebase": True, "error": None}
 
 
 def guardar_usuarios_lote(usuarios: dict[str, dict]):

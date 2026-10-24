@@ -327,7 +327,7 @@ class ServicioDatosPadron(ServicioDatos):
             if not datos:
                 return False, "Sin datos de configuración para subir"
             fb.db().collection("config").document("general").set(datos, merge=True)
-            self.ops["escrituras"] += 1
+            self._contar_op("escrituras", 1)
             return True, ""
         except Exception as e:
             return False, str(e)
@@ -1478,7 +1478,7 @@ class ServicioDatosPadron(ServicioDatos):
                 for uid, data in chunk:
                     batch.set(col_ref.document(uid), data)
                 batch.commit()
-                self.ops["escrituras"] += len(chunk)
+                self._contar_op("escrituras", len(chunk))
                 subidos_acum += len(chunk)
                 if callback_progreso:
                     pct = 20 + int((subidos_acum / max(1, total_items)) * 40)
@@ -1504,7 +1504,7 @@ class ServicioDatosPadron(ServicioDatos):
         }
         db.collection("config").document(
             "general").set(datos_cfg_nube, merge=True)
-        self.ops["escrituras"] += 1
+        self._contar_op("escrituras", 1)
 
         # 5. Detectar sobrantes usando list_documents() (SOLO IDs, NUNCA stream())
         if callback_progreso:
@@ -1580,7 +1580,7 @@ class ServicioDatosPadron(ServicioDatos):
                 for fut in concurrent.futures.as_completed(futures):
                     cnt = fut.result()
                     borrados_acum += cnt
-                    self.ops["escrituras"] += cnt
+                    self._contar_op("escrituras", cnt)
                     if callback_progreso:
                         pct = 75 + int((borrados_acum / total_sobrantes) * 20)
                         callback_progreso(
@@ -1677,7 +1677,7 @@ class ServicioDatosPadron(ServicioDatos):
                 batch.set(config_ref, datos_config, merge=True)
             batch.commit()
             subidos_acum += len(chunk)
-            self.ops["escrituras"] += len(chunk) + (1 if es_ultimo else 0)
+            self._contar_op("escrituras", len(chunk) + (1 if es_ultimo else 0))
 
             if callback_progreso:
                 pct = 40 + int((subidos_acum / max(1, total_items)) * 55)
@@ -1927,7 +1927,7 @@ class ServicioDatosPadron(ServicioDatos):
         )
         docs_nube = resultado_descarga["docs"]
         docs_recibidos = len(docs_nube)
-        self.ops["lecturas"] += docs_recibidos
+        self._contar_op("lecturas", docs_recibidos)
 
         # 2. Fusión en memoria con protección ADMIN y recálculo de consumos.
         if callback_progreso:
@@ -2068,9 +2068,9 @@ class ServicioDatosPadron(ServicioDatos):
             col_ref = db.collection(f"mes_{periodo}")
             if id_antiguo_borrar and id_antiguo_borrar != id_usuario:
                 col_ref.document(id_antiguo_borrar).delete()
-                self.ops["escrituras"] += 1
+                self._contar_op("escrituras", 1)
             col_ref.document(id_usuario).set(payload, merge=True)
-            self.ops["escrituras"] += 1
+            self._contar_op("escrituras", 1)
             return True, None
         except Exception as e:
             return False, str(e)
@@ -2191,6 +2191,53 @@ class ServicioDatosPadron(ServicioDatos):
         return self._sincronizar_usuario_unitario_a_firebase(
             id_usuario, self.mes.get(id_usuario, self.usuarios[id_usuario])
         )
+
+    def eliminar_usuario(self, id_usuario: str) -> Dict[str, Any]:
+        """
+        Elimina DEFINITIVAMENTE al usuario del padrón local (Excel) y, si el mes
+        está ABIERTO y hay conexión, también su documento en Firestore
+        (mes_<periodo>) para que desaparezca de la app de los lectores.
+
+        Solo se toca el mes actual: los meses históricos conservan sus recibos.
+        Si falla el guardado local, se revierte todo en memoria.
+        """
+        if id_usuario not in self.usuarios:
+            raise ValueError(f"El usuario '{id_usuario}' no existe en el padrón.")
+
+        import copy
+        usuario_previo = copy.deepcopy(self.usuarios[id_usuario])
+        mes_previo = copy.deepcopy(self.mes[id_usuario]) if id_usuario in self.mes else None
+
+        del self.usuarios[id_usuario]
+        self.mes.pop(id_usuario, None)
+        if getattr(self, "meses_encontrados", None) and self.periodo in self.meses_encontrados:
+            self.meses_encontrados[self.periodo].pop(id_usuario, None)
+
+        try:
+            self.guardar_en_respaldo_local()
+        except Exception:
+            self.usuarios[id_usuario] = usuario_previo
+            if mes_previo is not None:
+                self.mes[id_usuario] = mes_previo
+                if getattr(self, "meses_encontrados", None) and self.periodo in self.meses_encontrados:
+                    self.meses_encontrados[self.periodo][id_usuario] = mes_previo
+            raise
+
+        # Firestore (mejor esfuerzo): solo si el mes está ABIERTO
+        exito_fb, err_fb = True, None
+        mes_actual = self.config.get("mes_actual", {})
+        estado = str(mes_actual.get("estado") or "").upper()
+        periodo = mes_actual.get("periodo") or self.periodo
+        if estado == "ABIERTO" and periodo and not getattr(self, "es_contingencia", False):
+            try:
+                import firebase_client as fb
+                fb.db().collection(f"mes_{periodo}").document(id_usuario).delete()
+                self._contar_op("escrituras", 1)
+            except Exception as e:
+                exito_fb, err_fb = False, str(e)
+
+        return {"id_usuario": id_usuario, "eliminado": True,
+                "firebase": exito_fb, "error": err_fb}
 
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
         if id_viejo == id_nuevo:
@@ -2363,7 +2410,7 @@ class ServicioDatosPadron(ServicioDatos):
             fb.db().collection("config").document("general").set(
                 {"mes_actual": {"estado": "CERRADO"}}, merge=True
             )
-            self.ops["escrituras"] += 1
+            self._contar_op("escrituras", 1)
         except Exception:
             pass
 
@@ -2380,7 +2427,7 @@ class ServicioDatosPadron(ServicioDatos):
             fb.db().collection("config").document("general").set(
                 {"mes_actual": {"estado": "ABIERTO"}}, merge=True
             )
-            self.ops["escrituras"] += 1
+            self._contar_op("escrituras", 1)
         except Exception:
             pass
 
@@ -2411,7 +2458,7 @@ class ServicioDatosPadron(ServicioDatos):
             med_obj["nota"] = nota or ""
             med_obj["registrado_por"] = registrado_por
 
-        self.ops["escrituras"] += 1
+        self._contar_op("escrituras", 1)
         self.guardar_en_respaldo_local()
 
         encolar_cambio("lectura", {
@@ -2584,7 +2631,7 @@ class ServicioDatosPadron(ServicioDatos):
         if monto >= tot and tot > 0:
             doc["meses_adeudados"] = 0
 
-        self.ops["escrituras"] += 1
+        self._contar_op("escrituras", 1)
         self.guardar_en_respaldo_local(periodo)
 
         encolar_cambio("pago", {
@@ -2613,7 +2660,7 @@ class ServicioDatosPadron(ServicioDatos):
         else:
             doc["meses_adeudados"] = 1
 
-        self.ops["escrituras"] += 1
+        self._contar_op("escrituras", 1)
         self.guardar_en_respaldo_local(periodo)
 
         encolar_cambio("anular_pago", {
@@ -2707,8 +2754,22 @@ class ServicioDatosPadron(ServicioDatos):
     def eliminar_lector(self, uid: str) -> None:
         self._servicio_autenticacion_lectores().eliminar_lector(uid)
 
+    def _contar_op(self, tipo: str, n: int = 1) -> None:
+        """Suma al contador de sesión y al contador DIARIO persistente (pie de página)."""
+        n = int(n or 0)
+        if n <= 0:
+            return
+        self.ops[tipo] = self.ops.get(tipo, 0) + n
+        try:
+            from servicios import contador_ops
+            contador_ops.registrar(tipo, n)
+        except Exception:
+            pass
+
     def get_ops(self) -> Dict[str, int]:
-        return self.ops
+        """Operaciones realizadas HOY por esta PC (se reinicia con la cuota de Google)."""
+        from servicios import contador_ops
+        return contador_ops.obtener()
 
     def hay_aviso_ops(self) -> Dict[str, Optional[str]]:
         return {"lecturas": None, "escrituras": None}

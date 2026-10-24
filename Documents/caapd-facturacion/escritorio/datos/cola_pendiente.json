@@ -55,5 +55,27 @@
     "fecha_creacion": "2026-10-15T02:33:48.561498",
     "reintentos": 1,
     "ultimo_error": "No se encontró el archivo de credenciales Firebase:\n  serviceAccountKey.json\nEdita config_local.py con la ruta correcta."
+  },
+  {
+    "id_evento": "evt_20261024_004210_355477",
+    "tipo": "pago",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "12345678",
+      "monto_pagado": 25.0,
+      "fecha_pago": "2026-10-24"
+    },
+    "fecha_creacion": "2026-10-24T00:42:10.355477",
+    "reintentos": 0
+  },
+  {
+    "id_evento": "evt_20261024_004210_406256",
+    "tipo": "anular_pago",
+    "payload": {
+      "periodo": "2026-10",
+      "id_usuario": "12345678"
+    },
+    "fecha_creacion": "2026-10-24T00:42:10.406256",
+    "reintentos": 0
   }
 ]
