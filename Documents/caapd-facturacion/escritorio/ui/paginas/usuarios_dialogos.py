@@ -313,12 +313,70 @@ class DialogoUsuario(QDialog):
 
         self.setWindowTitle(
             "Editar Usuario" if self.es_edicion else "Nuevo Usuario")
-        self.resize(560, 640)
-        self.setMinimumSize(480, 500)
         self.setModal(True)
 
         self._construir_ui()
         self._cargar_datos_iniciales()
+        self._ajustar_tamano_a_pantalla()
+
+    def _ajustar_tamano_a_pantalla(self) -> None:
+        """
+        Dimensiona el diálogo en proporción a la pantalla donde está la ventana
+        principal (no en píxeles fijos) y garantiza que nunca sea más angosto
+        que lo que su contenido necesita (en PCs con fuente/escalado de Windows
+        grande los campos se recortaban por la derecha).
+        """
+        ventana = self.parentWidget().window() if self.parentWidget() else None
+        pantalla = (ventana.screen()
+                    if ventana is not None else None) or self.screen()
+        if pantalla is None:
+            self.resize(680, 720)
+            return
+        area = pantalla.availableGeometry()
+
+        # Ancho que exige el contenido (formulario + barra de scroll + márgenes)
+        contenido = getattr(self, "_scroll_widget", None)
+        ancho_contenido = 0
+        if contenido is not None:
+            margenes = self.layout().contentsMargins() if self.layout() else None
+            extra = (margenes.left() + margenes.right()) if margenes else 40
+            ancho_contenido = contenido.minimumSizeHint().width() + extra + 24
+
+        # Ancho: ~42% de la pantalla, entre 620 y 960 px, y nunca menor al contenido
+        ancho = int(area.width() * 0.42)
+        ancho = max(620, ancho_contenido, min(ancho, 960))
+        # Alto: ~82% de la pantalla, entre 560 y 900 px
+        alto = int(area.height() * 0.82)
+        alto = max(560, min(alto, 900))
+        # Nunca más grande que la pantalla disponible
+        ancho = min(ancho, area.width() - 40)
+        alto = min(alto, area.height() - 40)
+
+        self.setMinimumSize(
+            min(max(560, ancho_contenido), ancho), min(500, alto))
+        self.resize(ancho, alto)
+        self._centrado_pendiente = True
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        """Al mostrarse por primera vez, se centra sobre la ventana principal."""
+        super().showEvent(event)
+        if not getattr(self, "_centrado_pendiente", False):
+            return
+        self._centrado_pendiente = False
+        ventana = self.parentWidget().window() if self.parentWidget() else None
+        pantalla = (ventana.screen()
+                    if ventana is not None else None) or self.screen()
+        if pantalla is None:
+            return
+        area = pantalla.availableGeometry()
+        referencia = ventana.frameGeometry() if (
+            ventana is not None and ventana.isVisible()) else area
+        ancho, alto = self.frameGeometry().width(), self.frameGeometry().height()
+        x = referencia.center().x() - ancho // 2
+        y = referencia.center().y() - alto // 2
+        x = max(area.left(), min(x, area.right() - ancho))
+        y = max(area.top(), min(y, area.bottom() - alto))
+        self.move(x, y)
 
     def _construir_ui(self) -> None:
         layout_principal = QVBoxLayout(self)
@@ -342,6 +400,7 @@ class DialogoUsuario(QDialog):
             "QScrollArea { border: none; background: transparent; }")
 
         scroll_widget = QWidget()
+        self._scroll_widget = scroll_widget
         layout_form = QVBoxLayout(scroll_widget)
         layout_form.setContentsMargins(4, 4, 8, 4)
         layout_form.setSpacing(12)
@@ -431,8 +490,10 @@ class DialogoUsuario(QDialog):
         col_sec.addWidget(lbl_sec)
 
         self.combo_sector = QComboBox()
+        # Puede encogerse con el diálogo; el desplegable (view) muestra el texto completo
         self.combo_sector.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.combo_sector.setMinimumContentsLength(12)
         sec_view = QListView()
         sec_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.combo_sector.setView(sec_view)
@@ -453,7 +514,8 @@ class DialogoUsuario(QDialog):
         self.combo_categoria = QComboBox()
         self.combo_categoria.setMinimumWidth(180)
         self.combo_categoria.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.combo_categoria.setMinimumContentsLength(12)
         cat_view = QListView()
         cat_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         cat_view.setMinimumWidth(260)
