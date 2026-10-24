@@ -1883,6 +1883,12 @@ class ServicioDatosPadron(ServicioDatos):
                 mes_local = datos_excel.get("mes_docs") or {}
 
         if (periodo is None or p == self.periodo) and _todas_lecturas_actuales_completas(mes_local):
+            recibos_faltan = any(not doc.get("nro_recibo") for doc in (mes_local or {}).values())
+            if recibos_faltan:
+                if callback_progreso:
+                    callback_progreso(80, "Emitiendo recibos del mes...")
+                self.sincronizar_deudas_desde_mes_previo(p)
+                self.generar_recibos_mes(p)
             return {
                 "periodo": p,
                 "documentos_descargados": 0,
@@ -1891,7 +1897,7 @@ class ServicioDatosPadron(ServicioDatos):
                 "tiempo_segundos": round(time.perf_counter() - t_inicio, 2),
                 "metodo": "LOCAL",
                 "exito": True,
-                "omitida": True,
+                "omitida": not recibos_faltan,
             }
 
         if periodo is None and mes_local is not self.mes:
@@ -1939,11 +1945,17 @@ class ServicioDatosPadron(ServicioDatos):
         # 2b. Conciliar deudas arrastradas del mes previo (si clientes pagaron durante días de lectura)
         self.sincronizar_deudas_desde_mes_previo(p)
 
+        # 2c. Emitir recibos y facturar el mes automáticamente
+        if callback_progreso:
+            callback_progreso(
+                85, "Emitiendo recibos del mes y calculando facturación...")
+        self.generar_recibos_mes(p)
+
         # 3. Guardar en Excel local
         if callback_progreso:
             callback_progreso(
-                85,
-                f"Descarga completa ({docs_recibidos} documentos). Guardando el Excel local...",
+                95,
+                f"Descarga y facturación completa ({docs_recibidos} documentos). Guardando el Excel local...",
             )
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.config["ultima_descarga_lectores"] = ahora_str
@@ -1956,7 +1968,7 @@ class ServicioDatosPadron(ServicioDatos):
         duracion = time.perf_counter() - t_inicio
         if callback_progreso:
             callback_progreso(
-                100, f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s!")
+                100, f"¡{actualizados} lectura(s) descargadas y recibos emitidos en {duracion:.2f} s!")
 
         return {
             "periodo": p,
@@ -2523,11 +2535,30 @@ class ServicioDatosPadron(ServicioDatos):
         mes_target = self.mes if (p == self.periodo or not p) else (
             getattr(self, "meses_encontrados", {}).get(p) or self.mes
         )
+
+        max_recibo = int(self.config.get("ultimo_recibo") or 0)
+        for per_key, docs_m in getattr(self, "meses_encontrados", {}).items():
+            if per_key == p:
+                continue
+            for u_doc in (docs_m or {}).values():
+                r_str = str(u_doc.get("nro_recibo") or "")
+                if r_str.isdigit():
+                    max_recibo = max(max_recibo, int(r_str))
+        if max_recibo > int(self.config.get("ultimo_recibo") or 0):
+            self.config["ultimo_recibo"] = max_recibo
+
         total = len(mes_target)
         procesados = 0
 
-        for uid in list(mes_target.keys()):
-            self.generar_recibo_usuario(p, uid)
+        def clave_orden(uid):
+            u_doc = mes_target.get(uid) or {}
+            c = str(u_doc.get("nro_conexion") or "")
+            return int(c) if c.isdigit() else 999999
+
+        uids_ordenados = sorted(list(mes_target.keys()), key=clave_orden)
+
+        for uid in uids_ordenados:
+            self.generar_recibo_usuario(p, uid, guardar=False)
             procesados += 1
             if callback_progreso:
                 callback_progreso(procesados, total)
@@ -2830,7 +2861,12 @@ class ServicioDatosPadron(ServicioDatos):
             "pendientes": len(self.mes) - pagados,
         }
 
-    def generar_recibo_usuario(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
+    def generar_recibo_usuario(
+        self,
+        periodo: str,
+        id_usuario: str,
+        guardar: bool = True,
+    ) -> Dict[str, Any]:
         mes_target = self.mes if (periodo == self.periodo or not periodo) else (
             getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
         )
@@ -2893,5 +2929,6 @@ class ServicioDatosPadron(ServicioDatos):
             doc["fecha_pago"] = None
 
         mes_target[id_usuario] = doc
-        self.guardar_en_respaldo_local(periodo)
+        if guardar:
+            self.guardar_en_respaldo_local(periodo)
         return doc

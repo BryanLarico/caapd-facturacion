@@ -615,7 +615,11 @@ class PaginaCobros(QWidget):
 
                 def al_terminar_descarga(res):
                     if hasattr(ventana, "ocultar_progreso"):
-                        ventana.ocultar_progreso("¡Lecturas descargadas!")
+                        ventana.ocultar_progreso("¡Lecturas descargadas y recibos emitidos!")
+                    if hasattr(self, "toast"):
+                        self.toast.mostrar(
+                            "¡Lecturas descargadas y recibos emitidos con éxito!", "exito"
+                        )
                     p_descargado = (res or {}).get("periodo")
                     if not p_descargado and hasattr(self.servicio, "obtener_periodo_cobranza"):
                         p_descargado = self.servicio.obtener_periodo_cobranza()

@@ -112,3 +112,94 @@ def test_sincronizar_deudas_desde_mes_previo(monkeypatch):
 
     assert actualizados >= 1
     assert "2026-10" in guardados
+
+
+def test_traer_lecturas_de_lectores_emite_recibos_y_calcula_morosidad(monkeypatch):
+    servicio = ServicioDatosPadron.__new__(ServicioDatosPadron)
+    servicio.periodo = "2026-10"
+    servicio.base_dir = None
+    servicio.config = {
+        "mes_actual": {"periodo": "2026-10", "estado": "ABIERTO"},
+        "ultimo_recibo": 150,
+        "categorias": {
+            "A": {
+                "nombre": "Doméstico",
+                "cargo_fijo": 5.0,
+                "tarifa_plana": False,
+                "rangos": [{"hasta": 10, "precio": 1.0}],
+            }
+        },
+    }
+    # Usuario 1: pagó en 2026-09
+    # Usuario 2: debía 1 mes en 2026-09 y no pagó -> debe pasar a 2 Meses (Naranja)
+    # Usuario 3: debía 2 meses en 2026-09 y no pagó -> debe pasar a Corte 3 meses (Rojo)
+    mes_2026_09 = {
+        "u1": {"total_a_pagar": 20.0, "monto_pagado": 20.0, "pago": "SI", "meses_adeudados": 1, "nro_recibo": "000000148"},
+        "u2": {"total_a_pagar": 25.0, "monto_pagado": 0.0, "pago": "NO", "meses_adeudados": 1, "nro_recibo": "000000149"},
+        "u3": {"total_a_pagar": 40.0, "monto_pagado": 0.0, "pago": "NO", "meses_adeudados": 2, "nro_recibo": "000000150"},
+    }
+    mes_2026_10 = {
+        "u1": {
+            "nro_conexion": "1",
+            "codigo_categoria": "A",
+            "deuda_anterior": 20.0,
+            "meses_adeudados": 1,
+            "nro_recibo": None,
+            "medidores": [{"nro_medidor": "M1", "lectura_anterior": 100, "lectura_actual": 110}],
+        },
+        "u2": {
+            "nro_conexion": "2",
+            "codigo_categoria": "A",
+            "deuda_anterior": 25.0,
+            "meses_adeudados": 1,
+            "nro_recibo": None,
+            "medidores": [{"nro_medidor": "M2", "lectura_anterior": 50, "lectura_actual": 55}],
+        },
+        "u3": {
+            "nro_conexion": "3",
+            "codigo_categoria": "A",
+            "deuda_anterior": 40.0,
+            "meses_adeudados": 2,
+            "nro_recibo": None,
+            "medidores": [{"nro_medidor": "M3", "lectura_anterior": 200, "lectura_actual": 210}],
+        },
+    }
+    servicio.meses_encontrados = {
+        "2026-09": mes_2026_09,
+        "2026-10": mes_2026_10,
+    }
+    servicio.mes = mes_2026_10
+
+    monkeypatch.setattr(servicio, "guardar_en_respaldo_local", lambda *args, **kwargs: None)
+    monkeypatch.setattr(servicio, "_contar_op", lambda *args, **kwargs: None)
+
+    # Ejecutar traer_lecturas_de_lectores (lecturas completas localmente)
+    servicio.traer_lecturas_de_lectores("2026-10")
+
+    # Verificar que los 3 usuarios tienen número de recibo consecutivo
+    assert mes_2026_10["u1"]["nro_recibo"] is not None
+    assert mes_2026_10["u2"]["nro_recibo"] is not None
+    assert mes_2026_10["u3"]["nro_recibo"] is not None
+    assert int(mes_2026_10["u1"]["nro_recibo"]) > 150
+
+    # u1: pagó mes anterior -> deuda_anterior = 0, meses_adeudados = 1
+    assert mes_2026_10["u1"]["deuda_anterior"] == 0.0
+    assert mes_2026_10["u1"]["meses_adeudados"] == 1
+
+    # u2: no pagó mes anterior (tenía 1 mes) -> pasa a meses_adeudados = 2 (Naranja)
+    assert mes_2026_10["u2"]["deuda_anterior"] == 25.0
+    assert mes_2026_10["u2"]["meses_adeudados"] == 2
+
+    # u3: no pagó mes anterior (tenía 2 meses) -> pasa a meses_adeudados = 3 (Rojo/Corte)
+    assert mes_2026_10["u3"]["deuda_anterior"] == 40.0
+    assert mes_2026_10["u3"]["meses_adeudados"] == 3
+
+    # Estado del mes pasó a FACTURADO
+    assert servicio.config["mes_actual"]["estado"] == "FACTURADO"
+
+    # Verificar que en el modelo de cobros se colorea correctamente
+    from ui.paginas.cobros_modelo import color_fila_morosidad, COLOR_FILA_DOS_MESES, COLOR_FILA_CORTE
+    assert color_fila_morosidad(mes_2026_10["u1"]) is None
+    assert color_fila_morosidad(mes_2026_10["u2"]) == COLOR_FILA_DOS_MESES
+    assert color_fila_morosidad(mes_2026_10["u3"]) == COLOR_FILA_CORTE
+

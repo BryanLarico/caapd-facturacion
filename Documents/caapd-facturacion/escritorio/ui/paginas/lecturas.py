@@ -467,7 +467,7 @@ class PaginaLecturas(QWidget):
 
     @Slot(object)
     def _al_terminar_descarga(self, res: Any) -> None:
-        self._terminar_sincronizacion("¡Lecturas descargadas!")
+        self._terminar_sincronizacion("¡Lecturas descargadas y recibos emitidos!")
         res = res or {}
         conflictos = res.get("conflictos_admin") or []
         info_extra = ""
@@ -482,13 +482,17 @@ class PaginaLecturas(QWidget):
             )
         mostrar_dialogo_info(
             self,
-            "Descarga de Lecturas Completada",
-            f"¡Descarga finalizada con éxito!\n\n"
+            "Descarga de Lecturas y Emisión Completada",
+            f"¡Descarga y emisión de recibos finalizada con éxito!\n\n"
             f"• {res.get('actualizados', 0)} lectura(s) actualizada(s) en Excel.\n"
-            f"• Tiempo total de descarga: {res.get('tiempo_segundos', 0)} s."
+            f"• Recibos del mes generados y listos para cobrar en Cobros.\n"
+            f"• Tiempo total: {res.get('tiempo_segundos', 0)} s."
             f"{info_extra}",
         )
         self.cargar_datos_asincrono(forzar=True)
+        ventana = self.window()
+        if hasattr(ventana, "pagina_cobros") and hasattr(ventana.pagina_cobros, "cargar_datos_asincrono"):
+            ventana.pagina_cobros.cargar_datos_asincrono(forzar=True)
 
     @Slot(str)
     def _al_fallar_sincronizacion(self, err_msg: str) -> None:
