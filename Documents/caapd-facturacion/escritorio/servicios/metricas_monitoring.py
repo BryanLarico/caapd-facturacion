@@ -72,28 +72,95 @@ def _buscar_archivo_credenciales(ruta_personalizada: Optional[Path | str] = None
     return None
 
 
+def _log(msg: str) -> None:
+    """Diagnóstico en logs/metricas.log junto al exe (nunca falla)."""
+    try:
+        ruta = rutas.ruta_aplicacion("logs", "metricas.log")
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        with open(ruta, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n")
+    except Exception:
+        pass
+
+
+def _mensaje_error_http(resp: Any) -> str:
+    """Extrae el mensaje real que devuelve Google (p. ej. 'API no habilitada')."""
+    try:
+        return str(resp.json().get("error", {}).get("message") or resp.text[:300])
+    except Exception:
+        return str(getattr(resp, "text", "")[:300])
+
+
+def _sumar_metrica(base_url: str, headers: Any, metric_name: str,
+                   iso_inicio: str, iso_fin: str, requests: Any) -> int:
+    """
+    Total de una métrica DELTA en el rango, con agregación del lado de Google:
+    - ALIGN_SUM por hora reduce miles de puntos crudos a <= 24 por serie
+    - REDUCE_SUM junta todas las series (tipo de operación, base de datos...)
+    y se siguen todas las páginas (nextPageToken).
+    """
+    params = {
+        "filter": f'metric.type = "{metric_name}"',
+        "interval.startTime": iso_inicio,
+        "interval.endTime": iso_fin,
+        "aggregation.alignmentPeriod": "3600s",
+        "aggregation.perSeriesAligner": "ALIGN_SUM",
+        "aggregation.crossSeriesReducer": "REDUCE_SUM",
+        "view": "FULL",
+    }
+    suma = 0
+    token_pagina = None
+    for _ in range(50):  # tope de seguridad
+        if token_pagina:
+            params["pageToken"] = token_pagina
+        resp = requests.get(base_url, headers=headers, params=params, timeout=8)
+        if resp.status_code != 200:
+            raise _ErrorHttp(resp.status_code, _mensaje_error_http(resp))
+        data = resp.json()
+        for serie in data.get("timeSeries", []):
+            for pt in serie.get("points", []):
+                val = pt.get("value", {})
+                if val.get("int64Value") is not None:
+                    suma += int(val["int64Value"])
+                elif val.get("doubleValue") is not None:
+                    suma += int(round(float(val["doubleValue"])))
+        token_pagina = data.get("nextPageToken")
+        if not token_pagina:
+            break
+    return suma
+
+
+class _ErrorHttp(Exception):
+    def __init__(self, codigo: int, mensaje: str) -> None:
+        super().__init__(f"HTTP {codigo}: {mensaje}")
+        self.codigo = codigo
+        self.mensaje = mensaje
+
+
 def consultar_metricas_hoy(forzar: bool = False) -> Dict[str, Any]:
     """
     Consulta a Google Cloud Monitoring las operaciones reales de hoy (desde 00:00 Pacífico).
     No gasta cuota de Firestore. Si la API no tiene permiso o no hay conexión,
-    retorna disponible=False sin lanzar excepciones.
+    retorna disponible=False (con el motivo real en 'error') sin lanzar excepciones.
     """
     global _CACHE_METRICAS
     ahora = time.time()
     if not forzar and _CACHE_METRICAS["resultado"] is not None and (ahora - _CACHE_METRICAS["timestamp"]) < 60.0:
         return _CACHE_METRICAS["resultado"]
 
+    def _no_disponible(error: str, codigo: Optional[int] = None) -> Dict[str, Any]:
+        global _CACHE_METRICAS
+        res = {"disponible": False, "lecturas": 0, "escrituras": 0,
+               "fuente": "Local", "error": error}
+        if codigo is not None:
+            res["codigo"] = codigo
+        _CACHE_METRICAS = {"timestamp": ahora, "resultado": res}
+        _log(f"NO DISPONIBLE: {error}")
+        return res
+
     ruta_clave = _buscar_archivo_credenciales()
     if not ruta_clave:
-        res = {
-            "disponible": False,
-            "lecturas": 0,
-            "escrituras": 0,
-            "fuente": "Local",
-            "error": "No se encontró archivo de credenciales de Google Cloud",
-        }
-        _CACHE_METRICAS = {"timestamp": ahora, "resultado": res}
-        return res
+        return _no_disponible("No se encontró archivo de credenciales de Google Cloud")
 
     try:
         import json
@@ -108,97 +175,49 @@ def consultar_metricas_hoy(forzar: bool = False) -> Dict[str, Any]:
         if not project_id:
             raise ValueError("El archivo JSON no contiene 'project_id'")
 
-        scopes = [
-            "https://www.googleapis.com/auth/cloud-platform",
-            "https://www.googleapis.com/auth/monitoring.read",
-        ]
         credentials = service_account.Credentials.from_service_account_file(
             str(ruta_clave),
-            scopes=scopes,
+            scopes=["https://www.googleapis.com/auth/monitoring.read"],
         )
         credentials.refresh(Request())
-        token = credentials.token
-
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {"Authorization": f"Bearer {credentials.token}"}
         iso_inicio, iso_fin, legible_pacifico = obtener_rango_hoy_pacifico()
-
         base_url = f"https://monitoring.googleapis.com/v3/projects/{project_id}/timeSeries"
 
-        # Métricas a consultar
         metricas = {
             "read_count": "firestore.googleapis.com/document/read_count",
             "write_count": "firestore.googleapis.com/document/write_count",
             "delete_count": "firestore.googleapis.com/document/delete_count",
         }
-
-        totales = {"read_count": 0, "write_count": 0, "delete_count": 0}
-
+        totales: Dict[str, int] = {}
         for clave_m, metric_name in metricas.items():
-            params = {
-                "filter": f'metric.type = "{metric_name}"',
-                "interval.startTime": iso_inicio,
-                "interval.endTime": iso_fin,
-            }
-            resp = requests.get(base_url, headers=headers, params=params, timeout=6)
-            if resp.status_code == 200:
-                data = resp.json()
-                series = data.get("timeSeries", [])
-                suma = 0
-                for s in series:
-                    for pt in s.get("points", []):
-                        val = pt.get("value", {})
-                        int_val = val.get("int64Value")
-                        if int_val is not None:
-                            suma += int(int_val)
-                        elif "doubleValue" in val:
-                            suma += int(val["doubleValue"])
-                totales[clave_m] = suma
-            elif resp.status_code == 403:
-                # Permiso denegado: falta el rol Monitoring Viewer en GCP Console
-                res = {
-                    "disponible": False,
-                    "lecturas": 0,
-                    "escrituras": 0,
-                    "fuente": "Local",
-                    "error": "Requiere rol 'Monitoring Viewer' en Google Cloud Console",
-                    "codigo": 403,
-                }
-                _CACHE_METRICAS = {"timestamp": ahora, "resultado": res}
-                return res
-            else:
-                # Otro código HTTP
-                res = {
-                    "disponible": False,
-                    "lecturas": 0,
-                    "escrituras": 0,
-                    "fuente": "Local",
-                    "error": f"Error HTTP {resp.status_code} al consultar Cloud Monitoring",
-                    "codigo": resp.status_code,
-                }
-                _CACHE_METRICAS = {"timestamp": ahora, "resultado": res}
-                return res
-
-        total_lecturas = totales["read_count"]
-        total_escrituras = totales["write_count"] + totales["delete_count"]
+            totales[clave_m] = _sumar_metrica(
+                base_url, headers, metric_name, iso_inicio, iso_fin, requests)
 
         res = {
             "disponible": True,
-            "lecturas": total_lecturas,
-            "escrituras": total_escrituras,
+            "lecturas": totales["read_count"],
+            "escrituras": totales["write_count"] + totales["delete_count"],
+            "eliminaciones": totales["delete_count"],
             "fuente": "Cloud Monitoring",
             "desde_pacifico": legible_pacifico,
             "error": None,
         }
         _CACHE_METRICAS = {"timestamp": ahora, "resultado": res}
+        _log(f"OK proyecto={project_id} desde={iso_inicio} lecturas={totales['read_count']} "
+             f"escrituras={totales['write_count']} eliminaciones={totales['delete_count']}")
         return res
 
+    except _ErrorHttp as e:
+        msg = e.mensaje
+        if e.codigo == 403 and ("disabled" in msg.lower() or "has not been used" in msg.lower()):
+            texto = ("La API de Cloud Monitoring no está habilitada en el proyecto. "
+                     "Habilítela en console.cloud.google.com/apis/library/monitoring.googleapis.com")
+        elif e.codigo == 403:
+            texto = ("La cuenta de servicio no tiene permiso: asigne el rol 'Visualizador de Monitoring' "
+                     f"(Monitoring Viewer) en IAM. Detalle: {msg}")
+        else:
+            texto = f"Error HTTP {e.codigo} al consultar Cloud Monitoring: {msg}"
+        return _no_disponible(texto, e.codigo)
     except Exception as e:
-        res = {
-            "disponible": False,
-            "lecturas": 0,
-            "escrituras": 0,
-            "fuente": "Local",
-            "error": str(e),
-        }
-        _CACHE_METRICAS = {"timestamp": ahora, "resultado": res}
-        return res
+        return _no_disponible(f"{type(e).__name__}: {e}")

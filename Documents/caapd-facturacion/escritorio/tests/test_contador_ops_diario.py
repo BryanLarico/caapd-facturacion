@@ -54,10 +54,10 @@ def test_pie_de_pagina_se_actualiza_al_instante(qtbot):
     serv = ServicioDatosPadron(base_dir=Path(tempfile.mkdtemp()))
     ventana = VentanaPrincipal(serv)
     qtbot.addWidget(ventana)
-    assert ventana.lbl_lecturas.text() == "Lecturas: 0"
+    assert ventana.lbl_lecturas.text().startswith("Lecturas: 0")
     serv._contar_op("lecturas", 1234)
     serv._contar_op("escrituras", 2)
-    qtbot.waitUntil(lambda: ventana.lbl_lecturas.text() == "Lecturas: 1 234", timeout=2000)
+    qtbot.waitUntil(lambda: ventana.lbl_lecturas.text().startswith("Lecturas: 1 234"), timeout=2000)
     assert ventana.lbl_escrituras.text() == "Escrituras: 2"
 
 
@@ -71,7 +71,7 @@ def test_pie_muestra_total_exacto_de_google_cuando_esta_disponible(qtbot):
     qtbot.addWidget(ventana)
     ventana._timer_metricas.stop(); ventana._timer_refresco_metricas.stop()
     serv._contar_op("lecturas", 10)
-    qtbot.waitUntil(lambda: ventana.lbl_lecturas.text() == "Lecturas: 10", timeout=2000)
+    qtbot.waitUntil(lambda: ventana.lbl_lecturas.text().startswith("Lecturas: 10"), timeout=2000)
     # Llega la respuesta de Cloud Monitoring: manda el total exacto del proyecto
     ventana._metricas_nube = {"disponible": True, "lecturas": 3812, "escrituras": 847,
                               "desde_pacifico": "2026-10-24 00:00 PDT", "error": None}
@@ -83,5 +83,5 @@ def test_pie_muestra_total_exacto_de_google_cuando_esta_disponible(qtbot):
     ventana._metricas_nube = {"disponible": False, "lecturas": 0, "escrituras": 0,
                               "error": "Requiere rol 'Monitoring Viewer' en Google Cloud Console"}
     ventana._pintar_contadores_locales()
-    assert ventana.lbl_lecturas.text() == "Lecturas: 10"
+    assert ventana.lbl_lecturas.text() == "Lecturas: 10 (esta PC)"
     assert "Monitoring Viewer" in ventana.lbl_lecturas.toolTip()

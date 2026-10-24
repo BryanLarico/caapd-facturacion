@@ -125,7 +125,7 @@ class VentanaPrincipal(QMainWindow):
             self._senal_ops_cambiaron.connect(
                 lambda: self._programar_consulta_metricas(45_000),
                 Qt.ConnectionType.QueuedConnection)
-            self._programar_consulta_metricas(5_000)
+            self._programar_consulta_metricas(1_500)   # al abrir, casi de inmediato
             self._timer_refresco_metricas.start()
 
         self.actualizar_barra_estado()
@@ -424,27 +424,41 @@ class VentanaPrincipal(QMainWindow):
         l_escr = int(local.get("escrituras", 0))
         nube = self._metricas_nube if getattr(self, "_metricas_nube", None) else None
 
+        sufijo = ""
         if nube and nube.get("disponible"):
             n_lect = int(nube.get("lecturas", 0))
             n_escr = int(nube.get("escrituras", 0))
             desde = nube.get("desde_pacifico") or "00:00 hora del Pacífico"
+            elim = int(nube.get("eliminaciones", 0) or 0)
             tooltip = (
                 "Total EXACTO de Google (Cloud Monitoring) para todo el proyecto: incluye esta PC, "
                 f"la app móvil de los lectores y la consola.\nContado desde {desde}. "
                 "Google tarda 1-3 minutos en reflejar las últimas operaciones.\n"
+                f"Escrituras incluye {self._fmt_miles(elim)} eliminaciones (consumen la misma cuota).\n"
                 f"Solo esta PC hoy: {self._fmt_miles(l_lect)} lecturas / {self._fmt_miles(l_escr)} escrituras."
             )
         else:
             n_lect, n_escr = l_lect, l_escr
-            motivo = (nube or {}).get("error") or "aún no consultado"
+            es_memoria = getattr(self.servicio, "es_memoria", False)
+            consultando = getattr(self, "_consultando_metricas", False) or (
+                nube is None and not es_memoria)
+            if es_memoria:
+                motivo = "no aplica (datos en memoria)"
+            elif consultando:
+                sufijo = " (esta PC, consultando a Google…)"
+                motivo = "consultando…"
+            else:
+                sufijo = " (esta PC)"
+                motivo = (nube or {}).get("error") or "sin respuesta"
             tooltip = (
                 "Operaciones realizadas desde esta PC en el día de hoy (se reinicia a las 00:00 hora "
                 "del Pacífico, igual que la cuota gratuita de Google).\n"
                 "No incluye la app móvil ni la consola.\n"
-                f"Total exacto de Google no disponible: {motivo}."
+                f"Total exacto de Google no disponible: {motivo}\n"
+                "Detalle en logs\\metricas.log junto al programa."
             )
 
-        self.lbl_lecturas.setText(f"Lecturas: {self._fmt_miles(n_lect)}")
+        self.lbl_lecturas.setText(f"Lecturas: {self._fmt_miles(n_lect)}{sufijo}")
         self.lbl_escrituras.setText(f"Escrituras: {self._fmt_miles(n_escr)}")
         self.lbl_lecturas.setToolTip(tooltip)
         self.lbl_escrituras.setToolTip(tooltip)
