@@ -29,12 +29,16 @@ from PySide6.QtWidgets import QMessageBox, QSizePolicy
 @pytest.fixture(autouse=True)
 def mock_message_boxes(monkeypatch):
     """Evita diálogos bloqueantes de QMessageBox y confirmaciones en pruebas."""
-    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
-    monkeypatch.setattr(DialogoConfirmacionMedidorDuplicado, "exec", lambda self: setattr(self, "confirmado", True) or 1)
-
+    monkeypatch.setattr(QMessageBox, "information", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Ok)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args,
+                        **kwargs: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(DialogoConfirmacionMedidorDuplicado,
+                        "exec", lambda self: setattr(self, "confirmado", True) or 1)
 
 
 @pytest.fixture
@@ -239,7 +243,8 @@ def test_dialogo_usuario_creacion_y_validaciones(qtbot, datos_usuarios_prueba):
 
 def test_dialogo_usuario_valida_medidores_duplicados(qtbot, datos_usuarios_prueba):
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
-    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+    config = {"sectores": ["CENTRO"], "categorias": {
+        "A": {"nombre": "Doméstico"}}}
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
     qtbot.addWidget(dialogo)
@@ -251,7 +256,8 @@ def test_dialogo_usuario_valida_medidores_duplicados(qtbot, datos_usuarios_prueb
     dialogo._agregar_medidor()
 
     # Al intentar guardar debe bloquear la duplicidad
-    valido, err_msg = servicio.validar_medidores_unicos(dialogo.medidores_lista)
+    valido, err_msg = servicio.validar_medidores_unicos(
+        dialogo.medidores_lista)
     assert not valido
     assert "ya está asignado" in err_msg
 
@@ -263,7 +269,8 @@ def test_corregir_dni_modal_y_servicio(qtbot, datos_usuarios_prueba):
         "nombre": "RAMIREZ TORRES, IRMA",
     }
 
-    dialogo = DialogoCorregirDni(servicio_datos=servicio, usuario=usuario_pendiente)
+    dialogo = DialogoCorregirDni(
+        servicio_datos=servicio, usuario=usuario_pendiente)
     qtbot.addWidget(dialogo)
 
     dialogo.campo_nuevo_dni.setText("30770349")  # Intentar asignar el real
@@ -281,7 +288,8 @@ def test_pagina_usuarios_interaccion_completa(qtbot, datos_usuarios_prueba):
     qtbot.addWidget(pagina)
 
     pagina.cargar_datos_asincrono()
-    qtbot.waitUntil(lambda: len(pagina.lista_usuarios_completa) == 4, timeout=2000)
+    qtbot.waitUntil(lambda: len(pagina.lista_usuarios_completa)
+                    == 4, timeout=2000)
 
     # Verificar contadores
     assert "Todos (4)" in pagina.btn_filtro_todos.text()
@@ -418,12 +426,14 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
     avisos = []
     monkeypatch.setattr(
         "ui.paginas.usuarios_dialogos.mostrar_dialogo_aviso",
-        lambda parent, titulo, texto, detalle=None: avisos.append((titulo, texto)),
+        lambda parent, titulo, texto, detalle=None: avisos.append(
+            (titulo, texto)),
     )
     monkeypatch.setattr(
         QMessageBox,
         "warning",
-        lambda parent, titulo, texto: avisos.append((titulo, texto)) or QMessageBox.StandardButton.Ok,
+        lambda parent, titulo, texto: avisos.append(
+            (titulo, texto)) or QMessageBox.StandardButton.Ok,
     )
 
     mock_doc = MagicMock()
@@ -505,7 +515,8 @@ def test_dialogo_editar_dni_sd_a_real_renombra_y_sincroniza(qtbot, tmp_path):
     mock_db.collection.return_value.document.side_effect = doc_selector
 
     usuario_editar = dict(servicio.usuarios["SD-001"])
-    dialogo = DialogoUsuario(servicio_datos=servicio, usuario=usuario_editar, config=servicio.config)
+    dialogo = DialogoUsuario(servicio_datos=servicio,
+                             usuario=usuario_editar, config=servicio.config)
     qtbot.addWidget(dialogo)
 
     # Reemplazar SD-001 por DNI definitivo 30771072
@@ -540,7 +551,8 @@ def test_pagina_usuarios_btn_actualizar_excel(qtbot, datos_usuarios_prueba):
     pagina.btn_actualizar_excel.click()
     assert pagina.btn_actualizar_excel.property("activo") == "true"
 
-    qtbot.waitUntil(lambda: pagina.btn_actualizar_excel.isEnabled() is True, timeout=2000)
+    qtbot.waitUntil(
+        lambda: pagina.btn_actualizar_excel.isEnabled() is True, timeout=2000)
     assert pagina.btn_actualizar_excel.text() == "Actualizar Excel"
 
     # Al cambiar de filtro, se desactiva
@@ -563,7 +575,8 @@ def test_obtener_siguiente_dni_sugerido(datos_usuarios_prueba):
 def test_dialogo_usuario_acepta_dni_con_sufijo(qtbot, datos_usuarios_prueba):
     """Una misma persona puede tener 2 conexiones: 30771072 y 30771072-1 (o -A)."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
-    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+    config = {"sectores": ["CENTRO"], "categorias": {
+        "A": {"nombre": "Doméstico"}}}
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
     qtbot.addWidget(dialogo)
@@ -593,7 +606,8 @@ def test_dialogo_usuario_acepta_dni_con_sufijo(qtbot, datos_usuarios_prueba):
 
 def test_dialogo_usuario_validacion_en_vivo_dni_y_medidor(qtbot, datos_usuarios_prueba):
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
-    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+    config = {"sectores": ["CENTRO"], "categorias": {
+        "A": {"nombre": "Doméstico"}}}
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
     qtbot.addWidget(dialogo)
@@ -652,13 +666,15 @@ def test_dialogo_confirmacion_dni_duplicado_botones_y_acciones(qtbot, datos_usua
 
 def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monkeypatch):
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
-    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+    config = {"sectores": ["CENTRO"], "categorias": {
+        "A": {"nombre": "Doméstico"}}}
 
     # Mockear el diálogo para simular que el usuario hace clic en "Guardar 30771072-1"
     monkeypatch.setattr(
         DialogoConfirmacionDniDuplicado,
         "exec",
-        lambda self: setattr(self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_SUGERIDO) or 1,
+        lambda self: setattr(
+            self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_SUGERIDO) or 1,
     )
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
@@ -680,13 +696,15 @@ def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monk
 
 def test_dialogo_usuario_guardar_cancelar_mantiene_edicion(qtbot, datos_usuarios_prueba, monkeypatch):
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
-    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
+    config = {"sectores": ["CENTRO"], "categorias": {
+        "A": {"nombre": "Doméstico"}}}
 
     # Mockear el diálogo para simular que el usuario hace clic en "Cancelar" (volver a editar)
     monkeypatch.setattr(
         DialogoConfirmacionDniDuplicado,
         "exec",
-        lambda self: setattr(self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_CANCELAR) or 0,
+        lambda self: setattr(
+            self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_CANCELAR) or 0,
     )
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
@@ -702,4 +720,3 @@ def test_dialogo_usuario_guardar_cancelar_mantiene_edicion(qtbot, datos_usuarios
     # No debe haberse guardado nada nuevo
     assert "30771072-1" not in servicio.usuarios
     assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
-

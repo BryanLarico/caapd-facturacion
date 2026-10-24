@@ -122,8 +122,10 @@ class DialogoConfirmacionDniDuplicado(QDialog):
         col_texto = QVBoxLayout()
         col_texto.setSpacing(8)
 
-        lbl_titulo = QLabel(f"El DNI <b>'{self.dni}'</b> ya se encuentra registrado.")
-        lbl_titulo.setStyleSheet("font-size: 14px; font-weight: bold; color: #b45309;")
+        lbl_titulo = QLabel(
+            f"El DNI <b>'{self.dni}'</b> ya se encuentra registrado.")
+        lbl_titulo.setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #b45309;")
         lbl_titulo.setWordWrap(True)
         col_texto.addWidget(lbl_titulo)
 
@@ -160,19 +162,22 @@ class DialogoConfirmacionDniDuplicado(QDialog):
 
         self.btn_aceptar = QPushButton("Aceptar")
         self.btn_aceptar.setProperty("class", "boton boton_secundario")
-        self.btn_aceptar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_aceptar.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_aceptar.setMinimumHeight(38)
         self.btn_aceptar.clicked.connect(self._on_aceptar)
 
         self.btn_cancelar = QPushButton("Cancelar")
         self.btn_cancelar.setProperty("class", "boton boton_secundario")
-        self.btn_cancelar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_cancelar.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_cancelar.setMinimumHeight(38)
         self.btn_cancelar.clicked.connect(self._on_cancelar)
 
         self.btn_sugerido = QPushButton(f"Guardar {self.dni_sugerido}")
         self.btn_sugerido.setProperty("class", "boton boton_primario")
-        self.btn_sugerido.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_sugerido.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_sugerido.setMinimumHeight(38)
         self.btn_sugerido.clicked.connect(self._on_sugerido)
 
@@ -231,7 +236,8 @@ class DialogoConfirmacionMedidorDuplicado(QDialog):
         col_texto.setSpacing(8)
 
         lbl_titulo = QLabel("Medidor ya registrado en el sistema")
-        lbl_titulo.setStyleSheet("font-size: 14px; font-weight: bold; color: #b45309;")
+        lbl_titulo.setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #b45309;")
         lbl_titulo.setWordWrap(True)
         col_texto.addWidget(lbl_titulo)
 
@@ -242,7 +248,8 @@ class DialogoConfirmacionMedidorDuplicado(QDialog):
         lbl_detalle.setWordWrap(True)
         col_texto.addWidget(lbl_detalle)
 
-        lbl_pregunta = QLabel("¿Seguro que deseas registrar este medidor? Podría tratarse de un error de tipeo.")
+        lbl_pregunta = QLabel(
+            "¿Seguro que deseas registrar este medidor? Podría tratarse de un error de tipeo.")
         lbl_pregunta.setStyleSheet("font-size: 12px; color: #475569;")
         lbl_pregunta.setWordWrap(True)
         col_texto.addWidget(lbl_pregunta)
@@ -258,13 +265,15 @@ class DialogoConfirmacionMedidorDuplicado(QDialog):
 
         self.btn_aceptar = QPushButton("Aceptar")
         self.btn_aceptar.setProperty("class", "boton boton_secundario")
-        self.btn_aceptar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_aceptar.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_aceptar.setMinimumHeight(38)
         self.btn_aceptar.clicked.connect(self._on_aceptar)
 
         self.btn_cancelar = QPushButton("Cancelar")
         self.btn_cancelar.setProperty("class", "boton boton_secundario")
-        self.btn_cancelar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_cancelar.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_cancelar.setMinimumHeight(38)
         self.btn_cancelar.clicked.connect(self.reject)
 
@@ -327,8 +336,10 @@ class DialogoUsuario(QDialog):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet(
+            "QScrollArea { border: none; background: transparent; }")
 
         scroll_widget = QWidget()
         layout_form = QVBoxLayout(scroll_widget)
@@ -379,6 +390,7 @@ class DialogoUsuario(QDialog):
         self.campo_conexion = QLineEdit()
         self.campo_conexion.setPlaceholderText("6 dígitos (ej. 000796)")
         self.campo_conexion.setMaxLength(6)
+        col_con.addWidget(self.campo_conexion)
         self.msg_conexion = self._crear_mensaje_campo()
         col_con.addWidget(self.msg_conexion)
 
@@ -609,7 +621,8 @@ class DialogoUsuario(QDialog):
 
         # Conectar validaciones en vivo para DNI y medidor duplicados
         self.campo_id.textChanged.connect(self._validar_dni_en_vivo)
-        self.campo_nuevo_medidor.textChanged.connect(self._validar_medidor_en_vivo)
+        self.campo_nuevo_medidor.textChanged.connect(
+            self._validar_medidor_en_vivo)
 
     def _cargar_datos_iniciales(self) -> None:
         if self.es_edicion and self.usuario:
@@ -678,7 +691,8 @@ class DialogoUsuario(QDialog):
                 return
 
         dni_buscar = normalizar_id_completo(txt)
-        usr = self.servicio.obtener_usuario(dni_buscar) or self.servicio.obtener_usuario(txt)
+        usr = self.servicio.obtener_usuario(
+            dni_buscar) or self.servicio.obtener_usuario(txt)
         if usr:
             nombre = usr.get("nombre", "")
             txt_extra = f": {nombre}" if nombre else ""
@@ -1068,7 +1082,8 @@ class DialogoUsuario(QDialog):
 
             usr_existente = self.servicio.obtener_usuario(id_final)
             if usr_existente is not None:
-                dni_sugerido = obtener_siguiente_dni_sugerido(self.servicio, id_final)
+                dni_sugerido = obtener_siguiente_dni_sugerido(
+                    self.servicio, id_final)
                 dlg = DialogoConfirmacionDniDuplicado(
                     dni=id_final,
                     dni_sugerido=dni_sugerido,
@@ -1099,7 +1114,8 @@ class DialogoUsuario(QDialog):
 
                 usr_existente = self.servicio.obtener_usuario(norm_id)
                 if usr_existente is not None:
-                    dni_sugerido = obtener_siguiente_dni_sugerido(self.servicio, norm_id)
+                    dni_sugerido = obtener_siguiente_dni_sugerido(
+                        self.servicio, norm_id)
                     dlg = DialogoConfirmacionDniDuplicado(
                         dni=norm_id,
                         dni_sugerido=dni_sugerido,
