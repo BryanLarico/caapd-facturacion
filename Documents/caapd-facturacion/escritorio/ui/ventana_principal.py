@@ -332,6 +332,8 @@ class VentanaPrincipal(QMainWindow):
         elif clave_pagina == "cobros":
             if not self.pagina_cobros.lista_items_completa:
                 self.pagina_cobros.cargar_datos_asincrono()
+            else:
+                self.pagina_cobros._actualizar_menu_periodos()
             if abrir_asistente:
                 QTimer.singleShot(
                     150, self.pagina_cobros.abrir_asistente_recibos)

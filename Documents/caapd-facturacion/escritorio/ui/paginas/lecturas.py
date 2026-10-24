@@ -791,3 +791,6 @@ class PaginaLecturas(QWidget):
         diag = DialogoAbrirMes(self.servicio, self)
         if diag.exec() == QMessageBox.DialogCode.Accepted:
             self.cargar_datos_asincrono(forzar=True)
+            ventana = self.window()
+            if hasattr(ventana, "pagina_cobros"):
+                ventana.pagina_cobros.cargar_datos_asincrono(forzar=True)

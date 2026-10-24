@@ -581,11 +581,20 @@ class ServicioDatosPadron(ServicioDatos):
         else:
             destino = rutas.ruta_base_de_datos(f"PADRON_MES_{p_obj}.xlsx")
 
+        mes_a_guardar = self.mes
+        if p_obj != self.periodo and hasattr(self, "meses_encontrados") and p_obj in self.meses_encontrados:
+            mes_a_guardar = self.meses_encontrados[p_obj]
+
+        if not hasattr(self, "meses_encontrados") or self.meses_encontrados is None:
+            self.meses_encontrados = {}
+        if mes_a_guardar:
+            self.meses_encontrados[p_obj] = mes_a_guardar
+
         try:
             resultado = respaldo_excel.generar_respaldo_excel(
                 config=self.config,
                 usuarios=self.usuarios,
-                mes_docs=self.mes,
+                mes_docs=mes_a_guardar,
                 periodo=p_obj,
                 ruta_archivo=destino,
             )
@@ -671,11 +680,10 @@ class ServicioDatosPadron(ServicioDatos):
         if not math.isfinite(importe) or importe < 0:
             raise ValueError(
                 "La deuda debe ser un importe finito no negativo.")
-        if self.periodo and periodo != self.periodo:
-            raise ValueError(
-                f"El periodo activo es {self.periodo}, no {periodo}.")
-
-        doc = self.mes.get(id_usuario)
+        mes_target = self.mes if (periodo == self.periodo or not periodo) else (
+            getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
+        )
+        doc = mes_target.get(id_usuario)
         if not doc:
             raise ValueError(
                 f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
@@ -1036,6 +1044,7 @@ class ServicioDatosPadron(ServicioDatos):
 
         self.usuarios = usuarios_consolidados
         self.meses_encontrados = meses_cargados
+        self.config_por_periodo = config_por_periodo
 
         periodos_ordenados = sorted(meses_cargados.keys(), reverse=True)
         periodo_reciente = periodos_ordenados[0] if periodos_ordenados else "2026-10"
@@ -1071,6 +1080,185 @@ class ServicioDatosPadron(ServicioDatos):
             "advertencias": advertencias,
             "exito": True,
         }
+
+    def _estado_de_periodo(self, periodo: str) -> str:
+        """Determina si un periodo está FACTURADO, CERRADO o ABIERTO."""
+        cfg_p = getattr(self, "config_por_periodo", {}).get(periodo) or {}
+        estado_cfg = (cfg_p.get("mes_actual") or {}).get("estado")
+        if estado_cfg:
+            return estado_cfg
+
+        docs = getattr(self, "meses_encontrados", {}).get(periodo)
+        if docs is None and periodo == getattr(self, "periodo", None):
+            docs = self.mes
+
+        if not docs:
+            try:
+                docs = self.cargar_mes(periodo)
+            except Exception:
+                docs = {}
+
+        if docs:
+            recibos = any(d.get("nro_recibo") for d in docs.values())
+            if recibos:
+                return "FACTURADO"
+
+            # Revisar si ya tiene lecturas descargadas/registradas
+            tiene_lecturas = any(
+                any(m.get("lectura_actual") is not None for m in d.get("medidores", []))
+                for d in docs.values()
+            )
+            if tiene_lecturas:
+                return "FACTURADO"
+
+            return "ABIERTO"
+        return "ABIERTO"
+
+    def obtener_periodos_disponibles(self) -> List[str]:
+        """Devuelve la lista ordenada (más reciente primero) de todos los periodos disponibles en Base de datos/."""
+        import re
+        periodos_set = set()
+
+        directorio = self.base_dir or rutas.ruta_base_de_datos()
+        archivos = buscar_archivos_base_datos(directorio)
+        patron = re.compile(r"PADRON_MES_(\d{4}-\d{2})", re.IGNORECASE)
+        for arch in archivos:
+            m = patron.search(arch.name)
+            if m:
+                periodos_set.add(m.group(1))
+
+        # Incluir meses en memoria siempre que su archivo exista o sea el periodo activo en memoria
+        meses = getattr(self, "meses_encontrados", {})
+        if meses:
+            for k in list(meses.keys()):
+                arch_k = directorio / f"PADRON_MES_{k}.xlsx"
+                if arch_k.exists() or (k == getattr(self, "periodo", None) and getattr(self, "mes", None)):
+                    periodos_set.add(k)
+
+        # Si no hay archivos descubiertos en Base de datos, usar fallback
+        if not periodos_set:
+            if getattr(self, "periodo", None):
+                periodos_set.add(str(self.periodo))
+            periodo_cfg = (getattr(self, "config", {}).get("mes_actual") or {}).get("periodo")
+            if periodo_cfg:
+                periodos_set.add(str(periodo_cfg))
+
+        if not periodos_set:
+            return ["2026-09"]
+
+        return sorted(periodos_set, reverse=True)
+
+    def obtener_periodo_cobranza(self) -> str:
+        """
+        Determina el periodo activo que debe cargarse en la ventana de Cobros.
+        - Si el mes más reciente está ABIERTO (en proceso de lecturas por los lectores
+          y aún NO tiene lecturas descargadas ni registradas), la cobranza sigue operando
+          sobre el mes previo que ya está facturado.
+        - En cuanto se descargan las lecturas de los lectores (o el mes más reciente
+          ya tiene lecturas registradas), ese mes pasa a ser la cobranza activa.
+        """
+        periodos = self.obtener_periodos_disponibles()
+        if not periodos:
+            return str(self.periodo or "2026-10")
+
+        mas_reciente = periodos[0]
+        docs_reciente = getattr(self, "meses_encontrados", {}).get(mas_reciente)
+        if docs_reciente is None and mas_reciente == getattr(self, "periodo", None):
+            docs_reciente = self.mes
+        if not docs_reciente:
+            try:
+                docs_reciente = self.cargar_mes(mas_reciente)
+            except Exception:
+                docs_reciente = {}
+
+        # ¿El mes más reciente ya tiene recibos emitidos o lecturas registradas?
+        tiene_recibos = any(d.get("nro_recibo") for d in (docs_reciente or {}).values())
+        tiene_lecturas = any(
+            any(m.get("lectura_actual") is not None for m in d.get("medidores", []))
+            for d in (docs_reciente or {}).values()
+        )
+
+        # Si hay meses previos y el más reciente todavía está completamente vacío de lecturas
+        # (los lectores siguen en la calle), la cobranza sigue en el mes previo.
+        if len(periodos) > 1 and not (tiene_recibos or tiene_lecturas):
+            return periodos[1]
+
+        # Si ya tiene lecturas descargadas o recibos, o es el único mes: cobranza activa aquí
+        return mas_reciente
+
+    def obtener_periodo_lecturas(self) -> str:
+        """Devuelve el periodo en curso para toma o registro de lecturas."""
+        periodos = self.obtener_periodos_disponibles()
+        return periodos[0] if periodos else str(self.periodo or "2026-10")
+
+    def sincronizar_deudas_desde_mes_previo(self, periodo: Optional[str] = None) -> int:
+        """
+        Sincroniza y concilia las deudas anteriores de `periodo` basándose en el estado
+        final de pagos del mes previo en `Base de datos/`.
+        Garantiza que si los clientes pagaron durante los días de lectura, no arrastren
+        deuda anterior ni figuren con meses de atraso en el mes recién creado.
+        """
+        p = periodo or self.periodo
+        if not p:
+            return 0
+
+        periodos = sorted(getattr(self, "meses_encontrados", {}).keys())
+        idx = periodos.index(p) if p in periodos else -1
+        periodo_previo = periodos[idx - 1] if idx > 0 else None
+
+        if not periodo_previo:
+            try:
+                y, m = [int(x) for x in p.split("-")]
+                m_prev = 12 if m == 1 else m - 1
+                y_prev = y - 1 if m == 1 else y
+                periodo_previo = f"{y_prev:04d}-{m_prev:02d}"
+            except Exception:
+                return 0
+
+        docs_previo = self.cargar_mes(periodo_previo)
+        if not docs_previo:
+            return 0
+
+        docs_actual = self.mes if p == self.periodo else getattr(self, "meses_encontrados", {}).get(p, {})
+        if not docs_actual:
+            return 0
+
+        actualizados = 0
+        for uid, doc_act in docs_actual.items():
+            if doc_act.get("deuda_anterior_manual"):
+                continue
+
+            doc_prev = docs_previo.get(uid)
+            if not doc_prev:
+                continue
+
+            tot_prev = float(doc_prev.get("total_a_pagar") or 0.0)
+            pagado_prev = float(doc_prev.get("monto_pagado") or 0.0)
+            pago_si = str(doc_prev.get("pago") or "").strip().upper() in ("SI", "1", "TRUE", "PAGADO")
+
+            if pago_si or (pagado_prev >= tot_prev and tot_prev > 0):
+                saldo_pendiente = 0.0
+                meses_adeudados = 1
+            else:
+                saldo_pendiente = max(0.0, tot_prev - pagado_prev)
+                meses_prev = int(float(doc_prev.get("meses_adeudados") or 0.0))
+                meses_adeudados = (meses_prev + 1) if saldo_pendiente > 0 else 1
+
+            deuda_ant_actual = float(doc_act.get("deuda_anterior") or 0.0)
+            meses_act = int(float(doc_act.get("meses_adeudados") or 1))
+
+            if round(deuda_ant_actual, 2) != round(saldo_pendiente, 2) or meses_act != meses_adeudados:
+                doc_act["deuda_anterior"] = round(saldo_pendiente, 2)
+                doc_act["meses_adeudados"] = meses_adeudados
+                if doc_act.get("deuda_actual") is not None:
+                    d_act = float(doc_act.get("deuda_actual") or 0.0)
+                    doc_act["total_a_pagar"] = round(saldo_pendiente + d_act, 2)
+                actualizados += 1
+
+        if actualizados > 0:
+            self.guardar_en_respaldo_local(p)
+
+        return actualizados
 
     def verificar_cambios_externos(self) -> Tuple[bool, List[str]]:
         """Comprueba si algún archivo en 'Base de datos/' fue modificado externamente."""
@@ -1685,6 +1873,9 @@ class ServicioDatosPadron(ServicioDatos):
         actualizados, conflictos_admin = fusionar_lecturas_nube(
             docs_nube, self.mes)
 
+        # 2b. Conciliar deudas arrastradas del mes previo (si clientes pagaron durante días de lectura)
+        self.sincronizar_deudas_desde_mes_previo(p)
+
         # 3. Guardar en Excel local
         if callback_progreso:
             callback_progreso(
@@ -1693,7 +1884,11 @@ class ServicioDatosPadron(ServicioDatos):
             )
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.config["ultima_descarga_lectores"] = ahora_str
-        self.guardar_en_respaldo_local()
+        self.periodo = p
+        if not hasattr(self, "meses_encontrados") or self.meses_encontrados is None:
+            self.meses_encontrados = {}
+        self.meses_encontrados[p] = self.mes
+        self.guardar_en_respaldo_local(p)
 
         duracion = time.perf_counter() - t_inicio
         if callback_progreso:
@@ -2001,7 +2196,23 @@ class ServicioDatosPadron(ServicioDatos):
     # Documentos del Mes y Lecturas
     # -----------------------------------------------------------------------
     def cargar_mes(self, periodo: str) -> Dict[str, Dict[str, Any]]:
-        return self.mes
+        p_str = str(periodo or "").strip()
+        if hasattr(self, "meses_encontrados") and p_str in self.meses_encontrados:
+            return self.meses_encontrados[p_str]
+        if (p_str == self.periodo or not p_str) and self.mes:
+            return self.mes
+
+        directorio = self.base_dir or rutas.ruta_base_de_datos()
+        arch = directorio / f"PADRON_MES_{p_str}.xlsx"
+        if arch.exists():
+            datos = self._extraer_datos_archivo_excel(arch)
+            docs = datos.get("mes_docs") or {}
+            if not hasattr(self, "meses_encontrados"):
+                self.meses_encontrados = {}
+            self.meses_encontrados[p_str] = docs
+            return docs
+
+        return {}
 
     def verificar_puede_abrir_mes(self) -> Tuple[bool, str, str]:
         mes_act = self.config.get("mes_actual") or {}
@@ -2056,7 +2267,13 @@ class ServicioDatosPadron(ServicioDatos):
             "fecha_vencimiento": fecha_vencimiento,
         }
         self.mes = nuevos_docs
-        self.guardar_en_respaldo_local()
+        if not hasattr(self, "meses_encontrados") or self.meses_encontrados is None:
+            self.meses_encontrados = {}
+        self.meses_encontrados[periodo] = nuevos_docs
+        try:
+            self.guardar_en_respaldo_local(periodo)
+        except TypeError:
+            self.guardar_en_respaldo_local()
         return {
             "periodo": periodo,
             "usuarios_creados": len(nuevos_docs),
@@ -2188,19 +2405,23 @@ class ServicioDatosPadron(ServicioDatos):
         callback_progreso: Optional[Any] = None,
     ) -> Dict[str, Any]:
         p = periodo or self.periodo
-        total = len(self.mes)
+        self.sincronizar_deudas_desde_mes_previo(p)
+        mes_target = self.mes if (p == self.periodo or not p) else (
+            getattr(self, "meses_encontrados", {}).get(p) or self.mes
+        )
+        total = len(mes_target)
         procesados = 0
 
-        for uid in list(self.mes.keys()):
+        for uid in list(mes_target.keys()):
             self.generar_recibo_usuario(p, uid)
             procesados += 1
             if callback_progreso:
                 callback_progreso(procesados, total)
 
-        if "mes_actual" in self.config:
+        if "mes_actual" in self.config and (p == self.periodo or not p):
             self.config["mes_actual"]["estado"] = "FACTURADO"
 
-        self.guardar_en_respaldo_local()
+        self.guardar_en_respaldo_local(p)
         return {"periodo": p, "total_generados": procesados}
 
     def _historial_consumos(self, id_usuario: str, periodo: str, n: int = 5) -> List[Optional[float]]:
@@ -2221,7 +2442,7 @@ class ServicioDatosPadron(ServicioDatos):
                 m_i += 12
                 a_i -= 1
             per = f"{a_i:04d}-{m_i:02d}"
-            docs_per = self.meses_encontrados.get(per)
+            docs_per = getattr(self, "meses_encontrados", {}).get(per)
             if docs_per is None:
                 # ese mes no existe en Base de datos/
                 serie.append(None)
@@ -2249,15 +2470,21 @@ class ServicioDatosPadron(ServicioDatos):
         return d
 
     def generar_pdf_recibo(self, periodo: str, id_usuario: str) -> str:
-        doc = self.mes.get(id_usuario)
+        mes_target = self.mes if (periodo == self.periodo or not periodo) else (
+            getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
+        )
+        doc = mes_target.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado.")
+            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         from servicios.generador_pdf import generar_recibo_pdf_para_usuario
         return str(generar_recibo_pdf_para_usuario(self._doc_para_pdf(doc, id_usuario, periodo), self.config, periodo))
 
     def generar_zip_recibos(self, periodo: str, sector: Optional[str] = None) -> Optional[str]:
         from servicios.generador_pdf import generar_recibo_pdf_para_usuario, empaquetar_recibos_en_zip
-        for uid, doc in self.mes.items():
+        mes_target = self.mes if (periodo == self.periodo or not periodo) else (
+            getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
+        )
+        for uid, doc in mes_target.items():
             if sector and doc.get("sector") != sector:
                 continue
             if doc.get("nro_recibo"):
@@ -2273,7 +2500,10 @@ class ServicioDatosPadron(ServicioDatos):
         monto_pagado: float,
         fecha_pago: Optional[str] = None,
     ) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
+        mes_target = self.mes if (periodo == self.periodo or not periodo) else (
+            getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
+        )
+        doc = mes_target.get(id_usuario)
         if not doc:
             raise ValueError(
                 f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
@@ -2298,7 +2528,10 @@ class ServicioDatosPadron(ServicioDatos):
         return doc
 
     def anular_pago(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
+        mes_target = self.mes if (periodo == self.periodo or not periodo) else (
+            getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
+        )
+        doc = mes_target.get(id_usuario)
         if not doc:
             raise ValueError(
                 f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
@@ -2468,7 +2701,10 @@ class ServicioDatosPadron(ServicioDatos):
         }
 
     def generar_recibo_usuario(self, periodo: str, id_usuario: str) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
+        mes_target = self.mes if (periodo == self.periodo or not periodo) else (
+            getattr(self, "meses_encontrados", {}).get(periodo) or self.mes
+        )
+        doc = mes_target.get(id_usuario)
         if not doc:
             raise ValueError(
                 f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
@@ -2523,6 +2759,6 @@ class ServicioDatosPadron(ServicioDatos):
             doc["pago"] = "NO"
             doc["fecha_pago"] = None
 
-        self.mes[id_usuario] = doc
+        mes_target[id_usuario] = doc
         self.guardar_en_respaldo_local(periodo)
         return doc

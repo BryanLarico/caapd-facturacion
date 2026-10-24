@@ -48,6 +48,25 @@ from ui.paginas.cobros_modelo import DelegadoFilasCobros, ModeloCobros, ProxyCob
 # Ancho (px) por debajo del cual la ficha lateral se coloca debajo de la tabla
 ANCHO_MINIMO_DOS_COLUMNAS = 1150
 
+NOMBRES_MESES_ES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
+}
+
+
+def formatear_mes_espanol(periodo: str) -> str:
+    """Devuelve 'Septiembre 2026' dado '2026-09'."""
+    try:
+        partes = str(periodo or "").strip().split("-")
+        if len(partes) == 2:
+            y, m = int(partes[0]), int(partes[1])
+            nombre = NOMBRES_MESES_ES.get(m, f"Mes {m:02d}")
+            return f"{nombre} {y}"
+    except Exception:
+        pass
+    return str(periodo or "")
+
 
 class PaginaCobros(QWidget):
     """Pantalla interactiva unificada de facturación, cobranza y control de morosidad."""
@@ -103,12 +122,30 @@ class PaginaCobros(QWidget):
 
         fila_encabezado.addStretch(1)
 
-        # Badge de Periodo
+        # Selector de Periodo en Cobros (Botón con Menú y Submenús por año)
         self.lbl_badge_periodo = QLabel("Periodo: —")
-        self.lbl_badge_periodo.setStyleSheet(
-            "background-color: #f1f5f9; color: #475569; font-weight: bold; padding: 6px 14px; border-radius: 6px; font-size: 13px;"
+        self.lbl_badge_periodo.hide()
+
+        self.btn_periodo = QPushButton("Periodo: —")
+        self.btn_periodo.setObjectName("btn_periodo_cobros")
+        self.btn_periodo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_periodo.setToolTip("Cambiar periodo de cobranza o consultar meses anteriores")
+        self.btn_periodo.setStyleSheet(
+            "QPushButton#btn_periodo_cobros { "
+            "  background-color: #ffffff; color: #0f172a; font-weight: 600; font-size: 13px; "
+            "  border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 32px 6px 14px; text-align: left; "
+            "} "
+            "QPushButton#btn_periodo_cobros:hover { "
+            "  border-color: #0284c7; background-color: #f8fafc; "
+            "} "
+            "QPushButton#btn_periodo_cobros::menu-indicator { "
+            "  subcontrol-origin: padding; subcontrol-position: center right; right: 12px; "
+            "}"
         )
-        fila_encabezado.addWidget(self.lbl_badge_periodo)
+        self.combo_periodo = self.btn_periodo  # Compatibilidad
+        self.menu_periodo = QMenu(self.btn_periodo)
+        self.btn_periodo.setMenu(self.menu_periodo)
+        fila_encabezado.addWidget(self.btn_periodo)
 
         # Botón Carpeta de recibos (Escritorio/recibos) — entre Periodo y Actualizar
         self.btn_carpeta_recibos = QPushButton("Carpeta de recibos")
@@ -533,7 +570,7 @@ class PaginaCobros(QWidget):
             if dlg.resultado_accion == DialogoActualizarBaseDatos.ACCION_LOCAL:
                 if hasattr(ventana, "mostrar_progreso"):
                     ventana.mostrar_progreso(50, "Recargando padrón local...")
-                self.cargar_datos_asincrono(forzar=True)
+                self.cargar_datos_asincrono(forzar=True, periodo=self.periodo_actual)
                 if hasattr(ventana, "ocultar_progreso"):
                     ventana.ocultar_progreso("¡Padrón local recargado!")
                 return
@@ -552,7 +589,7 @@ class PaginaCobros(QWidget):
                     if hasattr(ventana, "ocultar_progreso"):
                         ventana.ocultar_progreso(
                             "¡Bases sincronizadas con Firebase!")
-                    self.cargar_datos_asincrono(forzar=True)
+                    self.cargar_datos_asincrono(forzar=True, periodo=self.periodo_actual)
                     QMessageBox.information(
                         self,
                         "Sincronización Completada",
@@ -572,12 +609,19 @@ class PaginaCobros(QWidget):
                 self._set_cargando(True, "Sincronizando…")
 
                 def tarea_sync():
-                    return self.servicio.sincronizar_desde_firebase()
+                    res = self.servicio.sincronizar_desde_firebase()
+                    self.servicio.limpiar_cache()
+                    return res
 
                 def al_terminar_descarga(res):
                     if hasattr(ventana, "ocultar_progreso"):
                         ventana.ocultar_progreso("¡Lecturas descargadas!")
-                    self.cargar_datos_asincrono(forzar=True)
+                    p_descargado = (res or {}).get("periodo")
+                    if not p_descargado and hasattr(self.servicio, "obtener_periodo_cobranza"):
+                        p_descargado = self.servicio.obtener_periodo_cobranza()
+                    if p_descargado:
+                        self.periodo_actual = p_descargado
+                    self.cargar_datos_asincrono(forzar=True, periodo=self.periodo_actual)
 
                 worker = Worker(tarea_sync)
                 worker.signals.resultado.connect(al_terminar_descarga)
@@ -585,7 +629,7 @@ class PaginaCobros(QWidget):
                 self.thread_pool.start(worker)
                 return
 
-        self.cargar_datos_asincrono(forzar=True)
+        self.cargar_datos_asincrono(forzar=True, periodo=self.periodo_actual)
 
     def accion_recargar_excel(self) -> None:
         """Recarga los datos directamente desde el Excel del padrón sin reiniciar el programa."""
@@ -602,9 +646,18 @@ class PaginaCobros(QWidget):
         def tarea():
             self.servicio.limpiar_cache()
             cfg = self.servicio.cargar_config()
-            mes_act = cfg.get("mes_actual") or {}
-            periodo = mes_act.get(
-                "periodo") or self.periodo_actual or "2026-10"
+            periodos_disp = (
+                self.servicio.obtener_periodos_disponibles()
+                if hasattr(self.servicio, "obtener_periodos_disponibles")
+                else []
+            )
+            periodo = self.periodo_actual
+            if not periodo or (periodos_disp and periodo not in periodos_disp):
+                if hasattr(self.servicio, "obtener_periodo_cobranza"):
+                    periodo = self.servicio.obtener_periodo_cobranza()
+                else:
+                    mes_act = cfg.get("mes_actual") or {}
+                    periodo = mes_act.get("periodo") or "2026-09"
             docs = self.servicio.cargar_mes(periodo)
             return cfg, periodo, docs
 
@@ -637,17 +690,29 @@ class PaginaCobros(QWidget):
             self.btn_actualizar_excel.style().unpolish(self.btn_actualizar_excel)
             self.btn_actualizar_excel.style().polish(self.btn_actualizar_excel)
 
-    def cargar_datos_asincrono(self, forzar: bool = False) -> None:
+    def cargar_datos_asincrono(self, forzar: bool = False, periodo: Optional[str] = None) -> None:
         self._set_cargando(True)
 
         def tarea():
-            cfg = self.servicio.cargar_config()
-            mes_act = cfg.get("mes_actual") or {}
-            periodo = mes_act.get("periodo") or "2026-10"
             if forzar:
                 self.servicio.limpiar_cache()
-            docs = self.servicio.cargar_mes(periodo)
-            return cfg, periodo, docs
+            cfg = self.servicio.cargar_config()
+
+            p_cobranza = periodo
+            periodos_disp = (
+                self.servicio.obtener_periodos_disponibles()
+                if hasattr(self.servicio, "obtener_periodos_disponibles")
+                else []
+            )
+            if not p_cobranza or (periodos_disp and p_cobranza not in periodos_disp):
+                if hasattr(self.servicio, "obtener_periodo_cobranza"):
+                    p_cobranza = self.servicio.obtener_periodo_cobranza()
+                else:
+                    mes_act = cfg.get("mes_actual") or {}
+                    p_cobranza = mes_act.get("periodo") or "2026-09"
+
+            docs = self.servicio.cargar_mes(p_cobranza)
+            return cfg, p_cobranza, docs
 
         worker = Worker(tarea)
         worker.signals.resultado.connect(self._al_recibir_datos)
@@ -655,14 +720,143 @@ class PaginaCobros(QWidget):
         worker.signals.finalizado.connect(lambda: self._set_cargando(False))
         self.thread_pool.start(worker)
 
+    def _al_seleccionar_periodo_menu(self, periodo: str) -> None:
+        if periodo and periodo != self.periodo_actual:
+            self.cargar_datos_asincrono(periodo=periodo)
+
+    def _actualizar_menu_periodos(self) -> None:
+        """Construye el menú organizado de periodos: meses activos arriba y años anteriores en submenús."""
+        if not hasattr(self, "btn_periodo"):
+            return
+
+        periodos_disp: List[str] = []
+        if hasattr(self.servicio, "obtener_periodos_disponibles"):
+            periodos_disp = self.servicio.obtener_periodos_disponibles()
+        elif hasattr(self.servicio, "meses_encontrados"):
+            periodos_disp = sorted(self.servicio.meses_encontrados.keys(), reverse=True)
+        if not periodos_disp:
+            periodos_disp = [self.periodo_actual]
+
+        p_cobranza = (
+            self.servicio.obtener_periodo_cobranza()
+            if hasattr(self.servicio, "obtener_periodo_cobranza")
+            else None
+        )
+        p_lecturas = (
+            self.servicio.obtener_periodo_lecturas()
+            if hasattr(self.servicio, "obtener_periodo_lecturas")
+            else None
+        )
+
+        # Agrupar periodos por año
+        periodos_por_anio: Dict[int, List[str]] = {}
+        for p in periodos_disp:
+            try:
+                y = int(str(p).split("-")[0])
+            except Exception:
+                y = 2026
+            periodos_por_anio.setdefault(y, []).append(p)
+
+        anios_ordenados = sorted(periodos_por_anio.keys(), reverse=True)
+        anio_reciente = anios_ordenados[0] if anios_ordenados else 2026
+
+        # Crear nuevo menú estilizado
+        menu = QMenu(self.btn_periodo)
+        menu.setStyleSheet(
+            "QMenu { "
+            "  background-color: #ffffff; color: #0f172a; "
+            "  border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px; "
+            "} "
+            "QMenu::item { "
+            "  padding: 8px 24px 8px 12px; border-radius: 6px; "
+            "  font-size: 13px; font-weight: 500; min-width: 230px; "
+            "} "
+            "QMenu::item:selected { "
+            "  background-color: #e0f2fe; color: #0369a1; "
+            "} "
+            "QMenu::separator { "
+            "  height: 1px; background: #e2e8f0; margin: 4px 6px; "
+            "} "
+            "QMenu::section { "
+            "  color: #64748b; font-size: 11px; font-weight: bold; "
+            "  padding: 4px 10px; margin-top: 2px; "
+            "}"
+        )
+
+        def agregar_item_periodo(parent_menu: QMenu, per: str) -> None:
+            etiqueta = formatear_mes_espanol(per)
+            ico = iconos.icono("circle-check" if per == p_cobranza else "calendar-plus", "gris")
+
+            if per == p_cobranza:
+                etiqueta += "  ·  Cobranza activa"
+                ico = iconos.icono("circle-check", "exito")
+            elif per == p_lecturas and p_lecturas != p_cobranza:
+                etiqueta += "  ·  En lecturas"
+                ico = iconos.icono("clock", "aviso")
+
+            accion = parent_menu.addAction(ico, etiqueta)
+            accion.setCheckable(True)
+            if per == self.periodo_actual:
+                accion.setChecked(True)
+                accion.setIcon(iconos.icono("check", "primario"))
+
+            accion.triggered.connect(
+                lambda checked=False, p_sel=per: self._al_seleccionar_periodo_menu(p_sel)
+            )
+
+        # 1. Meses del año en curso
+        for p in periodos_por_anio.get(anio_reciente, []):
+            agregar_item_periodo(menu, p)
+
+        # 2. Años anteriores como submenús (máximo 12 meses por año)
+        anios_anteriores = [y for y in anios_ordenados if y < anio_reciente]
+        if anios_anteriores:
+            menu.addSeparator()
+            for y_prev in anios_anteriores:
+                meses_prev = periodos_por_anio[y_prev]
+                contiene_seleccionado = self.periodo_actual in meses_prev
+                sub_ico = (
+                    iconos.icono("check", "primario")
+                    if contiene_seleccionado
+                    else iconos.icono("folder-open", "gris")
+                )
+                titulo_sub = f"Año {y_prev}  ({len(meses_prev)} meses)"
+                if contiene_seleccionado:
+                    titulo_sub += "  ·  [Activo]"
+                submenu = menu.addMenu(sub_ico, titulo_sub)
+                submenu.setStyleSheet(menu.styleSheet())
+                for p_sub in meses_prev:
+                    agregar_item_periodo(submenu, p_sub)
+
+        self.btn_periodo.setMenu(menu)
+
+        # Actualizar texto e icono del botón principal
+        texto_btn = formatear_mes_espanol(self.periodo_actual)
+        ico_btn = iconos.icono("calendar-plus", "primario")
+        if self.periodo_actual == p_cobranza:
+            texto_btn += " (Cobranza activa)"
+            ico_btn = iconos.icono("circle-check", "exito")
+        elif self.periodo_actual == p_lecturas and p_lecturas != p_cobranza:
+            texto_btn += " (En lecturas)"
+            ico_btn = iconos.icono("clock", "aviso")
+
+        self.btn_periodo.setIcon(ico_btn)
+        self.btn_periodo.setText(f"  {texto_btn}  ")
+
     def _al_recibir_datos(self, resultado: tuple) -> None:
         self.config_actual, self.periodo_actual, mes_dict = resultado
         self._set_cargando(False)
 
-        mes_act = self.config_actual.get("mes_actual") or {}
-        self.estado_mes = mes_act.get("estado") or "ABIERTO"
+        if hasattr(self.servicio, "_estado_de_periodo"):
+            self.estado_mes = self.servicio._estado_de_periodo(self.periodo_actual)
+        else:
+            mes_act = self.config_actual.get("mes_actual") or {}
+            self.estado_mes = mes_act.get("estado") or "ABIERTO"
 
         self.lbl_badge_periodo.setText(f"Periodo: {self.periodo_actual}")
+
+        # Actualizar botón y menú de selección de periodos
+        self._actualizar_menu_periodos()
 
         # Actualizar sectores en el combo
         sectores = self.config_actual.get("sectores") or []
