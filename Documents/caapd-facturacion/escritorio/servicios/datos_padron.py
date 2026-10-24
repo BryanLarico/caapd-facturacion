@@ -276,7 +276,61 @@ class ServicioDatosPadron(ServicioDatos):
             else:
                 self._inicializar_por_defecto()
 
+        self._aplicar_config_json_local()
         self._asegurar_categorias_completas()
+
+    CLAVES_CONFIG_USUARIO = (
+        "categorias", "sectores", "observaciones", "igv",
+        "empresa", "dias_vencimiento",
+    )
+
+    def _ruta_config_json(self) -> Path:
+        if self.base_dir:
+            return Path(self.base_dir) / "config.json"
+        return rutas.ruta_datos("config.json")
+
+    def _aplicar_config_json_local(self) -> None:
+        import json
+        ruta = self._ruta_config_json()
+        try:
+            if not ruta.exists():
+                return
+            datos = json.loads(ruta.read_text(encoding="utf-8"))
+            if not isinstance(datos, dict):
+                return
+            for k in self.CLAVES_CONFIG_USUARIO:
+                if k in datos and datos[k] is not None:
+                    self.config[k] = datos[k]
+        except Exception:
+            pass  # un config.json dañado nunca debe impedir abrir el programa
+
+    def _guardar_config_json_local(self) -> None:
+        import json
+        import os
+        ruta = self._ruta_config_json()
+        try:
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            datos = {k: self.config.get(k)
+                     for k in self.CLAVES_CONFIG_USUARIO if k in self.config}
+            tmp = ruta.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(datos, indent=2, ensure_ascii=False,
+                                      default=str), encoding="utf-8")
+            os.replace(tmp, ruta)
+        except Exception:
+            pass
+
+    def _subir_config_a_firebase(self) -> Tuple[bool, str]:
+        try:
+            import firebase_client as fb
+            datos = {k: self.config.get(k)
+                     for k in self.CLAVES_CONFIG_USUARIO if k in self.config}
+            if not datos:
+                return False, "Sin datos de configuración para subir"
+            fb.db().collection("config").document("general").set(datos, merge=True)
+            self.ops["escrituras"] += 1
+            return True, ""
+        except Exception as e:
+            return False, str(e)
 
     def _asegurar_categorias_completas(self) -> None:
         """Garantiza que la configuración posea las categorías estándar completas (A, B, C) con nombres."""
@@ -727,7 +781,8 @@ class ServicioDatosPadron(ServicioDatos):
         elif m_pagado < total_nuevo:
             doc["pago"] = "NO"
             if deuda_anterior > 0:
-                doc["meses_adeudados"] = max(2, int(doc.get("meses_adeudados") or 1))
+                doc["meses_adeudados"] = max(
+                    2, int(doc.get("meses_adeudados") or 1))
             else:
                 doc["meses_adeudados"] = 1
 
@@ -1105,7 +1160,8 @@ class ServicioDatosPadron(ServicioDatos):
 
             # Revisar si ya tiene lecturas descargadas/registradas
             tiene_lecturas = any(
-                any(m.get("lectura_actual") is not None for m in d.get("medidores", []))
+                any(m.get("lectura_actual")
+                    is not None for m in d.get("medidores", []))
                 for d in docs.values()
             )
             if tiene_lecturas:
@@ -1139,7 +1195,8 @@ class ServicioDatosPadron(ServicioDatos):
         if not periodos_set:
             if getattr(self, "periodo", None):
                 periodos_set.add(str(self.periodo))
-            periodo_cfg = (getattr(self, "config", {}).get("mes_actual") or {}).get("periodo")
+            periodo_cfg = (getattr(self, "config", {}).get(
+                "mes_actual") or {}).get("periodo")
             if periodo_cfg:
                 periodos_set.add(str(periodo_cfg))
 
@@ -1162,7 +1219,8 @@ class ServicioDatosPadron(ServicioDatos):
             return str(self.periodo or "2026-10")
 
         mas_reciente = periodos[0]
-        docs_reciente = getattr(self, "meses_encontrados", {}).get(mas_reciente)
+        docs_reciente = getattr(
+            self, "meses_encontrados", {}).get(mas_reciente)
         if docs_reciente is None and mas_reciente == getattr(self, "periodo", None):
             docs_reciente = self.mes
         if not docs_reciente:
@@ -1172,7 +1230,8 @@ class ServicioDatosPadron(ServicioDatos):
                 docs_reciente = {}
 
         # ¿El mes más reciente ya tiene recibos emitidos o lecturas registradas?
-        tiene_recibos = any(d.get("nro_recibo") for d in (docs_reciente or {}).values())
+        tiene_recibos = any(d.get("nro_recibo")
+                            for d in (docs_reciente or {}).values())
         tiene_lecturas = any(
             any(m.get("lectura_actual") is not None for m in d.get("medidores", []))
             for d in (docs_reciente or {}).values()
@@ -1219,7 +1278,8 @@ class ServicioDatosPadron(ServicioDatos):
         if not docs_previo:
             return 0
 
-        docs_actual = self.mes if p == self.periodo else getattr(self, "meses_encontrados", {}).get(p, {})
+        docs_actual = self.mes if p == self.periodo else getattr(
+            self, "meses_encontrados", {}).get(p, {})
         if not docs_actual:
             return 0
 
@@ -1234,7 +1294,8 @@ class ServicioDatosPadron(ServicioDatos):
 
             tot_prev = float(doc_prev.get("total_a_pagar") or 0.0)
             pagado_prev = float(doc_prev.get("monto_pagado") or 0.0)
-            pago_si = str(doc_prev.get("pago") or "").strip().upper() in ("SI", "1", "TRUE", "PAGADO")
+            pago_si = str(doc_prev.get("pago") or "").strip(
+            ).upper() in ("SI", "1", "TRUE", "PAGADO")
 
             if pago_si or (pagado_prev >= tot_prev and tot_prev > 0):
                 saldo_pendiente = 0.0
@@ -1242,7 +1303,8 @@ class ServicioDatosPadron(ServicioDatos):
             else:
                 saldo_pendiente = max(0.0, tot_prev - pagado_prev)
                 meses_prev = int(float(doc_prev.get("meses_adeudados") or 0.0))
-                meses_adeudados = (meses_prev + 1) if saldo_pendiente > 0 else 1
+                meses_adeudados = (
+                    meses_prev + 1) if saldo_pendiente > 0 else 1
 
             deuda_ant_actual = float(doc_act.get("deuda_anterior") or 0.0)
             meses_act = int(float(doc_act.get("meses_adeudados") or 1))
@@ -1252,7 +1314,8 @@ class ServicioDatosPadron(ServicioDatos):
                 doc_act["meses_adeudados"] = meses_adeudados
                 if doc_act.get("deuda_actual") is not None:
                     d_act = float(doc_act.get("deuda_actual") or 0.0)
-                    doc_act["total_a_pagar"] = round(saldo_pendiente + d_act, 2)
+                    doc_act["total_a_pagar"] = round(
+                        saldo_pendiente + d_act, 2)
                 actualizados += 1
 
         if actualizados > 0:
@@ -1918,7 +1981,9 @@ class ServicioDatosPadron(ServicioDatos):
 
     def guardar_config(self, datos: Dict[str, Any]) -> None:
         self.config = dict(datos)
-        self.guardar_en_respaldo_local()
+        self._guardar_config_json_local()      # 1) archivo propio
+        self.guardar_en_respaldo_local()       # 2) hoja CONFIG del Excel
+        self._subir_config_a_firebase()        # 3) Firestore (mejor esfuerzo)
 
     def actualizar_config_campo(self, campo: str, valor: Any) -> None:
         partes = campo.split(".")
@@ -1926,6 +1991,8 @@ class ServicioDatosPadron(ServicioDatos):
         for p in partes[:-1]:
             nodo = nodo.setdefault(p, {})
         nodo[partes[-1]] = valor
+        if partes[0] in self.CLAVES_CONFIG_USUARIO:
+            self._guardar_config_json_local()
         self.guardar_en_respaldo_local()
 
     # -----------------------------------------------------------------------
@@ -2475,7 +2542,8 @@ class ServicioDatosPadron(ServicioDatos):
         )
         doc = mes_target.get(id_usuario)
         if not doc:
-            raise ValueError(f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+            raise ValueError(
+                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
         from servicios.generador_pdf import generar_recibo_pdf_para_usuario
         return str(generar_recibo_pdf_para_usuario(self._doc_para_pdf(doc, id_usuario, periodo), self.config, periodo))
 
@@ -2540,7 +2608,8 @@ class ServicioDatosPadron(ServicioDatos):
         doc["pago"] = "NO"
         deuda_ant = float(doc.get("deuda_anterior") or 0.0)
         if deuda_ant > 0:
-            doc["meses_adeudados"] = max(2, int(doc.get("meses_adeudados") or 1))
+            doc["meses_adeudados"] = max(
+                2, int(doc.get("meses_adeudados") or 1))
         else:
             doc["meses_adeudados"] = 1
 
@@ -2733,12 +2802,15 @@ class ServicioDatosPadron(ServicioDatos):
         )
 
         subtotal_mes = round(
-            calc["monto_agua"] + calc["monto_desague"] + calc["cargo_fijo"] + calc["igv"], 2
+            calc["monto_agua"] + calc["monto_desague"] +
+            calc["cargo_fijo"] + calc["igv"], 2
         )
-        deuda_actual = float(doc.get("deuda_actual") if doc.get("deuda_actual") is not None else subtotal_mes)
+        deuda_actual = float(doc.get("deuda_actual") if doc.get(
+            "deuda_actual") is not None else subtotal_mes)
         total_a_pagar = round(deuda_manual + deuda_actual, 2)
 
-        meses_ad = int(doc.get("meses_adeudados") or calc.get("meses_adeudados") or 1)
+        meses_ad = int(doc.get("meses_adeudados")
+                       or calc.get("meses_adeudados") or 1)
         if deuda_manual > 0 and meses_ad < 2:
             meses_ad = 2
 

@@ -1,3 +1,13 @@
+"""
+ui/paginas/configuracion.py — Pantalla de Configuración del Sistema (Fase 6).
+
+Permite visualizar y editar:
+1. Datos institucionales del Comité (empresa, resolución, teléfonos, dirección).
+2. Tarifas por categoría (A, B, C) con escala de rangos de consumo (modo rango único).
+3. Parámetros tributarios (IGV) y políticas de morosidad.
+4. Sectores / barrios de la comunidad.
+5. Catálogo de observaciones y novedades de medidores para la App y la PC.
+"""
 from __future__ import annotations
 import copy
 import json
@@ -21,6 +31,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QStyledItemDelegate,
     QTableWidget,
@@ -35,16 +46,6 @@ from servicios.datos import ServicioDatos
 from ui.componentes.alerta import AlertaWidget
 from ui.componentes.indicador_carga import IndicadorCarga
 from ui.hilos import Worker, mostrar_dialogo_error
-"""
-ui/paginas/configuracion.py — Pantalla de Configuración del Sistema (Fase 6).
-
-Permite visualizar y editar:
-1. Datos institucionales del Comité (empresa, resolución, teléfonos, dirección).
-2. Tarifas por categoría (A, B, C) con escala de rangos de consumo (modo rango único).
-3. Parámetros tributarios (IGV) y políticas de morosidad.
-4. Sectores / barrios de la comunidad.
-5. Catálogo de observaciones y novedades de medidores para la App y la PC.
-"""
 
 
 class DelegadoEdicionEnFila(QStyledItemDelegate):
@@ -146,24 +147,25 @@ class PaginaConfiguracion(QWidget):
             lambda: self.cargar_datos_asincrono(forzar=True))
         fila_encabezado.addWidget(self.btn_recargar)
 
-        # Botón Guardar
+        # Botón Guardar: mismas clases de estilo que "Reestablecer" (misma fuente
+        # y padding) en su variante primaria, en lugar de un stylesheet propio
+        # con otra fuente/padding que lo hacía de distinto tamaño.
         self.btn_guardar = QPushButton("Guardar Configuración")
         iconos.aplicar(self.btn_guardar, "device-floppy", "blanco")
+        self.btn_guardar.setProperty("class", "boton boton_primario")
         self.btn_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_guardar.setStyleSheet("""
-            QPushButton {
-                background-color: #0369a1; color: #ffffff;
-                font-weight: bold; font-size: 13px;
-                padding: 8px 18px; border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #0284c7; }
-            QPushButton:disabled { background-color: #94a3b8; }
-        """)
         self.btn_guardar.clicked.connect(self._accion_guardar_configuracion)
         # deshabilitado hasta que exista algún cambio
         self.btn_guardar.setEnabled(False)
         self.btn_guardar.setToolTip("No hay cambios pendientes por guardar")
         fila_encabezado.addWidget(self.btn_guardar)
+
+        # Ambos botones con exactamente el mismo alto y ancho
+        ALTO_BOTONES = 40
+        ancho_botones = max(self.btn_recargar.sizeHint().width(),
+                            self.btn_guardar.sizeHint().width())
+        for b in (self.btn_recargar, self.btn_guardar):
+            b.setFixedSize(ancho_botones, ALTO_BOTONES)
 
         layout_principal.addLayout(fila_encabezado)
 
@@ -227,6 +229,27 @@ class PaginaConfiguracion(QWidget):
 
         # Conectar señales de todos los campos para detectar cambios
         self._conectar_senales_cambios()
+
+    # -----------------------------------------------------------------------
+    # Utilidades de formulario
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _etiqueta_form(texto: str) -> QLabel:
+        """
+        Etiqueta para QFormLayout centrada verticalmente respecto a su campo.
+
+        QFormLayout alinea las etiquetas hacia ARRIBA cuando el campo es más alto
+        que el texto (comportamiento interno de Qt), salvo que la etiqueta pueda
+        expandirse verticalmente: en ese caso ocupa el alto de la fila y su
+        alineación AlignVCenter centra el texto respecto a la caja de al lado.
+        """
+        lbl = QLabel(texto)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignRight |
+                         Qt.AlignmentFlag.AlignVCenter)
+        lbl.setSizePolicy(QSizePolicy.Policy.Preferred,
+                          QSizePolicy.Policy.Expanding)
+        lbl.setStyleSheet("font-weight: 600; color: #0f172a;")
+        return lbl
 
     # -----------------------------------------------------------------------
     # TAB 1: DATOS INSTITUCIONALES DEL COMITÉ (oculta, se conserva internamente)
@@ -342,14 +365,19 @@ class PaginaConfiguracion(QWidget):
 
         # Tarjeta de Datos de la Categoría
         self.grp_cat = QGroupBox("Parámetros de la Categoría")
-        self.grp_cat.setStyleSheet("font-weight: bold; color: #0f172a;")
+        # Solo el título del QGroupBox en negrita: con "font-weight: bold" a secas
+        # el estilo se heredaba a TODOS los hijos (etiquetas y cajas "S/. 5.00").
+        self.grp_cat.setStyleSheet(
+            "QGroupBox { font-weight: bold; color: #0f172a; }")
         f_cat = QFormLayout(self.grp_cat)
         f_cat.setContentsMargins(16, 16, 16, 16)
         f_cat.setSpacing(10)
-        f_cat.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        f_cat.setLabelAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         self.txt_cat_nombre = QLineEdit()
-        f_cat.addRow("Nombre descriptivo:", self.txt_cat_nombre)
+        f_cat.addRow(self._etiqueta_form(
+            "Nombre descriptivo:"), self.txt_cat_nombre)
 
         self.spin_cat_cargo_fijo = QDoubleSpinBox()
         self.spin_cat_cargo_fijo.setRange(0.0, 999.0)
@@ -359,7 +387,8 @@ class PaginaConfiguracion(QWidget):
         self.spin_cat_cargo_fijo.setToolTip(
             "Cargo fijo mensual regular cuando el usuario registra consumo de agua"
         )
-        f_cat.addRow("Cargo Fijo Mensual:", self.spin_cat_cargo_fijo)
+        f_cat.addRow(self._etiqueta_form("Cargo Fijo Mensual:"),
+                     self.spin_cat_cargo_fijo)
 
         self.spin_cat_cargo_fijo_sin_consumo = QDoubleSpinBox()
         self.spin_cat_cargo_fijo_sin_consumo.setRange(0.0, 999.0)
@@ -369,7 +398,7 @@ class PaginaConfiguracion(QWidget):
         self.spin_cat_cargo_fijo_sin_consumo.setToolTip(
             "Monto fijo a cobrar cuando el usuario no registre consumo de agua (0 m³)"
         )
-        f_cat.addRow("Cargo Fijo sin Consumo:",
+        f_cat.addRow(self._etiqueta_form("Cargo Fijo sin Consumo:"),
                      self.spin_cat_cargo_fijo_sin_consumo)
 
         self.spin_cat_tarifa_desague = QDoubleSpinBox()
@@ -377,8 +406,16 @@ class PaginaConfiguracion(QWidget):
         self.spin_cat_tarifa_desague.setValue(0.00)
         self.spin_cat_tarifa_desague.setSingleStep(0.50)
         self.spin_cat_tarifa_desague.setPrefix("S/. ")
-        f_cat.addRow("Tarifa Desagüe / Alcantarillado:",
+        f_cat.addRow(self._etiqueta_form("Tarifa Desagüe / Alcantarillado:"),
                      self.spin_cat_tarifa_desague)
+
+        # El texto "S/. 5.00" iba pegado al borde izquierdo: el padding del QSS
+        # no llega al QLineEdit interno del spinbox. Se alinea con el QLineEdit
+        # de "Nombre descriptivo" (padding 12px) usando márgenes de texto.
+        for spin in (self.spin_cat_cargo_fijo,
+                     self.spin_cat_cargo_fijo_sin_consumo,
+                     self.spin_cat_tarifa_desague):
+            spin.lineEdit().setTextMargins(12, 0, 0, 0)
 
         lay.addWidget(self.grp_cat)
 
@@ -399,7 +436,8 @@ class PaginaConfiguracion(QWidget):
 
         self.btn_eliminar_rango = QPushButton("Eliminar Rango Seleccionado")
         iconos.aplicar(self.btn_eliminar_rango, "trash", "peligro")
-        self.btn_eliminar_rango.setProperty("class", "boton boton_peligro_secundario")
+        self.btn_eliminar_rango.setProperty(
+            "class", "boton boton_peligro_secundario")
         self.btn_eliminar_rango.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_eliminar_rango.clicked.connect(self._accion_eliminar_rango)
         fila_btn_r.addWidget(self.btn_eliminar_rango)
@@ -759,7 +797,8 @@ class PaginaConfiguracion(QWidget):
         cf_num = float(5.00 if cargo_fijo_val is None else cargo_fijo_val)
         self.spin_cat_cargo_fijo.setValue(cf_num)
         cargo_fijo_sc_val = cat_data.get("cargo_fijo_sin_consumo")
-        cf_sc_num = float(cf_num if cargo_fijo_sc_val is None else cargo_fijo_sc_val)
+        cf_sc_num = float(
+            cf_num if cargo_fijo_sc_val is None else cargo_fijo_sc_val)
         self.spin_cat_cargo_fijo_sin_consumo.setValue(cf_sc_num)
         self.spin_cat_tarifa_desague.setValue(
             float(cat_data.get("tarifa_desague") or 0.0))

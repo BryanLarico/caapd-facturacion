@@ -189,8 +189,7 @@ class PaginaLectores(QWidget):
         h_header.resizeSection(2, 120)  # Estado
         h_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
         h_header.resizeSection(3, 150)  # Último acceso
-        h_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
-        h_header.resizeSection(4, 300)  # UID
+        self.tabla.setColumnHidden(4, True)
 
         layout_principal.addWidget(self.tabla, stretch=1)
 
