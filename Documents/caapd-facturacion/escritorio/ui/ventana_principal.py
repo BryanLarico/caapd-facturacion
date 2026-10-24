@@ -72,8 +72,6 @@ class VentanaPrincipal(QMainWindow):
     # cuando mostrar_progreso()/ocultar_progreso() se invocan desde un hilo Worker.
     _senal_progreso = Signal(int, str)
     _senal_ocultar_progreso = Signal(str)
-    # Emitida (desde cualquier hilo) cada vez que se registra una operación Firestore
-    _senal_ops_cambiaron = Signal()
 
     def __init__(
         self,
@@ -98,35 +96,6 @@ class VentanaPrincipal(QMainWindow):
             self._mostrar_progreso_ui, Qt.ConnectionType.QueuedConnection)
         self._senal_ocultar_progreso.connect(
             self._ocultar_progreso_ui, Qt.ConnectionType.QueuedConnection)
-
-        # Pie de página: se repinta al instante tras cada lectura/escritura a Firebase.
-        # El contador diario avisa desde el hilo de trabajo; la señal (en cola)
-        # lleva la actualización al hilo de la interfaz.
-        from servicios import contador_ops
-        self._senal_ops_cambiaron.connect(
-            self._pintar_contadores_locales, Qt.ConnectionType.QueuedConnection)
-        self._cb_ops = lambda _totales: self._senal_ops_cambiaron.emit()
-        contador_ops.suscribir(self._cb_ops)
-
-        # Número EXACTO de Google (Cloud Monitoring, no gasta cuota de Firestore).
-        # Se consulta en segundo plano: al abrir (tras 5 s), cada 2 min y unos
-        # segundos después de cada operación (las métricas de Google tardan
-        # ~1-3 min en reflejarse). Nunca en los tests con servicio en memoria.
-        self._metricas_nube = None
-        self._consultando_metricas = False
-        self._timer_metricas = QTimer(self)
-        self._timer_metricas.setSingleShot(True)
-        self._timer_metricas.timeout.connect(self._consultar_metricas_nube)
-        self._timer_refresco_metricas = QTimer(self)
-        self._timer_refresco_metricas.setInterval(120_000)
-        self._timer_refresco_metricas.timeout.connect(
-            lambda: self._programar_consulta_metricas(0))
-        if not getattr(self.servicio, "es_memoria", False):
-            self._senal_ops_cambiaron.connect(
-                lambda: self._programar_consulta_metricas(45_000),
-                Qt.ConnectionType.QueuedConnection)
-            self._programar_consulta_metricas(1_500)   # al abrir, casi de inmediato
-            self._timer_refresco_metricas.start()
 
         self.actualizar_barra_estado()
 
@@ -320,18 +289,24 @@ class VentanaPrincipal(QMainWindow):
 
         layout.addStretch(1)
 
-        # Contadores de operaciones
-        self.lbl_lecturas = QLabel("Lecturas: 0")
-        self.lbl_lecturas.setObjectName("pie_chip")
-        layout.addWidget(self.lbl_lecturas)
-
-        self.lbl_escrituras = QLabel("Escrituras: 0")
-        self.lbl_escrituras.setObjectName("pie_chip")
-        layout.addWidget(self.lbl_escrituras)
-
-        lbl_limite = QLabel("Límite diario: 50 000 lect. / 20 000 escrit.")
-        lbl_limite.setObjectName("pie_texto")
-        layout.addWidget(lbl_limite)
+        # Manual de usuario: abre la carpeta "Manual de usuario" junto al programa
+        self.btn_manual = QPushButton("Abrir carpeta de manual de usuario")
+        iconos.aplicar(self.btn_manual, "folder-open", "primario", 14)
+        self.btn_manual.setObjectName("btn_manual_usuario")
+        self.btn_manual.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_manual.setToolTip(
+            "Abre la carpeta donde se encuentra el manual de usuario del sistema")
+        self.btn_manual.setStyleSheet("""
+            QPushButton {
+                background-color: #e0f2fe; color: #075985;
+                font-size: 12px; font-weight: 600;
+                padding: 4px 12px; border: 1px solid #7dd3fc; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #bae6fd; }
+            QPushButton:pressed { background-color: #7dd3fc; }
+        """)
+        self.btn_manual.clicked.connect(self._accion_abrir_carpeta_manual)
+        layout.addWidget(self.btn_manual)
 
         return pie
 
@@ -379,103 +354,8 @@ class VentanaPrincipal(QMainWindow):
             btn.style().polish(btn)
 
     def actualizar_barra_estado(self) -> None:
-        """Actualiza los contadores de sesión sin iniciar consultas de red."""
-        self._pintar_contadores_locales()
-
-    def _programar_consulta_metricas(self, retraso_ms: int) -> None:
-        """Agenda (con rebote) una consulta a Cloud Monitoring en segundo plano."""
-        if getattr(self.servicio, "es_memoria", False):
-            return
-        self._timer_metricas.start(max(0, int(retraso_ms)))
-
-    def _consultar_metricas_nube(self) -> None:
-        if self._consultando_metricas:
-            return
-        self._consultando_metricas = True
-        from servicios.metricas_monitoring import consultar_metricas_hoy
-
-        def al_terminar(res) -> None:
-            self._consultando_metricas = False
-            self._metricas_nube = res if isinstance(res, dict) else None
-            self._pintar_contadores_locales()
-
-        def al_error(_err: str) -> None:
-            self._consultando_metricas = False
-
-        worker = Worker(lambda: consultar_metricas_hoy(forzar=True))
-        worker.signals.resultado.connect(al_terminar)
-        worker.signals.error.connect(al_error)
-        self._worker_metricas = worker
-        QThreadPool.globalInstance().start(worker)
-
-    @staticmethod
-    def _fmt_miles(n: int) -> str:
-        return f"{int(n):,}".replace(",", " ")
-
-    def _pintar_contadores_locales(self) -> None:
-        """
-        Pie de página: operaciones Firestore de HOY.
-        - Si Cloud Monitoring responde: total EXACTO del proyecto (igual que la
-          consola de Firebase; incluye app móvil y consola).
-        - Si no (sin permiso / sin internet): lo realizado desde esta PC.
-        """
-        local = self.servicio.get_ops()
-        l_lect = int(local.get("lecturas", 0))
-        l_escr = int(local.get("escrituras", 0))
-        nube = self._metricas_nube if getattr(self, "_metricas_nube", None) else None
-
-        sufijo = ""
-        if nube and nube.get("disponible"):
-            n_lect = int(nube.get("lecturas", 0))
-            n_escr = int(nube.get("escrituras", 0))
-            desde = nube.get("desde_pacifico") or "00:00 hora del Pacífico"
-            elim = int(nube.get("eliminaciones", 0) or 0)
-            tooltip = (
-                "Total EXACTO de Google (Cloud Monitoring) para todo el proyecto: incluye esta PC, "
-                f"la app móvil de los lectores y la consola.\nContado desde {desde}. "
-                "Google tarda 1-3 minutos en reflejar las últimas operaciones.\n"
-                f"Escrituras incluye {self._fmt_miles(elim)} eliminaciones (consumen la misma cuota).\n"
-                f"Solo esta PC hoy: {self._fmt_miles(l_lect)} lecturas / {self._fmt_miles(l_escr)} escrituras."
-            )
-        else:
-            n_lect, n_escr = l_lect, l_escr
-            es_memoria = getattr(self.servicio, "es_memoria", False)
-            consultando = getattr(self, "_consultando_metricas", False) or (
-                nube is None and not es_memoria)
-            if es_memoria:
-                motivo = "no aplica (datos en memoria)"
-            elif consultando:
-                sufijo = " (esta PC, consultando a Google…)"
-                motivo = "consultando…"
-            else:
-                sufijo = " (esta PC)"
-                motivo = (nube or {}).get("error") or "sin respuesta"
-            tooltip = (
-                "Operaciones realizadas desde esta PC en el día de hoy (se reinicia a las 00:00 hora "
-                "del Pacífico, igual que la cuota gratuita de Google).\n"
-                "No incluye la app móvil ni la consola.\n"
-                f"Total exacto de Google no disponible: {motivo}\n"
-                "Detalle en logs\\metricas.log junto al programa."
-            )
-
-        self.lbl_lecturas.setText(f"Lecturas: {self._fmt_miles(n_lect)}{sufijo}")
-        self.lbl_escrituras.setText(f"Escrituras: {self._fmt_miles(n_escr)}")
-        self.lbl_lecturas.setToolTip(tooltip)
-        self.lbl_escrituras.setToolTip(tooltip)
-
-        # Color de aviso al acercarse al límite diario (80 %) o superarlo
-        for lbl, usado, limite in (
-            (self.lbl_lecturas, n_lect, 50_000),
-            (self.lbl_escrituras, n_escr, 20_000),
-        ):
-            nivel = "peligro" if usado >= limite else (
-                "aviso" if usado >= limite * 0.8 else "")
-            if lbl.property("nivel") != nivel:
-                lbl.setProperty("nivel", nivel)
-                lbl.setStyleSheet(
-                    "background-color: #dc2626; color: #ffffff;" if nivel == "peligro" else
-                    "background-color: #f59e0b; color: #1f2937;" if nivel == "aviso" else ""
-                )
+        """Compatibilidad: el pie ya no muestra contadores; no hace consultas de red."""
+        return
 
     def set_sincronizando(self, activo: bool) -> None:
         """Pausa la vigilancia de archivos mientras el propio programa escribe los Excel."""
@@ -563,6 +443,24 @@ class VentanaPrincipal(QMainWindow):
         except Exception:
             pass
 
+    def _accion_abrir_carpeta_manual(self) -> None:
+        """Abre (y crea si no existe) la carpeta 'Manual de usuario' junto al programa."""
+        p = rutas.ruta_manual_usuario()
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            os.startfile(p)
+        except Exception:
+            # Fuera de Windows (p. ej. en pruebas) usar el abridor del sistema
+            try:
+                from PySide6.QtCore import QUrl
+                from PySide6.QtGui import QDesktopServices
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
+            except Exception:
+                pass
+
     def _en_hilo_gui(self) -> bool:
         """True si el código actual se ejecuta en el hilo principal de la interfaz."""
         return QThread.currentThread() is self.thread()
@@ -605,14 +503,6 @@ class VentanaPrincipal(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Cierre seguro: detiene temporizadores y espera a los hilos de trabajo."""
-        try:
-            from servicios import contador_ops
-            contador_ops.desuscribir(getattr(self, "_cb_ops", None))
-        except Exception:
-            pass
-        for t in (getattr(self, "_timer_metricas", None), getattr(self, "_timer_refresco_metricas", None)):
-            if t is not None:
-                t.stop()
         if self.sincronizando:
             QMessageBox.information(
                 self,

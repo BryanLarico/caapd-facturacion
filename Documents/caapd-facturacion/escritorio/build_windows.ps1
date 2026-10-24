@@ -18,7 +18,7 @@ try {
     }
 
     $appRoot = Join-Path $PSScriptRoot "dist\CAAPD"
-    @("Base de datos", "datos", "logs", "plantillas", "salida", "respaldos") | ForEach-Object {
+    @("Base de datos", "datos", "logs", "plantillas", "salida", "respaldos", "Manual de usuario") | ForEach-Object {
         New-Item -ItemType Directory -Force -Path (Join-Path $appRoot $_) | Out-Null
     }
 

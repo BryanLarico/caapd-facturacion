@@ -134,6 +134,13 @@ def ruta_base_de_datos(*partes: str) -> Path:
     return p
 
 
+def ruta_manual_usuario(*partes: str) -> Path:
+    """Carpeta 'Manual de usuario' junto al programa (se crea si no existe)."""
+    p = ruta_aplicacion("Manual de usuario", *partes)
+    p.parent.mkdir(parents=True, exist_ok=True) if partes else p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def ruta_plantillas(*partes: str) -> Path:
     """Devuelve la ruta dentro de plantillas/ dentro de escritorio/."""
     dir_pl = DIR_BASE.joinpath("plantillas")

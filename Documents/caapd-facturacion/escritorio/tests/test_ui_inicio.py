@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtCore import QThread, Qt
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton
 
 from servicios.datos import ServicioDatosMemoria
 from ui.ventana_principal import VentanaPrincipal
@@ -83,14 +83,6 @@ def test_navegacion_entre_las_paginas(qtbot, servicio_memoria):
     assert ventana.botones_nav["cobros"].property("activo") == "true"
 
 
-def test_barra_estado_muestra_contadores(qtbot, servicio_memoria):
-    ventana = VentanaPrincipal(servicio_memoria)
-    qtbot.addWidget(ventana)
-
-    assert "12" in ventana.lbl_lecturas.text()
-    assert "4" in ventana.lbl_escrituras.text()
-
-
 def test_inicio_lanza_publicacion_solo_del_mes_actual(qtbot, servicio_memoria):
     ventana = VentanaPrincipal(servicio_memoria)
     qtbot.addWidget(ventana)
@@ -131,8 +123,8 @@ def test_inicio_lanza_publicacion_solo_del_mes_actual(qtbot, servicio_memoria):
     )
 
 
-def test_barra_estado_no_inicia_consultas_de_red(qtbot, servicio_memoria, monkeypatch):
-    def consulta_remota_no_permitida():
+def test_barra_estado_sin_contadores_y_con_boton_manual(qtbot, servicio_memoria, monkeypatch, tmp_path):
+    def consulta_remota_no_permitida(*_a, **_k):
         raise AssertionError("El inicio no debe consultar Google ni Firebase")
 
     monkeypatch.setattr(
@@ -144,10 +136,25 @@ def test_barra_estado_no_inicia_consultas_de_red(qtbot, servicio_memoria, monkey
 
     hilos_activos = ventana.pagina_inicio.thread_pool.activeThreadCount()
     ventana.actualizar_barra_estado()
-
-    assert ventana.lbl_lecturas.text() == "Lecturas: 12"
-    assert ventana.lbl_escrituras.text() == "Escrituras: 4"
     assert ventana.pagina_inicio.thread_pool.activeThreadCount() == hilos_activos
+
+    # Ya no existen los contadores ni el texto de límite diario
+    assert not hasattr(ventana, "lbl_lecturas")
+    assert not hasattr(ventana, "lbl_escrituras")
+    textos_lbl = [l.text() for l in ventana.findChildren(QLabel)]
+    assert not any("Límite diario" in t or t.startswith("Lecturas:") or t.startswith("Escrituras:")
+                   for t in textos_lbl)
+
+    # Botón del manual: abre (y crea) la carpeta "Manual de usuario" junto al programa
+    assert ventana.btn_manual.text() == "Abrir carpeta de manual de usuario"
+    import rutas
+    carpeta = tmp_path / "Manual de usuario"
+    monkeypatch.setattr(rutas, "ruta_manual_usuario", lambda *p: carpeta)
+    abiertos = []
+    monkeypatch.setattr("os.startfile", lambda ruta: abiertos.append(str(ruta)), raising=False)
+    ventana.btn_manual.click()
+    assert carpeta.is_dir()
+    assert abiertos == [str(carpeta)]
 
 
 def test_inicio_sin_mes_muestra_alerta_y_boton(qtbot, monkeypatch):
