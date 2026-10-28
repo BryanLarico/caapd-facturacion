@@ -2454,35 +2454,81 @@ class ServicioDatosPadron(ServicioDatos):
         novedad: str = "NORMAL",
         nota: str = "",
         registrado_por: str = "ADMIN",
+        lectura_anterior: Optional[int] = None,
     ) -> Dict[str, Any]:
-        doc = self.mes.get(id_usuario)
+        p = periodo or self.periodo
+        mes_target = self.mes if (p == self.periodo or not p) else (
+            getattr(self, "meses_encontrados", {}).get(p) or self.mes
+        )
+        doc = mes_target.get(id_usuario)
         if not doc:
             raise ValueError(
-                f"Usuario {id_usuario} no encontrado en el mes {periodo}.")
+                f"Usuario {id_usuario} no encontrado en el mes {p}.")
 
         med_obj = next((m for m in doc.get("medidores", [])
                        if m.get("nro_medidor") == nro_medidor), None)
         if med_obj:
+            if lectura_anterior is not None:
+                med_obj["lectura_anterior"] = int(lectura_anterior)
             med_obj["lectura_actual"] = int(lectura_actual)
             med_obj["fecha_lectura"] = datetime.date.today().isoformat()
             med_obj["estado_lectura"] = "LEIDO"
             med_obj["novedad"] = novedad or "NORMAL"
             med_obj["nota"] = nota or ""
             med_obj["registrado_por"] = registrado_por
+            try:
+                med_obj["consumo"] = calculos.consumo_medidor(
+                    med_obj.get("lectura_anterior", 0) or 0,
+                    med_obj["lectura_actual"],
+                    med_obj.get("novedad"),
+                )
+            except Exception:
+                med_obj["consumo"] = 0.0
+
+        # Recalcular consumo total m3 del abonado
+        meds_con_lectura = [
+            m for m in doc.get("medidores", [])
+            if m.get("lectura_actual") is not None
+        ]
+        if meds_con_lectura:
+            tot_c = 0.0
+            for m in meds_con_lectura:
+                try:
+                    tot_c += calculos.consumo_medidor(
+                        m.get("lectura_anterior", 0) or 0,
+                        m["lectura_actual"],
+                        m.get("novedad"),
+                    )
+                except Exception:
+                    pass
+            doc["consumo_total_m3"] = round(tot_c, 2)
+        else:
+            doc["consumo_total_m3"] = 0
+
+        # Si todos los medidores tienen lectura, recalcular recibo y todos los importes
+        meds = doc.get("medidores", [])
+        if bool(meds) and all(m.get("lectura_actual") is not None for m in meds):
+            self.generar_recibo_usuario(p, id_usuario, guardar=False)
 
         self._contar_op("escrituras", 1)
-        self.guardar_en_respaldo_local()
+        self.guardar_en_respaldo_local(p)
 
         encolar_cambio("lectura", {
-            "periodo": periodo,
+            "periodo": p,
             "id_usuario": id_usuario,
             "nro_medidor": nro_medidor,
+            "lectura_anterior": lectura_anterior if lectura_anterior is not None else (med_obj.get("lectura_anterior") if med_obj else None),
             "lectura_actual": lectura_actual,
             "novedad": novedad,
             "nota": nota,
             "registrado_por": registrado_por,
         })
-        return {"id_usuario": id_usuario, "nro_medidor": nro_medidor}
+        return {
+            "id_usuario": id_usuario,
+            "nro_medidor": nro_medidor,
+            "consumo_total_m3": doc.get("consumo_total_m3"),
+            "total_a_pagar": doc.get("total_a_pagar"),
+        }
 
     # -----------------------------------------------------------------------
     # Emisión de Recibos y Cobros
@@ -2805,11 +2851,155 @@ class ServicioDatosPadron(ServicioDatos):
     def hay_aviso_ops(self) -> Dict[str, Optional[str]]:
         return {"lecturas": None, "escrituras": None}
 
+    def conciliar_y_recalcular_base_datos(
+        self, periodo: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Recorre todos los registros del mes (o todos los meses cargados),
+        comprueba si hay inconsistencias entre lecturas anteriores, actuales,
+        consumos y montos de facturación (agua, cargo fijo, subtotal, total a pagar),
+        los recalcula con las tarifas vigentes y guarda el Excel si hubo cambios.
+        """
+        p_target = periodo or self.periodo
+        periodos_a_revisar = [p_target] if p_target else list(getattr(self, "meses_encontrados", {}).keys())
+
+        total_verificados = 0
+        total_inconsistencias = 0
+        archivos_guardados = []
+
+        for per in periodos_a_revisar:
+            docs_mes = self.mes if per == self.periodo else getattr(self, "meses_encontrados", {}).get(per, {})
+            if not docs_mes:
+                continue
+
+            hubo_cambios_periodo = False
+
+            for uid, doc in docs_mes.items():
+                total_verificados += 1
+                doc_modificado = False
+
+                # 1. Verificar cada medidor
+                for m in doc.get("medidores", []):
+                    l_ant = m.get("lectura_anterior")
+                    l_act = m.get("lectura_actual")
+                    nov = m.get("novedad") or "NORMAL"
+
+                    if l_act is not None:
+                        try:
+                            c_real = calculos.consumo_medidor(l_ant or 0, l_act, nov)
+                        except ValueError:
+                            c_real = 0.0
+
+                        if m.get("consumo") is None or round(float(m.get("consumo") or 0.0), 2) != round(c_real, 2):
+                            m["consumo"] = c_real
+                            doc_modificado = True
+
+                        if str(m.get("estado_lectura") or "").upper() != "LEIDO":
+                            m["estado_lectura"] = "LEIDO"
+                            doc_modificado = True
+
+                # 2. Verificar consumo_total_m3 del titular
+                meds_con_lectura = [m for m in doc.get("medidores", []) if m.get("lectura_actual") is not None]
+                if meds_con_lectura:
+                    consumo_tot_real = 0.0
+                    for m in meds_con_lectura:
+                        try:
+                            consumo_tot_real += calculos.consumo_medidor(
+                                m.get("lectura_anterior", 0) or 0,
+                                m["lectura_actual"],
+                                m.get("novedad"),
+                            )
+                        except Exception:
+                            pass
+                    consumo_tot_real = round(consumo_tot_real, 2)
+                    if doc.get("consumo_total_m3") is None or round(float(doc.get("consumo_total_m3") or 0.0), 2) != consumo_tot_real:
+                        doc["consumo_total_m3"] = consumo_tot_real
+                        doc_modificado = True
+
+                # 3. Verificar y reconstruir historial_m3 si está vacío
+                if not doc.get("historial_m3"):
+                    hist = self._historial_consumos(uid, per)
+                    if hist:
+                        doc["historial_m3"] = hist
+                        doc_modificado = True
+
+                # 4. Verificar montos y recibo (si todos los medidores tienen lectura)
+                todos_leidos = bool(doc.get("medidores")) and all(m.get("lectura_actual") is not None for m in doc.get("medidores", []))
+                if todos_leidos:
+                    cat_obj = self._categoria_de(doc)
+                    deuda_manual = float(doc.get("deuda_anterior") or 0.0)
+
+                    calc = calculos.calcular_recibo(
+                        medidores=doc.get("medidores", []),
+                        categoria=cat_obj,
+                        igv_activo=False,
+                        igv_porcentaje=0.18,
+                        recibo_anterior=None,
+                        deuda_anterior_manual=deuda_manual,
+                    )
+
+                    subtotal_mes_esperado = round(
+                        calc["monto_agua"] + calc["monto_desague"] +
+                        calc["cargo_fijo"] + calc["igv"], 2
+                    )
+                    total_pagar_esperado = calc["total_a_pagar"]
+
+                    # Comparar montos
+                    if round(float(doc.get("monto_agua") or 0.0), 2) != round(calc["monto_agua"], 2):
+                        doc["monto_agua"] = calc["monto_agua"]
+                        doc_modificado = True
+
+                    if round(float(doc.get("cargo_fijo") or 0.0), 2) != round(calc["cargo_fijo"], 2):
+                        doc["cargo_fijo"] = calc["cargo_fijo"]
+                        doc_modificado = True
+
+                    if round(float(doc.get("monto_desague") or 0.0), 2) != round(calc["monto_desague"], 2):
+                        doc["monto_desague"] = calc["monto_desague"]
+                        doc_modificado = True
+
+                    if round(float(doc.get("deuda_actual") or 0.0), 2) != subtotal_mes_esperado:
+                        doc["deuda_actual"] = subtotal_mes_esperado
+                        doc_modificado = True
+
+                    if round(float(doc.get("total_a_pagar") or 0.0), 2) != total_pagar_esperado:
+                        doc["total_a_pagar"] = total_pagar_esperado
+                        doc_modificado = True
+
+                    if not doc.get("nro_recibo") and doc.get("estado_lectura") != "PENDIENTE":
+                        ultimo_recibo_num = int(self.config.get("ultimo_recibo") or 0) + 1
+                        doc["nro_recibo"] = f"{ultimo_recibo_num:09d}"
+                        self.config["ultimo_recibo"] = ultimo_recibo_num
+                        doc_modificado = True
+
+                    # Ajustar estado de pago si total cambió
+                    tot = float(doc["total_a_pagar"])
+                    m_pag = float(doc.get("monto_pagado") or 0.0)
+                    pago_str = str(doc.get("pago") or "").strip().upper()
+                    if pago_str in ("SI", "1", "TRUE", "PAGADO") and m_pag < tot:
+                        doc["monto_pagado"] = tot
+                        doc_modificado = True
+
+                if doc_modificado:
+                    total_inconsistencias += 1
+                    hubo_cambios_periodo = True
+
+            if hubo_cambios_periodo:
+                self.guardar_en_respaldo_local(per)
+                archivos_guardados.append(per)
+
+        return {
+            "verificados": total_verificados,
+            "inconsistencias_corregidas": total_inconsistencias,
+            "periodos_guardados": archivos_guardados,
+            "exito": True,
+        }
+
     def limpiar_cache(self, limpiar_config: bool = True) -> None:
         """Recarga los datos únicamente desde la carpeta 'Base de datos/' o Padrón Excel local. Cero lecturas a Firestore."""
         archivos_bd = buscar_archivos_base_datos(self.base_dir)
         if archivos_bd:
             self.cargar_desde_carpeta_base_datos(dir_bd=self.base_dir)
+            self.conciliar_y_recalcular_base_datos()
             return
 
         cargado = False
@@ -2902,9 +3092,8 @@ class ServicioDatosPadron(ServicioDatos):
             calc["monto_agua"] + calc["monto_desague"] +
             calc["cargo_fijo"] + calc["igv"], 2
         )
-        deuda_actual = float(doc.get("deuda_actual") if doc.get(
-            "deuda_actual") is not None else subtotal_mes)
-        total_a_pagar = round(deuda_manual + deuda_actual, 2)
+        deuda_actual = subtotal_mes
+        total_a_pagar = calc["total_a_pagar"]
 
         meses_ad = int(doc.get("meses_adeudados")
                        or calc.get("meses_adeudados") or 1)
@@ -2923,10 +3112,24 @@ class ServicioDatosPadron(ServicioDatos):
             "total_a_pagar": total_a_pagar,
             "meses_adeudados": meses_ad,
         })
-        if "monto_pagado" not in doc or doc.get("monto_pagado") is None:
-            doc["monto_pagado"] = 0.0
-            doc["pago"] = "NO"
-            doc["fecha_pago"] = None
+
+        # Mantener consistencia del pago
+        m_pagado = float(doc.get("monto_pagado") or 0.0)
+        pago_str = str(doc.get("pago") or "").strip().upper()
+        if pago_str in ("SI", "1", "TRUE", "PAGADO"):
+            if m_pagado == 0.0 or m_pagado < total_a_pagar:
+                doc["monto_pagado"] = total_a_pagar
+            doc["pago"] = "SI"
+            doc["meses_adeudados"] = 0
+        else:
+            if m_pagado >= total_a_pagar and total_a_pagar > 0:
+                doc["pago"] = "SI"
+                doc["meses_adeudados"] = 0
+            else:
+                doc["pago"] = "NO"
+                if "monto_pagado" not in doc or doc.get("monto_pagado") is None:
+                    doc["monto_pagado"] = 0.0
+                    doc["fecha_pago"] = None
 
         mes_target[id_usuario] = doc
         if guardar:

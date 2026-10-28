@@ -253,6 +253,7 @@ class ServicioDatos:
         novedad: str = "NORMAL",
         nota: str = "",
         registrado_por: str = "ADMIN",
+        lectura_anterior: Optional[int] = None,
     ) -> Dict[str, Any]:
         raise NotImplementedError
 
@@ -467,15 +468,22 @@ class ServicioDatosFirebase(ServicioDatos):
         novedad: str = "NORMAL",
         nota: str = "",
         registrado_por: str = "ADMIN",
+        lectura_anterior: Optional[int] = None,
     ) -> Dict[str, Any]:
-        return self._get_fb().guardar_lectura_medidor(
+        fb = self._get_fb()
+        kwargs = {
+            "novedad": novedad,
+            "nota": nota,
+            "registrado_por": registrado_por,
+        }
+        if lectura_anterior is not None:
+            kwargs["lectura_anterior"] = lectura_anterior
+        return fb.guardar_lectura_medidor(
             periodo,
             id_usuario,
             nro_medidor,
             lectura_actual,
-            novedad=novedad,
-            nota=nota,
-            registrado_por=registrado_por,
+            **kwargs,
         )
 
     def get_ops(self) -> Dict[str, int]:
@@ -879,6 +887,7 @@ class ServicioDatosMemoria(ServicioDatos):
         novedad: str = "NORMAL",
         nota: str = "",
         registrado_por: str = "ADMIN",
+        lectura_anterior: Optional[int] = None,
     ) -> Dict[str, Any]:
         import datetime
         import calculos
@@ -891,12 +900,19 @@ class ServicioDatosMemoria(ServicioDatos):
         if not med_obj:
             raise ValueError(f"Medidor {nro_medidor} no pertenece a {id_usuario}.")
 
+        if lectura_anterior is not None:
+            med_obj["lectura_anterior"] = int(lectura_anterior)
         med_obj["lectura_actual"] = int(lectura_actual)
         med_obj["fecha_lectura"] = datetime.date.today().isoformat()
         med_obj["estado_lectura"] = "LEIDO"
         med_obj["novedad"] = novedad or "NORMAL"
         med_obj["nota"] = nota or ""
         med_obj["registrado_por"] = registrado_por
+        med_obj["consumo"] = calculos.consumo_medidor(
+            med_obj.get("lectura_anterior") or 0,
+            med_obj["lectura_actual"],
+            med_obj.get("novedad"),
+        )
 
         meds = doc.get("medidores", [])
         if all(m.get("lectura_actual") is not None for m in meds):
@@ -909,10 +925,11 @@ class ServicioDatosMemoria(ServicioDatos):
                 )
                 total_c += c
             doc["consumo_total_m3"] = round(total_c, 2)
+            self.generar_recibo_usuario(periodo, id_usuario)
         else:
             doc["consumo_total_m3"] = None
 
-        return {"id_usuario": id_usuario, "nro_medidor": nro_medidor, "consumo_total_m3": doc.get("consumo_total_m3")}
+        return {"id_usuario": id_usuario, "nro_medidor": nro_medidor, "consumo_total_m3": doc.get("consumo_total_m3"), "total_a_pagar": doc.get("total_a_pagar")}
 
     def actualizar_deuda(
         self, periodo: str, id_usuario: str, campo: str, valor: float

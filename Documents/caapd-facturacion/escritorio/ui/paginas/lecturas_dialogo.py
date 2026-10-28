@@ -86,10 +86,10 @@ class DialogoLectura(QDialog):
         lbl_med.setStyleSheet("font-size: 13px; color: #0369a1;")
         layout_card.addWidget(lbl_med)
 
-        ant = self.item.get("lectura_anterior") or 0
-        lbl_ant = QLabel(f"Lectura anterior: <b>{ant}</b>")
-        lbl_ant.setStyleSheet("font-size: 13px; color: #334155;")
-        layout_card.addWidget(lbl_ant)
+        cat_txt = f"Categoría: <b>{self.item.get('codigo_categoria', 'A')}</b>"
+        lbl_cat = QLabel(cat_txt)
+        lbl_cat.setStyleSheet("font-size: 13px; color: #475569;")
+        layout_card.addWidget(lbl_cat)
 
         layout.addWidget(card_medidor)
 
@@ -97,6 +97,21 @@ class DialogoLectura(QDialog):
         panel_inputs = QFrame()
         layout_inputs = QVBoxLayout(panel_inputs)
         layout_inputs.setSpacing(12)
+
+        # Lectura anterior (editable)
+        fila_ant = QHBoxLayout()
+        lbl_ant = QLabel("Lectura anterior:")
+        lbl_ant.setFixedWidth(130)
+        lbl_ant.setStyleSheet("font-weight: bold; color: #1e293b;")
+
+        self.input_anterior = QLineEdit()
+        self.input_anterior.setPlaceholderText("Ej. 10")
+        ant_val = self.item.get("lectura_anterior")
+        self.input_anterior.setText(str(ant_val if ant_val is not None else 0))
+        self.input_anterior.textChanged.connect(self._recalcular_y_validar)
+        fila_ant.addWidget(lbl_ant)
+        fila_ant.addWidget(self.input_anterior)
+        layout_inputs.addLayout(fila_ant)
 
         # Lectura actual
         fila_lect = QHBoxLayout()
@@ -200,27 +215,35 @@ class DialogoLectura(QDialog):
         self._recalcular_y_validar()
 
     def _recalcular_y_validar(self) -> None:
-        texto = self.input_actual.text().strip()
-        ant = self.item.get("lectura_anterior") or 0
+        texto_ant = self.input_anterior.text().strip()
+        texto_act = self.input_actual.text().strip()
         nov = self.combo_novedad.currentData() or "NORMAL"
 
-        if not texto:
-            self.lbl_feedback_consumo.setText("Consumo: —")
-            self.lbl_alerta.hide()
-            return
-
-        if not texto.isdigit():
-            self.lbl_feedback_consumo.setText("Ingrese solo números enteros.")
+        if not texto_ant or not texto_ant.isdigit():
+            self.lbl_feedback_consumo.setText("Lectura anterior no válida (ingrese un número entero).")
             self.lbl_feedback_consumo.setStyleSheet("color: #dc2626;")
             self.lbl_alerta.hide()
             return
 
-        act = int(texto)
+        ant = int(texto_ant)
+
+        if not texto_act:
+            self.lbl_feedback_consumo.setText("Consumo: —")
+            self.lbl_alerta.hide()
+            return
+
+        if not texto_act.isdigit():
+            self.lbl_feedback_consumo.setText("Lectura actual no válida (ingrese un número entero).")
+            self.lbl_feedback_consumo.setStyleSheet("color: #dc2626;")
+            self.lbl_alerta.hide()
+            return
+
+        act = int(texto_act)
         try:
             c = calculos.consumo_medidor(ant, act, nov)
             self.lbl_feedback_consumo.setText(f"Consumo calculado: {c:.0f} m³")
             self.lbl_feedback_consumo.setStyleSheet("color: #16a34a; font-weight: bold;")
-        except ValueError as e:
+        except ValueError:
             self.lbl_feedback_consumo.setText(f"Consumo negativo: {act - ant} m³")
             self.lbl_feedback_consumo.setStyleSheet("color: #dc2626; font-weight: bold;")
             self.lbl_alerta.setText(
@@ -248,15 +271,19 @@ class DialogoLectura(QDialog):
             self.lbl_alerta.hide()
 
     def _ejecutar_guardado(self) -> None:
-        texto = self.input_actual.text().strip()
-        if not texto or not texto.isdigit():
-            QMessageBox.warning(self, "Atención", "Debe ingresar una lectura válida (número entero positivo).")
+        texto_ant = self.input_anterior.text().strip()
+        texto_act = self.input_actual.text().strip()
+        if not texto_ant or not texto_ant.isdigit():
+            QMessageBox.warning(self, "Atención", "Debe ingresar una lectura anterior válida (número entero positivo).")
+            return
+        if not texto_act or not texto_act.isdigit():
+            QMessageBox.warning(self, "Atención", "Debe ingresar una lectura actual válida (número entero positivo).")
             return
 
-        act = int(texto)
+        ant = int(texto_ant)
+        act = int(texto_act)
         nov = self.combo_novedad.currentData() or "NORMAL"
         nota = self.input_nota.text().strip()
-        ant = self.item.get("lectura_anterior") or 0
 
         if act < ant and nov != "CAMBIO_MEDIDOR":
             QMessageBox.critical(
@@ -267,7 +294,7 @@ class DialogoLectura(QDialog):
             )
             return
 
-        self.indicador.iniciar("Guardando lectura...")
+        self.indicador.iniciar("Guardando y recalculando...")
         self.btn_guardar.setEnabled(False)
         self.btn_cancelar.setEnabled(False)
 
@@ -280,6 +307,7 @@ class DialogoLectura(QDialog):
                 novedad=nov,
                 nota=nota,
                 registrado_por="ADMIN",
+                lectura_anterior=ant,
             )
 
         worker = Worker(tarea)
@@ -289,6 +317,13 @@ class DialogoLectura(QDialog):
         self.thread_pool.start(worker)
 
     def _al_exito(self, res: Dict[str, Any]) -> None:
+        if hasattr(self, "item") and isinstance(self.item, dict):
+            texto_ant = self.input_anterior.text().strip()
+            texto_act = self.input_actual.text().strip()
+            if texto_ant.isdigit():
+                self.item["lectura_anterior"] = int(texto_ant)
+            if texto_act.isdigit():
+                self.item["lectura_actual"] = int(texto_act)
         self.accept()
 
     def _al_error(self, err_msg: str) -> None:

@@ -341,24 +341,36 @@ class PaginaLecturas(QWidget):
 
         def tarea() -> Any:
             self.servicio.limpiar_cache(limpiar_config=True)
+            res_conciliacion = {}
+            if hasattr(self.servicio, "conciliar_y_recalcular_base_datos"):
+                res_conciliacion = self.servicio.conciliar_y_recalcular_base_datos()
             cfg = self.servicio.cargar_config()
             mes_actual = cfg.get("mes_actual") or {}
             periodo = mes_actual.get("periodo")
             mes_dict = {}
             if periodo:
                 mes_dict = self.servicio.cargar_mes(periodo)
-            return cfg, periodo, mes_dict
+            return cfg, periodo, mes_dict, res_conciliacion
 
         def al_terminar(resultado):
-            self._al_recibir_datos(resultado)
+            cfg, periodo, mes_dict, res_conciliacion = resultado
+            self._al_recibir_datos((cfg, periodo, mes_dict))
             self.btn_actualizar_excel.setEnabled(True)
             self.btn_actualizar_excel.setText("Actualizar Excel")
             if hasattr(ventana, "ocultar_progreso"):
                 ventana.ocultar_progreso("¡Padrón Excel recargado!")
+            if hasattr(ventana, "pagina_cobros"):
+                ventana.pagina_cobros.cargar_datos_asincrono(forzar=True)
+
+            incons = res_conciliacion.get("inconsistencias_corregidas", 0) if isinstance(res_conciliacion, dict) else 0
+            verifs = res_conciliacion.get("verificados", len(self.lista_items_completa)) if isinstance(res_conciliacion, dict) else len(self.lista_items_completa)
+            if incons > 0:
+                msg = f"¡Excel sincronizado! Se verificaron {verifs} registros y se recalcularon {incons} fila(s) modificada(s)."
+            else:
+                msg = f"¡Excel sincronizado! Se verificaron {verifs} registros: todos los datos y cálculos corresponden."
+
             if hasattr(self, "toast"):
-                self.toast.mostrar(
-                    "¡Excel recargado con éxito! Se sincronizaron los cambios.", "exito"
-                )
+                self.toast.mostrar(msg, "exito")
             QTimer.singleShot(2000, self._desactivar_estado_btn_excel)
 
         def al_fallar(err_msg):
@@ -748,7 +760,12 @@ class PaginaLecturas(QWidget):
             parent=self,
         )
         if diag.exec() == QMessageBox.DialogCode.Accepted:
-            self.actualizar_datos()
+            self.cargar_datos_asincrono(forzar=False)
+            ventana = self.window()
+            if hasattr(ventana, "pagina_cobros"):
+                ventana.pagina_cobros.cargar_datos_asincrono(forzar=False)
+            if hasattr(self, "toast"):
+                self.toast.mostrar("¡Lectura guardada y Excel actualizado!", "exito")
 
     def _alternar_estado_lecturas(self) -> None:
         if not self.periodo_actual:
@@ -774,7 +791,7 @@ class PaginaLecturas(QWidget):
                 self.indicador_carga.iniciar("Cerrando lecturas...")
                 self.thread_pool.start(
                     Worker(lambda: self.servicio.cerrar_lecturas(self.periodo_actual)))
-                QTimer.singleShot(1000, self.actualizar_datos)
+                QTimer.singleShot(1000, lambda: self.cargar_datos_asincrono(forzar=True))
 
         elif self.estado_mes == "CERRADO":
             resp = QMessageBox.question(
@@ -789,7 +806,7 @@ class PaginaLecturas(QWidget):
                 self.indicador_carga.iniciar("Reabriendo lecturas...")
                 self.thread_pool.start(
                     Worker(lambda: self.servicio.reabrir_lecturas(self.periodo_actual)))
-                QTimer.singleShot(1000, self.actualizar_datos)
+                QTimer.singleShot(1000, lambda: self.cargar_datos_asincrono(forzar=True))
 
     def _abrir_modal_mes(self) -> None:
         diag = DialogoAbrirMes(self.servicio, self)

@@ -239,9 +239,12 @@ def generar_respaldo_excel(
                 c_con = ws_sec.cell(row=fila_act, column=8)
                 if l_act is not None and l_ant is not None:
                     try:
-                        c_con.value = max(0, int(l_act) - int(l_ant))
+                        import calculos
+                        c_con.value = calculos.consumo_medidor(
+                            int(l_ant), int(l_act), m.get("novedad")
+                        )
                     except Exception:
-                        c_con.value = ""
+                        c_con.value = max(0, int(l_act) - int(l_ant))
                 else:
                     c_con.value = ""
                 c_con.border = borde_fino
@@ -618,7 +621,14 @@ def leer_respaldo_excel(ruta_archivo: Path | str) -> Dict[str, Any]:
                 l_ant).isdigit() else 0
             l_act_val = int(l_act) if l_act is not None and str(
                 l_act).isdigit() else None
-            cons_val = (l_act_val - l_ant_val) if l_act_val is not None else 0
+            if l_act_val is not None:
+                try:
+                    import calculos
+                    cons_val = calculos.consumo_medidor(l_ant_val, l_act_val, nov)
+                except Exception:
+                    cons_val = max(0, l_act_val - l_ant_val)
+            else:
+                cons_val = 0
 
             med_obj = {
                 "nro_medidor": n_med_str,
