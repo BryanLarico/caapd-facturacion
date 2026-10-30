@@ -86,7 +86,6 @@ def _todas_lecturas_actuales_completas(mes: Dict[str, Dict[str, Any]]) -> bool:
         medidor.get("lectura_actual") is not None
         and (not isinstance(medidor.get("lectura_actual"), str)
              or bool(medidor["lectura_actual"].strip()))
-        and str(medidor.get("estado_lectura") or "LEIDO").upper() != "PENDIENTE"
         for medidor in medidores
     )
 
@@ -168,33 +167,14 @@ def fusionar_lecturas_nube(
             if not ml:
                 continue
 
-            estado_cloud = str(mc.get("estado_lectura") or ("LEIDO" if mc.get("lectura_actual") is not None else "PENDIENTE")).strip().upper()
             lec_cloud = mc.get("lectura_actual")
-
-            # Si en la nube está PENDIENTE o no tiene lectura
-            if estado_cloud == "PENDIENTE" or lec_cloud is None or str(lec_cloud).strip() == "":
-                lec_local = ml.get("lectura_actual")
-                lec_ant = ml.get("lectura_anterior", 0) or 0
-                reg_por = str(ml.get("registrado_por") or "").upper()
-                if lec_local is not None:
-                    # Si la lectura local es igual a la anterior (residuo de estimación a cero) o no es de ADMIN:
-                    if str(lec_local) == str(lec_ant) or reg_por != "ADMIN":
-                        ml["lectura_actual"] = None
-                        ml["consumo"] = None
-                        ml["consumo_m3"] = None
-                        ml["estado_lectura"] = "PENDIENTE"
-                        ml["novedad"] = "NORMAL"
-                        ml["nota"] = ""
-                        ml["registrado_por"] = ""
-                        modificado_usuario = True
+            if lec_cloud is None:
                 continue
 
-            # Si en la nube está LEÍDO:
-            # Protección ADMIN: solo si el ADMIN ingresó una lectura real diferente a la anterior
+            # Protección ADMIN: si ya hay lectura de ADMIN, verificar conflicto.
             reg_por = str(ml.get("registrado_por") or "").upper()
             lec_local = ml.get("lectura_actual")
-            lec_ant = ml.get("lectura_anterior", 0) or 0
-            if reg_por == "ADMIN" and lec_local is not None and str(lec_local) != str(lec_ant):
+            if reg_por == "ADMIN" and lec_local is not None:
                 try:
                     if int(lec_local) != int(lec_cloud):
                         conflictos_admin.append({
@@ -214,45 +194,37 @@ def fusionar_lecturas_nube(
                 ml["lectura_actual"] = int(lec_cloud)
             except Exception:
                 ml["lectura_actual"] = lec_cloud
-            ml["estado_lectura"] = "LEIDO"
+            ml["estado_lectura"] = mc.get("estado_lectura", "LEIDO")
             ml["novedad"] = mc.get("novedad", "NORMAL")
             ml["nota"] = mc.get("nota", "")
             ml["fecha_lectura"] = mc.get(
                 "fecha_lectura") or datetime.date.today().isoformat()
             ml["registrado_por"] = mc.get("registrado_por") or "LECTOR"
-
-            # Recalcular consumo de este medidor
-            try:
-                c_m = calculos.consumo_medidor(
-                    ml.get("lectura_anterior", 0) or 0,
-                    ml["lectura_actual"],
-                    ml.get("novedad"),
-                )
-            except Exception:
-                c_m = 0.0
-            ml["consumo"] = c_m
-            ml["consumo_m3"] = c_m
-
             actualizados += 1
             modificado_usuario = True
 
         # Recalcular el consumo del usuario.
         if modificado_usuario or any(m.get("lectura_actual") is not None for m in meds_local):
-            consumo_total = 0.0
+            consumo_total = 0
             for m in meds_local:
-                if m.get("lectura_actual") is not None and m.get("lectura_anterior") is not None:
+                ant = m.get("lectura_anterior")
+                act = m.get("lectura_actual")
+                nov = str(m.get("novedad") or "").upper()
+                if act is not None and ant is not None:
                     try:
-                        c_val = calculos.consumo_medidor(
-                            m.get("lectura_anterior", 0) or 0,
-                            m["lectura_actual"],
-                            m.get("novedad"),
-                        )
+                        act_i = int(act)
+                        ant_i = int(ant)
+                        if nov == "CAMBIO_MEDIDOR":
+                            c = act_i
+                        elif act_i >= ant_i:
+                            c = act_i - ant_i
+                        else:
+                            c = 0
                     except Exception:
-                        c_val = 0.0
-                    m["consumo"] = c_val
-                    m["consumo_m3"] = c_val
-                    consumo_total += c_val
-            doc_local["consumo_total_m3"] = round(consumo_total, 2)
+                        c = 0
+                    m["consumo_m3"] = c
+                    consumo_total += c
+            doc_local["consumo_total_m3"] = consumo_total
 
     return actualizados, conflictos_admin
 
@@ -1888,7 +1860,7 @@ class ServicioDatosPadron(ServicioDatos):
         callback_progreso: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Acción B: Extraer lecturas de los lectores (Nube -> Excel).
+        Acción B: ExExtraer lecturas de los lectores (Nube -> Excel).
         Descarga por la API REST de Firestore (servicios/firestore_rest.py), NO por gRPC.
         La versión anterior usaba `col.select([...]).stream()`, que en Windows podía
         colgarse dentro de gRPC, congelar la ventana ("No responde") y cerrar el
@@ -1973,62 +1945,17 @@ class ServicioDatosPadron(ServicioDatos):
         # 2b. Conciliar deudas arrastradas del mes previo (si clientes pagaron durante días de lectura)
         self.sincronizar_deudas_desde_mes_previo(p)
 
-        # 2c. Emitir recibos y facturar el mes ÚNICAMENTE si TODAS las lecturas están completas
-        duracion = time.perf_counter() - t_inicio
-        if _todas_lecturas_actuales_completas(self.mes):
-            if callback_progreso:
-                callback_progreso(
-                    85, "Todas las lecturas completas. Emitiendo recibos del mes...")
-            self.generar_recibos_mes(p)
-            msg_final = f"¡{actualizados} lectura(s) descargadas y recibos emitidos en {duracion:.2f} s!"
-        else:
-            if callback_progreso:
-                callback_progreso(
-                    85, f"Lecturas parciales ({actualizados} leídas). Manteniendo mes ABIERTO...")
-            if "mes_actual" in self.config and (p == self.periodo or not p):
-                self.config["mes_actual"]["estado"] = "ABIERTO"
-
-            # Recalcular consumo y facturación preliminar solo para usuarios con todas sus lecturas tomadas
-            for uid, doc_u in self.mes.items():
-                meds = doc_u.get("medidores") or []
-                if meds and all(m.get("lectura_actual") is not None and str(m.get("estado_lectura") or "").upper() == "LEIDO" for m in meds):
-                    cat_obj = self._categoria_de(doc_u)
-                    deuda_manual = float(doc_u.get("deuda_anterior") or 0.0)
-                    calc = calculos.calcular_recibo(
-                        medidores=meds,
-                        categoria=cat_obj,
-                        igv_activo=False,
-                        igv_porcentaje=0.18,
-                        recibo_anterior=None,
-                        deuda_anterior_manual=deuda_manual,
-                    )
-                    subtotal_mes = round(
-                        calc["monto_agua"] + calc["monto_desague"] +
-                        calc["cargo_fijo"] + calc["igv"], 2
-                    )
-                    doc_u.update({
-                        "consumo_total_m3": calc["consumo_total_m3"],
-                        "monto_agua": calc["monto_agua"],
-                        "monto_desague": calc["monto_desague"],
-                        "cargo_fijo": calc["cargo_fijo"],
-                        "deuda_actual": subtotal_mes,
-                        "igv": calc["igv"],
-                        "redondeo": calc["redondeo"],
-                        "total_a_pagar": calc["total_a_pagar"],
-                    })
-                else:
-                    if not doc_u.get("nro_recibo") or self.config.get("mes_actual", {}).get("estado") == "ABIERTO":
-                        doc_u["nro_recibo"] = None
-                    doc_u["deuda_actual"] = 0.0
-                    doc_u["total_a_pagar"] = float(doc_u.get("deuda_anterior") or 0.0)
-
-            msg_final = f"¡{actualizados} lectura(s) descargadas en {duracion:.2f} s! El mes continúa ABIERTO."
+        # 2c. Emitir recibos y facturar el mes automáticamente
+        if callback_progreso:
+            callback_progreso(
+                85, "Emitiendo recibos del mes y calculando facturación...")
+        self.generar_recibos_mes(p)
 
         # 3. Guardar en Excel local
         if callback_progreso:
             callback_progreso(
                 95,
-                f"Descarga completada ({docs_recibidos} documentos). Guardando el Excel local...",
+                f"Descarga y facturación completa ({docs_recibidos} documentos). Guardando el Excel local...",
             )
         ahora_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.config["ultima_descarga_lectores"] = ahora_str
@@ -2040,7 +1967,8 @@ class ServicioDatosPadron(ServicioDatos):
 
         duracion = time.perf_counter() - t_inicio
         if callback_progreso:
-            callback_progreso(100, msg_final)
+            callback_progreso(
+                100, f"¡{actualizados} lectura(s) descargadas y recibos emitidos en {duracion:.2f} s!")
 
         return {
             "periodo": p,
@@ -3037,12 +2965,7 @@ class ServicioDatosPadron(ServicioDatos):
                         doc["total_a_pagar"] = total_pagar_esperado
                         doc_modificado = True
 
-                    estado_per = (
-                        self.config.get("mes_actual", {}).get("estado")
-                        if per == self.periodo
-                        else getattr(self, "config_por_periodo", {}).get(per, {}).get("mes_actual", {}).get("estado", "FACTURADO")
-                    )
-                    if not doc.get("nro_recibo") and estado_per in ("FACTURADO", "CERRADO") and doc.get("estado_lectura") != "PENDIENTE":
+                    if not doc.get("nro_recibo") and doc.get("estado_lectura") != "PENDIENTE":
                         ultimo_recibo_num = int(self.config.get("ultimo_recibo") or 0) + 1
                         doc["nro_recibo"] = f"{ultimo_recibo_num:09d}"
                         self.config["ultimo_recibo"] = ultimo_recibo_num

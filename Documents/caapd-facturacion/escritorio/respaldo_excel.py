@@ -290,9 +290,9 @@ def generar_respaldo_excel(
                 ws_sec.cell(row=fila_act, column=inicio_gris + 2,
                             value=m.get("consumo_anterior")).border = borde_fino
                 ws_sec.cell(row=fila_act, column=inicio_gris + 3,
-                            value=str(m.get("estado_lectura") or ("LEIDO" if l_act is not None else "PENDIENTE"))).border = borde_fino
+                            value=str(m.get("estado_lectura") or "LEIDO")).border = borde_fino
                 ws_sec.cell(row=fila_act, column=inicio_gris + 4,
-                            value=str(m.get("registrado_por") or ("LECTOR" if l_act is not None else ""))).border = borde_fino
+                            value=str(m.get("registrado_por") or "ADMIN")).border = borde_fino
 
                 # Montos e historial técnico solo en la primera fila
                 if m_idx == 0:
@@ -630,8 +630,6 @@ def leer_respaldo_excel(ruta_archivo: Path | str) -> Dict[str, Any]:
             else:
                 cons_val = 0
 
-            val_est = ws_sec.cell(row=r, column=col_map.get("estado_lectura", inicio_gris + 3)).value
-            est_default = "LEIDO" if l_act_val is not None else "PENDIENTE"
             med_obj = {
                 "nro_medidor": n_med_str,
                 "lectura_anterior": l_ant_val,
@@ -642,8 +640,8 @@ def leer_respaldo_excel(ruta_archivo: Path | str) -> Dict[str, Any]:
                 "nota": str(nota).strip() if nota else "",
                 "fecha_anterior": str(ws_sec.cell(row=r, column=col_map.get("fecha_anterior", inicio_gris + 1)).value or "").strip() or None,
                 "consumo_anterior": ws_sec.cell(row=r, column=col_map.get("consumo_anterior", inicio_gris + 2)).value,
-                "estado_lectura": str(val_est).strip() if val_est else est_default,
-                "registrado_por": str(ws_sec.cell(row=r, column=col_map.get("registrado_por", inicio_gris + 4)).value or ("LECTOR" if l_act_val is not None else "")).strip(),
+                "estado_lectura": str(ws_sec.cell(row=r, column=col_map.get("estado_lectura", inicio_gris + 3)).value or "LEIDO").strip(),
+                "registrado_por": str(ws_sec.cell(row=r, column=col_map.get("registrado_por", inicio_gris + 4)).value or "ADMIN").strip(),
             }
 
             if uid not in mes_docs:
