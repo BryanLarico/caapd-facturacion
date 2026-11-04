@@ -7,6 +7,12 @@ import pytest
 from servicios import actualizador as a
 
 
+@pytest.fixture(autouse=True)
+def cache_vacia(monkeypatch):
+    monkeypatch.setattr(a, "_cache_versiones", None)
+    monkeypatch.setattr(a, "_cache_hasta", 0.0)
+
+
 def release(version, **extras):
     return dict(tag_name=version, assets=[dict(name="CAAPD.zip",
                 browser_download_url="https://example.test/app.zip", size=123)],
@@ -48,7 +54,9 @@ def test_vacio_y_fallo_latest(monkeypatch):
     assert a.versiones_anteriores() == []
     with pytest.raises(RuntimeError):
         a.version_para_reparar()
-    get = MagicMock(side_effect=[RuntimeError("sin red"), respuesta(release("v99.0.0"))])
+    monkeypatch.setattr(a, "_cache_versiones", None)
+    get = MagicMock(side_effect=[RuntimeError("sin red"), RuntimeError("sin Atom"),
+                                respuesta(release("v99.0.0"))])
     monkeypatch.setattr(a.requests, "get", get)
     assert a.buscar_actualizacion().version == "99.0.0"
     get.side_effect = RuntimeError("sin red")
@@ -96,3 +104,72 @@ def test_tamano_incorrecto(monkeypatch, tmp_path):
 def test_bundle_ausente(monkeypatch):
     monkeypatch.setattr(a, "CA_BUNDLE", "no-existe.pem")
     assert a._verificacion() is True
+
+
+ATOM = b"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><link href="https://github.com/owner/repo/releases/tag/v1.0.12"/>
+    <updated>2025-11-01T12:00:00Z</updated>
+    <content type="html">&lt;p&gt;Correcciones &amp;amp; mejoras&lt;/p&gt;</content></entry>
+  <entry><link href="https://github.com/owner/repo/releases/tag/v1.0.14"/>
+    <published>2025-11-03T12:00:00Z</published></entry>
+  <entry><link href="https://github.com/owner/repo/releases/tag/v2.0.0-beta"/></entry>
+</feed>"""
+
+
+@pytest.mark.parametrize("fallo", [a.requests.HTTPError("403"), a.requests.HTTPError("429"),
+                                 a.requests.ConnectionError("sin red"), ValueError("JSON")])
+def test_atom_fallback_y_cache(monkeypatch, fallo):
+    atom = respuesta(None)
+    atom.content = ATOM
+    get = MagicMock(side_effect=[fallo, atom])
+    monkeypatch.setattr(a.requests, "get", get)
+    infos = a.listar_versiones()
+    assert [i.version for i in infos] == ["1.0.14", "1.0.12"]
+    assert infos[1].fecha == "2025-11-01T12:00:00Z"
+    assert infos[1].notas == "Correcciones & mejoras"
+    assert infos[0].tamano == 0
+    assert infos[0].url_zip.endswith("/releases/download/v1.0.14/CAAPD-1.0.14.zip")
+    infos.clear()
+    assert len(a.listar_versiones()) == 2
+    assert get.call_count == 2
+    assert get.call_args.args[0] == a.URL_ATOM
+
+
+def test_cache_api_expira_y_cachea_lista_vacia(monkeypatch):
+    reloj = [100.0]
+    monkeypatch.setattr(a.time, "monotonic", lambda: reloj[0])
+    get = MagicMock(return_value=respuesta([]))
+    monkeypatch.setattr(a.requests, "get", get)
+    assert a.listar_versiones() == []
+    reloj[0] += 599
+    assert a.listar_versiones() == []
+    assert get.call_count == 1
+    reloj[0] += 2
+    assert a.listar_versiones() == []
+    assert get.call_count == 2
+
+
+@pytest.mark.parametrize("contenido,esperado", [(b"<feed/>", ValueError),
+    (b"no xml", a.ElementTree.ParseError),
+    (b'<feed xmlns="http://www.w3.org/2005/Atom"/>', None)])
+def test_atom_vacio_o_invalido(monkeypatch, contenido, esperado):
+    r = respuesta(None)
+    r.content = contenido
+    monkeypatch.setattr(a.requests, "get", MagicMock(side_effect=[RuntimeError("API"), r]))
+    if esperado:
+        with pytest.raises(esperado):
+            a.listar_versiones()
+        assert a._cache_versiones is None
+    else:
+        assert a.listar_versiones() == []
+
+
+def test_descarga_sin_tamano_valida_zip(monkeypatch, tmp_path):
+    monkeypatch.setattr(a.tempfile, "tempdir", str(tmp_path))
+    r = MagicMock()
+    r.__enter__.return_value = r
+    r.headers = {"Content-Length": "999999"}
+    r.iter_content.return_value = [zip_bytes()]
+    monkeypatch.setattr(a.requests, "get", lambda *args, **kw: r)
+    assert a.descargar_zip(a.InfoActualizacion("1", "url", "", "app.zip")).is_file()

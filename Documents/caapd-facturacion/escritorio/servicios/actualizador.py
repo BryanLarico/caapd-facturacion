@@ -3,15 +3,21 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Optional
+from urllib.parse import unquote, urlparse
+from xml.etree import ElementTree
 
 import certifi
 import requests
@@ -22,6 +28,11 @@ from version import REPO_ACTUALIZACIONES, VERSION
 CA_BUNDLE = certifi.where()
 URL_RELEASES = f"https://api.github.com/repos/{REPO_ACTUALIZACIONES}/releases"
 URL_LATEST = URL_RELEASES + "/latest"
+URL_ATOM = f"https://github.com/{REPO_ACTUALIZACIONES}/releases.atom"
+CACHE_SEGUNDOS = 600
+_cache_versiones = None
+_cache_hasta = 0.0
+_cache_lock = threading.Lock()
 TIMEOUT = 15
 HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "CAAPD-Facturacion"}
 
@@ -75,7 +86,7 @@ def _info(data) -> Optional[InfoActualizacion]:
     return None
 
 
-def listar_versiones() -> list[InfoActualizacion]:
+def _listar_api() -> list[InfoActualizacion]:
     versiones = []
     url = URL_RELEASES + "?per_page=100"
     while url:
@@ -83,9 +94,66 @@ def listar_versiones() -> list[InfoActualizacion]:
         r.raise_for_status()
         versiones.extend(info for data in r.json() if (info := _info(data)))
         url = r.links.get("next", {}).get("url")
-    versiones.sort(key=lambda info: _a_tupla(info.version), reverse=True)
-    _log(f"Releases publicados: {[i.version for i in versiones]}")
     return versiones
+
+
+class _TextoNotas(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.partes = []
+
+    def handle_data(self, data):
+        self.partes.append(data)
+
+
+def _listar_atom() -> list[InfoActualizacion]:
+    r = requests.get(URL_ATOM, headers={"User-Agent": HEADERS["User-Agent"]},
+                     timeout=TIMEOUT, verify=_verificacion())
+    r.raise_for_status()
+    raiz = ElementTree.fromstring(r.content)
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    if raiz.tag != "{http://www.w3.org/2005/Atom}feed":
+        raise ValueError("La respuesta no es un feed Atom de releases.")
+    versiones = []
+    for entrada in raiz.findall("a:entry", ns):
+        enlace = next((e.get("href", "") for e in entrada.findall("a:link", ns)
+                       if e.get("rel", "alternate") == "alternate"), "")
+        tag = unquote(urlparse(enlace).path.rsplit("/", 1)[-1])
+        if not re.fullmatch(r"v?\d+\.\d+\.\d+", tag):
+            continue
+        ver = tag.lstrip("v")
+        notas = _TextoNotas()
+        notas.feed(entrada.findtext("a:content", "", ns))
+        fecha = (entrada.findtext("a:published", "", ns)
+                 or entrada.findtext("a:updated", "", ns))
+        nombre = f"CAAPD-{ver}.zip"
+        versiones.append(InfoActualizacion(
+            ver, f"https://github.com/{REPO_ACTUALIZACIONES}/releases/download/v{ver}/{nombre}",
+            " ".join(notas.partes), nombre, fecha=fecha))
+    _log(f"Fallback Atom: {[i.version for i in versiones]}")
+    return versiones
+
+
+def listar_versiones() -> list[InfoActualizacion]:
+    global _cache_versiones, _cache_hasta
+    with _cache_lock:
+        if _cache_versiones is not None and time.monotonic() < _cache_hasta:
+            _log("Releases: usando caché en memoria.")
+            return list(_cache_versiones)
+        try:
+            versiones = _listar_api()
+        except Exception as e:
+            _log(f"ERROR API de releases: {e}; consultando Atom.")
+            try:
+                versiones = _listar_atom()
+            except Exception as error_atom:
+                _log(f"ERROR Atom de releases: {error_atom}")
+                raise
+        versiones.sort(key=lambda info: _a_tupla(info.version), reverse=True)
+        _cache_versiones = list(versiones)
+        _cache_hasta = time.monotonic() + CACHE_SEGUNDOS
+        _log(f"Releases publicados: {[i.version for i in versiones]}")
+        return versiones
 
 
 def versiones_anteriores() -> list[InfoActualizacion]:
@@ -152,8 +220,8 @@ def descargar_zip(info: InfoActualizacion,
                         leido += len(chunk)
                         if progreso and total:
                             progreso(min(100, leido * 100 // total))
-        if total and leido != total:
-            raise ValueError(f"Descarga incompleta: {leido} bytes; se esperaban {total}.")
+        if info.tamano and leido != info.tamano:
+            raise ValueError(f"Descarga incompleta: {leido} bytes; se esperaban {info.tamano}.")
         validar_zip(destino)
         _log(f"Descarga validada: {destino}, {leido} bytes")
         return destino

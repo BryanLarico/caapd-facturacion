@@ -35,7 +35,12 @@ def test_sin_versiones(dialogo):
     assert "No hay versiones anteriores" in dialogo.estado.text()
 
 
-def test_error_de_red(dialogo):
-    dialogo._error("Sin conexión")
-    assert "Sin conexión" in dialogo.estado.text()
+def test_error_de_red(dialogo, monkeypatch):
+    mensajes = []
+    monkeypatch.setattr("servicios.actualizador._log", mensajes.append)
+    dialogo._error("403 https://api.github.com/repos/privado")
+    assert "Revise su conexión" in dialogo.estado.text()
+    assert "403" not in dialogo.estado.text()
+    assert "https://" not in dialogo.estado.text()
+    assert "403 https://" in mensajes[0]
     assert not dialogo.instalar.isEnabled()

@@ -37,9 +37,12 @@ try {
     foreach ($r in @('CAAPD.exe', '_internal/ui/estilos/tema.qss')) {
         if (-not (Test-Path -LiteralPath (Join-Path $extraido $r) -PathType Leaf)) { throw "Falta $r en la actualización" }
     }
-    # No sobrescribir copias de recuperación de una ejecución anterior.
-    if ((Test-Path -LiteralPath $viejo) -or (Test-Path -LiteralPath $exeViejo)) {
-        throw 'Hay copias .old pendientes. Contacte a soporte antes de actualizar.'
+    foreach ($p in @($viejo, $exeViejo)) {
+        if (Test-Path -LiteralPath $p) {
+            Log "Eliminando copia anterior pendiente: $p"
+            Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop
+            Log "Copia anterior eliminada: $p"
+        }
     }
     Mover $interno $viejo
     $movioInterno = $true
