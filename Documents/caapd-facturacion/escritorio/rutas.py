@@ -39,7 +39,8 @@ def preparar_directorios() -> None:
 
 def ruta_fuentes(*partes: str) -> Path:
     """Devuelve la ruta dentro de ui/estilos/fuentes/."""
-    return DIR_BASE.joinpath("ui", "estilos", "fuentes", *partes)
+    recurso = DIR_RECURSOS.joinpath("ui", "estilos", "fuentes", *partes)
+    return recurso if recurso.exists() else DIR_BASE.joinpath("ui", "estilos", "fuentes", *partes)
 
 
 def ruta_datos(*partes: str) -> Path:

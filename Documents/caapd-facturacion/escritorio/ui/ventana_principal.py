@@ -30,6 +30,7 @@ from ui.hilos import Worker, esperar_hilos, mostrar_dialogo_error
 from PySide6.QtCore import QThread  # ya importas QThread; si no, agrégalo
 from servicios import actualizador
 from version import VERSION
+from ui.dialogo_versiones import DialogoVersiones
 from ui.paginas.cobros import PaginaCobros
 from ui.paginas.configuracion import PaginaConfiguracion
 from ui.paginas.inicio import PaginaInicio
@@ -107,6 +108,7 @@ class VentanaPrincipal(QMainWindow):
         # Buscar actualización 3 s después de abrir (sin bloquear la UI)
         self._info_actualizacion = None
         QTimer.singleShot(3000, self._buscar_actualizacion)
+        QTimer.singleShot(1000, self._comprobar_integridad)
 
     def _construir_ui(self) -> None:
         widget_central = QWidget()
@@ -231,6 +233,9 @@ class VentanaPrincipal(QMainWindow):
         layout.addWidget(lbl_copy)
         lbl_version = QLabel(f"v{VERSION}")
         lbl_version.setObjectName("pie_texto")
+        lbl_version.setCursor(Qt.CursorShape.PointingHandCursor)
+        lbl_version.setToolTip("Opciones de versión")
+        lbl_version.mouseReleaseEvent = lambda event: self._opciones_version()
         layout.addWidget(lbl_version)
 
         self.btn_actualizar = QPushButton("Descargar actualización")
@@ -567,6 +572,30 @@ class VentanaPrincipal(QMainWindow):
         if resp != QMessageBox.StandardButton.Yes:
             return
 
+        self._descargar_version(info)
+
+    def _comprobar_integridad(self):
+        if not actualizador.recursos_faltantes():
+            actualizador.limpiar_copias_anteriores()
+            return
+        aviso = QMessageBox(self)
+        aviso.setWindowTitle("Instalación incompleta")
+        aviso.setText("La instalación está incompleta. Faltan recursos del programa. "
+                      "Puede repararla sin modificar sus datos.")
+        reparar = aviso.addButton("Reparar ahora", QMessageBox.ButtonRole.AcceptRole)
+        aviso.addButton("Más tarde", QMessageBox.ButtonRole.RejectRole)
+        aviso.exec()
+        if aviso.clickedButton() == reparar:
+            self._opciones_version(reparar=True)
+
+    def _opciones_version(self, reparar=False):
+        dialogo = DialogoVersiones(self, reparar=reparar)
+        if dialogo.exec() and dialogo.info is not None:
+            self._descargar_version(dialogo.info)
+
+    def _descargar_version(self, info):
+        if getattr(self, "_hilo_descarga", None) and self._hilo_descarga.isRunning():
+            return
         self.btn_actualizar.setEnabled(False)
         self.mostrar_progreso(0, "Descargando actualización…")
         self._hilo_descarga = _HiloDescargar(info, self)
