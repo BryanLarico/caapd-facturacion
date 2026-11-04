@@ -257,8 +257,10 @@ def test_dialogo_usuario_valida_medidores_duplicados(qtbot, datos_usuarios_prueb
     dialogo._agregar_medidor()
 
     # Al intentar guardar debe bloquear la duplicidad
-    valido, err_msg = servicio.validar_medidores_unicos(
-        dialogo.medidores_lista)
+    assert "003386" not in dialogo.medidores_lista
+    assert not dialogo.btn_guardar.isEnabled()
+    assert not dialogo.lbl_error_medidor.isHidden()
+    valido, err_msg = servicio.validar_medidores_unicos(["003386"])
     assert not valido
     assert "ya está asignado" in err_msg
 
@@ -1023,5 +1025,4 @@ def test_dialogo_editar_usuario_cambio_medidor_cancelar(qtbot, datos_usuarios_pr
     # Debe revertir el campo_medidor al original 123456
     assert dialogo.campo_medidor.text() == "123456"
     assert dialogo.campo_lectura_anterior.text() == "100"
-
 

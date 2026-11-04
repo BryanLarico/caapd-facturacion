@@ -1386,6 +1386,7 @@ class ServicioDatosPadron(ServicioDatos):
                     "lectura_anterior": m.get("lectura_anterior"),
                     "lectura_actual": m.get("lectura_actual"),
                     "fecha_anterior": m.get("fecha_anterior"),
+                    "consumo_anterior": m.get("consumo_anterior"),
                     "fecha_lectura": m.get("fecha_lectura"),
                     "estado_lectura": m.get("estado_lectura", "PENDIENTE"),
                     "novedad": m.get("novedad", "NORMAL"),
@@ -2044,6 +2045,8 @@ class ServicioDatosPadron(ServicioDatos):
                     "nro_medidor": str(m.get("nro_medidor") or ""),
                     "lectura_anterior": m.get("lectura_anterior"),
                     "lectura_actual": m.get("lectura_actual"),
+                    "fecha_anterior": m.get("fecha_anterior"),
+                    "consumo_anterior": m.get("consumo_anterior"),
                     "fecha_lectura": m.get("fecha_lectura"),
                     "estado_lectura": m.get("estado_lectura") or "PENDIENTE",
                     "novedad": m.get("novedad"),
@@ -2107,7 +2110,10 @@ class ServicioDatosPadron(ServicioDatos):
                 continue
             if nro in previos:
                 # conserva lecturas existentes
-                resultado.append(dict(previos[nro]))
+                base = dict(previos[nro])
+                if isinstance(m, dict):
+                    base.update(m)
+                resultado.append(base)
             elif isinstance(m, dict):
                 base = {
                     "nro_medidor": nro, "lectura_anterior": 0, "fecha_anterior": None,
@@ -2147,12 +2153,19 @@ class ServicioDatosPadron(ServicioDatos):
         usuario_previo = self.usuarios.get(id_usuario)
         mes_previo = self.mes.get(id_usuario) if self.mes is not None else None
 
-        self.usuarios[id_usuario] = d
+        self.usuarios[id_usuario] = dict(d, medidores=[
+            m.get("nro_medidor", "") if isinstance(m, dict) else m
+            for m in d.get("medidores") or []
+        ])
         if doc_mes is not None:
             self.mes[id_usuario] = doc_mes
 
         # 1. Persistir en Excel. Si falla, REVERTIR memoria y relanzar.
         try:
+            if doc_mes is not None and doc_mes.get("medidores") and all(
+                m.get("lectura_actual") is not None for m in doc_mes["medidores"]
+            ):
+                self.generar_recibo_usuario(self.periodo, id_usuario, guardar=False)
             self.guardar_en_respaldo_local()
         except Exception:
             if usuario_previo is None:
@@ -2182,7 +2195,13 @@ class ServicioDatosPadron(ServicioDatos):
         mes_previo = copy.deepcopy(
             self.mes[id_usuario]) if id_usuario in self.mes else None
 
-        self.usuarios[id_usuario].update(cambios)
+        cambios_usuario = dict(cambios)
+        if "medidores" in cambios_usuario:
+            cambios_usuario["medidores"] = [
+                m.get("nro_medidor", "") if isinstance(m, dict) else m
+                for m in cambios_usuario["medidores"]
+            ]
+        self.usuarios[id_usuario].update(cambios_usuario)
         if id_usuario in self.mes:
             cambios_mes = dict(cambios)
             if "medidores" in cambios_mes:
@@ -2193,6 +2212,16 @@ class ServicioDatosPadron(ServicioDatos):
             self.mes[id_usuario].update(cambios_mes)
 
         try:
+            doc_mes = self.mes.get(id_usuario)
+            if "medidores" in cambios and doc_mes is not None:
+                meds = doc_mes.get("medidores") or []
+                doc_mes["consumo_total_m3"] = round(sum(
+                    calculos.consumo_medidor(m.get("lectura_anterior") or 0,
+                                            m["lectura_actual"], m.get("novedad"))
+                    for m in meds if m.get("lectura_actual") is not None
+                ), 2)
+                if meds and all(m.get("lectura_actual") is not None for m in meds):
+                    self.generar_recibo_usuario(self.periodo, id_usuario, guardar=False)
             self.guardar_en_respaldo_local()
         except Exception:
             self.usuarios[id_usuario] = usuario_previo

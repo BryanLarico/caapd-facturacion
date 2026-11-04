@@ -693,7 +693,10 @@ class ServicioDatosMemoria(ServicioDatos):
     ) -> None:
         d = dict(datos)
         d["_id"] = id_usuario
-        self.usuarios[id_usuario] = d
+        self.usuarios[id_usuario] = dict(d, medidores=[
+            m.get("nro_medidor", "") if isinstance(m, dict) else m
+            for m in d.get("medidores") or []
+        ])
         if agregar_al_mes and self.config.get("mes_actual", {}).get("estado") == "ABIERTO":
             periodo = self.config.get("mes_actual", {}).get("periodo", "2026-03")
             if id_usuario not in self.mes:
@@ -704,14 +707,24 @@ class ServicioDatosMemoria(ServicioDatos):
                     "direccion": d.get("direccion", ""),
                     "codigo_categoria": d.get("codigo_categoria", "A"),
                     "medidores": [
+                        dict(m) if isinstance(m, dict) else
                         {"nro_medidor": m, "lectura_anterior": 0, "lectura_actual": None}
                         for m in d.get("medidores", [])
                     ],
                 }
+                meds = self.mes[id_usuario]["medidores"]
+                if meds and all(m.get("lectura_actual") is not None for m in meds):
+                    self.generar_recibo_usuario(periodo, id_usuario)
 
     def actualizar_usuario(self, id_usuario: str, cambios: Dict[str, Any]) -> None:
         if id_usuario in self.usuarios:
-            self.usuarios[id_usuario].update(cambios)
+            cambios_usuario = dict(cambios)
+            if "medidores" in cambios_usuario:
+                cambios_usuario["medidores"] = [
+                    m.get("nro_medidor", "") if isinstance(m, dict) else m
+                    for m in cambios_usuario["medidores"]
+                ]
+            self.usuarios[id_usuario].update(cambios_usuario)
         if id_usuario in self.mes:
             cambios_mes = dict(cambios)
             if "medidores" in cambios_mes:
@@ -726,7 +739,12 @@ class ServicioDatosMemoria(ServicioDatos):
                     if not nro:
                         continue
                     if nro in previos:
-                        nuevos.append(previos[nro])
+                        base = dict(previos[nro])
+                        if isinstance(med, dict):
+                            base.update(med)
+                        nuevos.append(base)
+                    elif isinstance(med, dict):
+                        nuevos.append(dict(med))
                     else:
                         nuevos.append({
                             "nro_medidor": nro,
@@ -737,6 +755,10 @@ class ServicioDatosMemoria(ServicioDatos):
                         })
                 cambios_mes["medidores"] = nuevos
             self.mes[id_usuario].update(cambios_mes)
+            meds = self.mes[id_usuario].get("medidores") or []
+            if meds and all(m.get("lectura_actual") is not None for m in meds):
+                self.generar_recibo_usuario(
+                    self.config.get("mes_actual", {}).get("periodo", ""), id_usuario)
 
     def eliminar_usuario(self, id_usuario: str) -> Dict[str, Any]:
         existia = id_usuario in self.usuarios
