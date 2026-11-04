@@ -475,14 +475,6 @@ class DialogoUsuario(QDialog):
         return self.filas_medidores[0].campo_medidor
 
     @property
-    def campo_lectura_actual(self):
-        return self.filas_medidores[0].campo_lectura_actual
-
-    @property
-    def campo_lectura_anterior(self):
-        return self.filas_medidores[0].campo_lectura_anterior if self.es_edicion else None
-
-    @property
     def medidores_lista(self):
         return [codigos.normalizar_medidor(f.campo_medidor.text())
                 for f in self.filas_medidores if f.campo_medidor.text().strip()]
@@ -490,10 +482,6 @@ class DialogoUsuario(QDialog):
     @property
     def medidor_original(self):
         return self.filas_medidores[0].original.get("nro_medidor", "")
-
-    @property
-    def lec_anterior_val(self):
-        return int(self.filas_medidores[0].campo_lectura_anterior.text() or 0)
 
     def _ajustar_tamano_a_pantalla(self) -> None:
         """
@@ -768,11 +756,7 @@ class DialogoUsuario(QDialog):
         self.lbl_error_medidor = self._crear_mensaje_campo()
         self.msg_medidores = self.lbl_error_medidor
         col_med.addWidget(self.msg_medidores)
-        self.lbl_error_lectura = self._crear_mensaje_campo()
-        self.msg_lectura = self.lbl_error_lectura
-        col_med.addWidget(self.msg_lectura)
         layout_form.addLayout(col_med)
-        self._crear_fila_medidor()
 
         layout_form.addStretch(1)
 
@@ -843,7 +827,7 @@ class DialogoUsuario(QDialog):
             campo.editingFinished.connect(
                 lambda c=clave: self._marcar_tocado(c))
 
-        # Conectar validaciones en vivo para DNI, conexión, medidor y lectura
+        # Conectar validaciones en vivo para DNI, conexión y medidor
         self.campo_id.textChanged.connect(self._validar_dni_en_vivo)
         self.campo_conexion.textChanged.connect(self._validar_conexion_en_vivo)
 
@@ -870,7 +854,6 @@ class DialogoUsuario(QDialog):
                     self.combo_categoria.setCurrentIndex(i)
                     break
 
-            self._quitar_medidor(self.filas_medidores[0])
             doc_mes = getattr(self.servicio, "mes", {}).get(self.id_original, {})
             por_numero = {
                 str(m["nro_medidor"]): m for m in doc_mes.get("medidores", [])
@@ -882,6 +865,7 @@ class DialogoUsuario(QDialog):
             if not self.filas_medidores:
                 self._crear_fila_medidor()
         else:
+            self._crear_fila_medidor()
             self.campo_conexion.setText(self.servicio.obtener_siguiente_conexion_libre())
 
         # Estado inicial del boton Guardar (sin marcar nada en rojo todavia)
@@ -973,10 +957,6 @@ class DialogoUsuario(QDialog):
     def _validar_medidor_en_vivo(self, texto: str = "") -> None:
         self._validar_formulario(mostrar_todo=True)
 
-    def _validar_lectura_en_vivo(self, texto: str = "") -> None:
-        self._tocados.add("lectura")
-        self._validar_formulario(mostrar_todo=True)
-
     def _al_terminar_editar_medidor(self) -> None:
         self.filas_medidores[0].confirmar_cambio()
 
@@ -1019,20 +999,21 @@ class DialogoUsuario(QDialog):
     def _quitar_medidor(self, fila) -> None:
         self.filas_medidores.remove(fila)
         self.layout_medidores.removeWidget(fila)
+        fila.hide()
+        fila.setParent(None)
         fila.deleteLater()
         self._validar_formulario()
 
     # -------------------------------------------------------------------
     # Validacion en vivo y feedback visual
     # -------------------------------------------------------------------
-    CAMPOS_OBLIGATORIOS = ("dni", "nombre", "direccion", "medidores", "lectura")
+    CAMPOS_OBLIGATORIOS = ("dni", "nombre", "direccion", "medidores")
     NOMBRES_CAMPO = {
         "dni": "DNI",
         "conexion": "N° de conexión",
         "nombre": "apellidos y nombres",
         "direccion": "dirección",
         "medidores": "número de medidor",
-        "lectura": "lectura actual",
     }
 
     def _crear_mensaje_campo(self) -> QLabel:
@@ -1170,15 +1151,6 @@ class DialogoUsuario(QDialog):
                 if numero in numeros:
                     errores["medidores"] = ("El medidor ya está en la lista.", "error")
                 numeros.append(numero)
-            lectura = fila.campo_lectura_actual.text().strip()
-            anterior = int(fila.campo_lectura_anterior.text() or 0)
-            if not lectura and fila.original.get("lectura_actual") is None and not fila.nuevo:
-                continue
-            if not lectura.isdigit():
-                errores["lectura"] = ("La lectura actual solo admite números enteros.", "error")
-            elif int(lectura) < anterior:
-                errores["lectura"] = (
-                    f"La lectura actual ({lectura}) no puede ser menor a la lectura anterior ({anterior}).", "error")
         valido, error = self.servicio.validar_medidores_unicos(
             numeros, id_usuario_actual=self.id_original or None)
         if not valido:
@@ -1217,8 +1189,6 @@ class DialogoUsuario(QDialog):
             "direccion": (self.campo_direccion, self.msg_direccion),
             "medidores": (self.campo_nuevo_medidor, self.msg_medidores),
         }
-        if self.filas_medidores and getattr(self, "msg_lectura", None):
-            mapa["lectura"] = (self.campo_lectura_actual, self.msg_lectura)
 
         for clave, (campo, lbl) in mapa.items():
             msg, nivel = errores.get(clave, (None, "error"))
@@ -1233,7 +1203,7 @@ class DialogoUsuario(QDialog):
 
         if hay_bloqueo:
             faltan = [self.NOMBRES_CAMPO[c]
-                      for c in ("dni", "nombre", "direccion", "medidores", "conexion", "lectura") if c in errores]
+                      for c in ("dni", "nombre", "direccion", "medidores", "conexion") if c in errores]
             self.lbl_resumen.setText(
                 "Para guardar falta: " + ", ".join(faltan) + ".")
             self.lbl_resumen.setProperty(
@@ -1256,8 +1226,6 @@ class DialogoUsuario(QDialog):
             ("direccion", self.campo_direccion),
             ("medidores", self.campo_nuevo_medidor),
         ]
-        if self.filas_medidores:
-            orden.append(("lectura", self.campo_lectura_actual))
         for clave, campo in orden:
             if clave in errores and campo is not None:
                 campo.setFocus()

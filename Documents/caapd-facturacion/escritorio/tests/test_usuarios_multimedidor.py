@@ -39,7 +39,8 @@ def test_editar_preserva_dos_medidores_y_metadatos(qtbot, servicio):
     antes = copy.deepcopy(servicio.mes["12345678"]["medidores"])
     dlg = editar(qtbot, servicio)
     assert len(dlg.filas_medidores) == 2
-    assert all(f.campo_lectura_anterior.isReadOnly() for f in dlg.filas_medidores)
+    assert dlg.layout_medidores.count() == 2
+    assert all(not hasattr(f, "campo_lectura_actual") for f in dlg.filas_medidores)
     dlg._guardar()
     assert servicio.usuarios["12345678"]["medidores"] == ["111111", "222222"]
     assert servicio.mes["12345678"]["medidores"] == antes
@@ -57,7 +58,8 @@ def test_agregar_enter_boton_limite_y_quitar(qtbot, servicio):
             qtbot.mouseClick(dlg.btn_agregar_medidor, Qt.MouseButton.LeftButton)
     assert len(dlg.filas_medidores) == 5
     assert dlg.result() == 0
-    assert dlg.filas_medidores[-1].campo_lectura_actual.text() == "0"
+    assert dlg.filas_medidores[-1].campo_medidor.text() == "555555"
+    assert dlg.filas_medidores[-1].nuevo
     dlg.campo_nuevo_medidor.setText("666666")
     dlg._agregar_medidor()
     assert len(dlg.filas_medidores) == 5
@@ -76,63 +78,42 @@ def test_agregar_invalido_no_modifica_lista(qtbot, servicio, valor):
     assert not dlg.msg_medidores.isHidden()
 
 
-def test_validacion_independiente_y_lista_vacia(qtbot, servicio):
+
+def test_validacion_duplicados_y_lista_vacia(qtbot, servicio):
     dlg = editar(qtbot, servicio)
     segunda = dlg.filas_medidores[1]
-    segunda.campo_lectura_actual.setText("199")
-    assert "lectura" in dlg._calcular_errores()
-    assert not dlg.btn_guardar.isEnabled()
-    segunda.campo_lectura_actual.setText("230")
     segunda.campo_medidor.setText("111111")
     assert "medidores" in dlg._calcular_errores()
+    assert not dlg.btn_guardar.isEnabled()
     segunda.campo_medidor.setText("222222")
-    segunda.campo_lectura_actual.setText("abc")
-    assert "lectura" in dlg._calcular_errores()
+    assert "medidores" not in dlg._calcular_errores()
+    assert dlg.btn_guardar.isEnabled()
     for fila in list(dlg.filas_medidores):
         dlg._quitar_medidor(fila)
+    assert dlg.layout_medidores.count() == 0
     assert "medidores" in dlg._calcular_errores()
     assert not dlg.btn_guardar.isEnabled()
 
 
-@pytest.mark.parametrize("motivo", ["CORRECCION", "REINSTALACION", None])
-def test_cambio_solo_afecta_fila_elegida(qtbot, servicio, monkeypatch, motivo):
-    antes = copy.deepcopy(servicio.mes["12345678"]["medidores"])
-    monkeypatch.setattr(DialogoMotivoCambioMedidor, "exec",
-                        lambda self: setattr(self, "motivo_elegido", motivo) or (1 if motivo else 0))
-    dlg = editar(qtbot, servicio)
-    segunda = dlg.filas_medidores[1]
-    segunda.campo_medidor.setText("333333")
-    assert segunda.confirmar_cambio() == bool(motivo)
-    dlg._guardar()
-    actuales = servicio.mes["12345678"]["medidores"]
-    assert actuales[0] == antes[0]
-    if motivo == "CORRECCION":
-        assert actuales[1] == dict(antes[1], nro_medidor="333333")
-    elif motivo == "REINSTALACION":
-        assert actuales[1]["nro_medidor"] == "333333"
-        assert actuales[1]["lectura_anterior"] == actuales[1]["lectura_actual"] == 0
-        assert actuales[1]["novedad"] == "CAMBIO_MEDIDOR"
-        assert actuales[1]["fecha_anterior"] is None
-    else:
-        assert actuales == antes
 
-
-def test_nuevo_tres_lecturas_y_cobro_unico(qtbot):
+def test_nuevo_tres_medidores_quedan_pendientes(qtbot):
     servicio = ServicioDatosMemoria()
+    servicio.config["mes_actual"] = {"periodo": "2026-09", "estado": "ABIERTO"}
     dlg = DialogoUsuario(servicio, servicio.config)
     qtbot.addWidget(dlg)
     dlg.campo_id.setText("87654321")
     dlg.campo_nombre.setText("RAMOS PEREZ, JOSE")
     dlg.campo_direccion.setText("CALLE DOS")
-    for numero in ("111111", "222222", "333333"):
+    dlg.campo_medidor.setText("111111")
+    for numero in ("222222", "333333"):
         dlg.campo_nuevo_medidor.setText(numero)
         dlg._agregar_medidor()
-    for i, fila in enumerate(dlg.filas_medidores, 1):
-        fila.campo_lectura_actual.setText(str(i * 10))
     dlg._guardar()
     doc = servicio.mes["87654321"]
-    assert len(doc["medidores"]) == 3
-    assert doc["consumo_total_m3"] == 60
+    assert [m["nro_medidor"] for m in doc["medidores"]] == ["111111", "222222", "333333"]
+    assert all(m["lectura_actual"] is None and m["estado_lectura"] == "PENDIENTE"
+               for m in doc["medidores"])
+    assert servicio.usuarios["87654321"]["medidores"] == ["111111", "222222", "333333"]
 
 
 def test_excel_y_payload_firebase_preservan_lista(tmp_path, servicio):
