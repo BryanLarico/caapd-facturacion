@@ -461,6 +461,8 @@ def generar_recibo_pdf(
     queda centrado en el area util (11.7 x 21 cm). Ver GEOMETRIA DE IMPRESION.
     (Las claves esperadas en `datos` no cambian respecto a la version anterior.)
     """
+    if len(datos.get("medidores") or []) > 5:
+        raise ValueError("El recibo admite hasta 5 medidores por conexión; no se omitirán medidores.")
     salida_path = Path(ruta_salida)
     salida_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -581,16 +583,15 @@ def generar_recibo_pdf(
             "consumo": float(datos.get("consumo_total_m3") or 0.0),
         }]
 
-    # Hasta 4 medidores. La tabla se compacta sola segun la cantidad de filas
-    # para no invadir "DESCRIPCION DE CONCEPTOS" (que sigue fija en 11.9 cm).
-    medidores = medidores[:4]
     n_med_filas = len(medidores)
     if n_med_filas <= 2:
         y_cabecera, paso_fila, fuente_fila = 13.3 * cm, 0.35 * cm, 8
-    elif n_med_filas == 3:
-        y_cabecera, paso_fila, fuente_fila = 13.6 * cm, 0.31 * cm, 7.5
     else:
-        y_cabecera, paso_fila, fuente_fila = 13.6 * cm, 0.26 * cm, 7
+        y_cabecera, paso_fila, fuente_fila = 13.6 * cm, 0.33 * cm, 8
+    y_ciclo = y_cabecera - 0.3 * cm - n_med_filas * paso_fila - 0.05 * cm
+    desplazamiento_conceptos = (
+        0 if n_med_filas == 1 else max(0, 11.9 * cm - (y_ciclo - 0.45 * cm))
+    )
 
     pdf.setFont("Helvetica-Bold", 8)
     pdf.drawString(0.8 * cm, y_cabecera, "Medidor")
@@ -602,8 +603,8 @@ def generar_recibo_pdf(
 
     y_medidor = y_cabecera - 0.3 * cm
     pdf.setFont("Helvetica", fuente_fila)
-    f_ant_global = "—"
-    f_act_global = "—"
+    fechas_anteriores = []
+    fechas_actuales = []
     for m in medidores:
         n_med = str(m.get("medidor") or m.get("nro_medidor") or "—")
         l_ant = float(m.get("lectura_anterior") or 0.0)
@@ -612,8 +613,8 @@ def generar_recibo_pdf(
         f_act = (_fecha_lectura(m.get("fecha_actual"))
                  or _fecha_lectura(m.get("fecha_lectura")) or fin_periodo)
         c_m3 = float(m.get("consumo") or (l_act - l_ant))
-        f_ant_global = f_ant if f_ant != "—" else f_ant_global
-        f_act_global = f_act if f_act != "—" else f_act_global
+        fechas_anteriores.append(datetime.strptime(f_ant, "%d/%m/%Y"))
+        fechas_actuales.append(datetime.strptime(f_act, "%d/%m/%Y"))
 
         pdf.drawString(0.8 * cm, y_medidor, n_med)
         pdf.drawString(2.8 * cm, y_medidor, f"{l_ant:.2f}")
@@ -624,15 +625,17 @@ def generar_recibo_pdf(
         y_medidor -= paso_fila
 
     # "Periodo / Ciclo" se ubica justo debajo de la ultima fila de medidor
+    f_ant_global = min(fechas_anteriores).strftime("%d/%m/%Y")
+    f_act_global = max(fechas_actuales).strftime("%d/%m/%Y")
     pdf.setFont("Helvetica", 8)
     pdf.drawString(0.5 * cm, y_medidor - 0.05 * cm,
                    f"Periodo / Ciclo del {f_ant_global} al {f_act_global}")
 
     # 9. Conceptos de Cobro
     pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(0.6 * cm, 11.9 * cm, "DESCRIPCIÓN DE CONCEPTOS")
-    pdf.drawString(8.6 * cm, 11.9 * cm, "INAFECTOS")
-    pdf.drawRightString(X_DERECHA, 11.9 * cm, "AFECTOS")
+    pdf.drawString(0.6 * cm, (11.9 * cm - desplazamiento_conceptos), "DESCRIPCIÓN DE CONCEPTOS")
+    pdf.drawString(8.6 * cm, (11.9 * cm - desplazamiento_conceptos), "INAFECTOS")
+    pdf.drawRightString(X_DERECHA, (11.9 * cm - desplazamiento_conceptos), "AFECTOS")
 
     s_agua = float(datos.get("servicio_agua") or 0.0)
     s_desague = float(datos.get("servicio_desague") or 0.0)
@@ -640,15 +643,15 @@ def generar_recibo_pdf(
     deuda_ant = float(datos.get("deuda_anterior") or 0.0)
 
     pdf.setFont("Helvetica", 8)
-    pdf.drawString(0.6 * cm, 11.5 * cm, "001")
-    pdf.drawString(1.6 * cm, 11.5 * cm, "SERVICIO DE AGUA")
-    pdf.drawRightString(X_DERECHA, 11.5 * cm, f"{s_agua:.2f}")
-    pdf.drawString(0.6 * cm, 11.1 * cm, "008")
-    pdf.drawString(1.6 * cm, 11.1 * cm, "SERVICIO DE DESAGUE")
-    pdf.drawRightString(X_DERECHA, 11.1 * cm, f"{s_desague:.2f}")
-    pdf.drawString(0.6 * cm, 10.7 * cm, "407")
-    pdf.drawString(1.6 * cm, 10.7 * cm, "CARGO FIJO")
-    pdf.drawRightString(X_DERECHA, 10.7 * cm, f"{c_fijo:.2f}")
+    pdf.drawString(0.6 * cm, (11.5 * cm - desplazamiento_conceptos), "001")
+    pdf.drawString(1.6 * cm, (11.5 * cm - desplazamiento_conceptos), "SERVICIO DE AGUA")
+    pdf.drawRightString(X_DERECHA, (11.5 * cm - desplazamiento_conceptos), f"{s_agua:.2f}")
+    pdf.drawString(0.6 * cm, (11.1 * cm - desplazamiento_conceptos), "008")
+    pdf.drawString(1.6 * cm, (11.1 * cm - desplazamiento_conceptos), "SERVICIO DE DESAGUE")
+    pdf.drawRightString(X_DERECHA, (11.1 * cm - desplazamiento_conceptos), f"{s_desague:.2f}")
+    pdf.drawString(0.6 * cm, (10.7 * cm - desplazamiento_conceptos), "407")
+    pdf.drawString(1.6 * cm, (10.7 * cm - desplazamiento_conceptos), "CARGO FIJO")
+    pdf.drawRightString(X_DERECHA, (10.7 * cm - desplazamiento_conceptos), f"{c_fijo:.2f}")
 
     # Leyenda de la deuda: "(SIN DEUDA)" o "(desde MESAÑO)", ej. "(OCT2026)".
     # Si el documento trae `deuda_desde` ya calculado se respeta; si no,
@@ -660,8 +663,8 @@ def generar_recibo_pdf(
         if not desde:
             desde = periodo_desde_deuda(periodo_str, meses_adeudados)
         leyenda_deuda = f"({desde})" if desde else "(CON DEUDA)"
-    pdf.drawString(1.6 * cm, 10.3 * cm, f"DEUDA ANTERIOR {leyenda_deuda}")
-    pdf.drawString(8.6 * cm, 10.3 * cm, f"S/. {deuda_ant:.2f}")
+    pdf.drawString(1.6 * cm, (10.3 * cm - desplazamiento_conceptos), f"DEUDA ANTERIOR {leyenda_deuda}")
+    pdf.drawString(8.6 * cm, (10.3 * cm - desplazamiento_conceptos), f"S/. {deuda_ant:.2f}")
 
     # 10. Histograma de 6 meses (colores segun el fondo)
     dibujar_histograma(
