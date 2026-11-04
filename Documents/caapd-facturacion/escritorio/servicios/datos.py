@@ -7,6 +7,7 @@ Implementa importación perezosa (lazy) para que la ventana se abra al instante 
 """
 import datetime
 from typing import Any, Dict, List, Optional, Tuple
+import codigos
 from servicios.estadisticas import calcular_estadisticas_inicio
 
 
@@ -210,6 +211,11 @@ class ServicioDatos:
         raise NotImplementedError
 
     def obtener_siguiente_conexion_libre(self) -> str:
+        raise NotImplementedError
+
+    def validar_conexion_unica(
+        self, conexion: str, id_usuario_actual: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
         raise NotImplementedError
 
     def obtener_siguiente_id_sd(self) -> str:
@@ -419,6 +425,13 @@ class ServicioDatosFirebase(ServicioDatos):
 
     def obtener_siguiente_conexion_libre(self) -> str:
         return self._get_fb().obtener_siguiente_conexion_libre()
+
+    def validar_conexion_unica(
+        self, conexion: str, id_usuario_actual: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
+        return self._get_fb().validar_conexion_unica(
+            conexion, id_usuario_actual=id_usuario_actual
+        )
 
     def obtener_siguiente_id_sd(self) -> str:
         return self._get_fb().obtener_siguiente_id_sd()
@@ -699,6 +712,31 @@ class ServicioDatosMemoria(ServicioDatos):
     def actualizar_usuario(self, id_usuario: str, cambios: Dict[str, Any]) -> None:
         if id_usuario in self.usuarios:
             self.usuarios[id_usuario].update(cambios)
+        if id_usuario in self.mes:
+            cambios_mes = dict(cambios)
+            if "medidores" in cambios_mes:
+                previos = {
+                    str(m.get("nro_medidor")).strip(): m
+                    for m in self.mes[id_usuario].get("medidores", [])
+                    if isinstance(m, dict) and m.get("nro_medidor")
+                }
+                nuevos = []
+                for med in cambios_mes["medidores"]:
+                    nro = str(med if isinstance(med, str) else med.get("nro_medidor") or "").strip()
+                    if not nro:
+                        continue
+                    if nro in previos:
+                        nuevos.append(previos[nro])
+                    else:
+                        nuevos.append({
+                            "nro_medidor": nro,
+                            "lectura_anterior": 0,
+                            "lectura_actual": None,
+                            "estado_lectura": "PENDIENTE",
+                            "novedad": "NORMAL",
+                        })
+                cambios_mes["medidores"] = nuevos
+            self.mes[id_usuario].update(cambios_mes)
 
     def eliminar_usuario(self, id_usuario: str) -> Dict[str, Any]:
         existia = id_usuario in self.usuarios
@@ -739,6 +777,24 @@ class ServicioDatosMemoria(ServicioDatos):
             if con.isdigit():
                 max_num = max(max_num, int(con))
         return f"{max_num + 1:06d}"
+
+    def validar_conexion_unica(
+        self, conexion: str, id_usuario_actual: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
+        if not conexion or not str(conexion).strip():
+            return True, None
+        con_norm = codigos.normalizar_conexion(conexion)
+        for uid, u in self.usuarios.items():
+            if id_usuario_actual and uid == id_usuario_actual:
+                continue
+            u_con = codigos.normalizar_conexion(u.get("nro_conexion") or "")
+            if u_con and u_con == con_norm:
+                nombre = u.get("nombre", "Desconocido")
+                return (
+                    False,
+                    f"La conexión {con_norm} ya está asignada a '{nombre}' (ID: {uid}).",
+                )
+        return True, None
 
     def obtener_siguiente_id_sd(self) -> str:
         import re

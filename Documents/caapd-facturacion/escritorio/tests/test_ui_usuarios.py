@@ -20,6 +20,7 @@ from ui.paginas.usuarios_dialogos import (
     DialogoUsuario,
     DialogoConfirmacionDniDuplicado,
     DialogoConfirmacionMedidorDuplicado,
+    DialogoMotivoCambioMedidor,
     obtener_siguiente_dni_sugerido,
 )
 from ui.paginas.usuarios_modelo import ModeloUsuarios, ProxyUsuarios
@@ -453,8 +454,8 @@ def test_guardar_usuario_falla_red_mantiene_excel_y_avisa(qtbot, tmp_path, monke
     with patch("firebase_client.db", return_value=mock_db):
         dialogo._guardar()
 
-    # Excel local quedó guardado con éxito
-    servicio.guardar_en_respaldo_local.assert_called_once()
+    # Excel local quedó guardado con éxito (padrón y mes)
+    assert servicio.guardar_en_respaldo_local.call_count >= 1
     assert "71234567" in servicio.usuarios
 
     # Se alertó al usuario sobre la sincronización pendiente
@@ -573,7 +574,7 @@ def test_obtener_siguiente_dni_sugerido(datos_usuarios_prueba):
 
 
 def test_dialogo_usuario_acepta_dni_con_sufijo(qtbot, datos_usuarios_prueba):
-    """Una misma persona puede tener 2 conexiones: 30771072 y 30771072-1 (o -A)."""
+    """Una misma persona puede tener 2 conexiones: ingresar el DNI existente permite guardar directamente."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     config = {"sectores": ["CENTRO"], "categorias": {
         "A": {"nombre": "Doméstico"}}}
@@ -582,26 +583,27 @@ def test_dialogo_usuario_acepta_dni_con_sufijo(qtbot, datos_usuarios_prueba):
     qtbot.addWidget(dialogo)
     dialogo.campo_nombre.setText("QUISPE CONDORI, JUAN SEGUNDA CONEXION")
     dialogo.campo_direccion.setText("JR. LIMA 45")
-    dialogo.campo_nuevo_medidor.setText("55443322")
-    dialogo._agregar_medidor()
+    dialogo.campo_medidor.setText("55443322")
 
-    # DNI repetido: se bloquea y se sugiere el sufijo libre
+    # DNI repetido: NO se bloquea, anuncia la nueva conexión para el titular
     dialogo.campo_id.setText("30771072")
     dialogo._marcar_tocado("dni")
-    assert not dialogo.btn_guardar.isEnabled()
-    assert "30771072-1" in dialogo.msg_id.text()
-
-    # Con sufijo numerico o letra se acepta y se normaliza en mayusculas
-    dialogo.campo_id.setText("30771072-1")
     assert dialogo.btn_guardar.isEnabled()
+    assert "El DNI corresponde a" in dialogo.lbl_error_dni.text()
+
+    # Con sufijo numérico o letra también se acepta
+    assert dialogo._normalizar_id_ingresado("30771072-1") == "30771072-1"
     assert dialogo._normalizar_id_ingresado("30771072-a") == "30771072-A"
     assert dialogo._normalizar_id_ingresado("7646978") == "07646978"
     assert dialogo._normalizar_id_ingresado("30771072-") is None
     assert dialogo._normalizar_id_ingresado("3077") is None
 
+    # Al guardar con DNI base existente, genera la nueva conexión correlativa
+    dialogo.campo_id.setText("30771072")
     dialogo._guardar()
     assert "30771072-1" in servicio.usuarios
     assert "55443322" in servicio.usuarios["30771072-1"]["medidores"]
+    assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
 
 
 def test_dialogo_usuario_validacion_en_vivo_dni_y_medidor(qtbot, datos_usuarios_prueba):
@@ -613,30 +615,23 @@ def test_dialogo_usuario_validacion_en_vivo_dni_y_medidor(qtbot, datos_usuarios_
     qtbot.addWidget(dialogo)
     dialogo.show()
 
-    # 1. DNI repetido en vivo
+    # 1. DNI repetido en vivo anuncia nueva conexión para titular
     dialogo.campo_id.setText("30771072")
     assert not dialogo.lbl_error_dni.isHidden()
-    assert "DNI registrado" in dialogo.lbl_error_dni.text()
+    assert "El DNI corresponde a" in dialogo.lbl_error_dni.text()
 
-    # DNI no repetido
+    # DNI no repetido oculta el aviso
     dialogo.campo_id.setText("99887766")
     assert dialogo.lbl_error_dni.isHidden()
 
     # 2. Medidor repetido en vivo (003386 ya pertenece a Maribel Alvarez)
-    dialogo.campo_nuevo_medidor.setText("3386")
+    dialogo.campo_medidor.setText("3386")
     assert not dialogo.lbl_error_medidor.isHidden()
-    assert "Medidor registrado" in dialogo.lbl_error_medidor.text()
+    assert "ya está asignado" in dialogo.lbl_error_medidor.text() or "ya pertenece" in dialogo.lbl_error_medidor.text()
 
-    # Medidor único
-    dialogo.campo_nuevo_medidor.setText("778899")
+    # Medidor único no genera error
+    dialogo.campo_medidor.setText("778899")
     assert dialogo.lbl_error_medidor.isHidden()
-
-    # Añadir medidor y verificar advertencia si se intenta agregar el mismo de nuevo
-    dialogo._agregar_medidor()
-    assert "778899" in dialogo.medidores_lista
-    dialogo.campo_nuevo_medidor.setText("778899")
-    assert not dialogo.lbl_error_medidor.isHidden()
-    assert "Medidor ya agregado" in dialogo.lbl_error_medidor.text()
 
 
 def test_dialogo_confirmacion_dni_duplicado_botones_y_acciones(qtbot, datos_usuarios_prueba):
@@ -664,18 +659,10 @@ def test_dialogo_confirmacion_dni_duplicado_botones_y_acciones(qtbot, datos_usua
     assert dlg.accion_elegida == DialogoConfirmacionDniDuplicado.ACCION_SUGERIDO
 
 
-def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monkeypatch):
+def test_dialogo_usuario_guardar_nueva_conexion_mismo_dni(qtbot, datos_usuarios_prueba):
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     config = {"sectores": ["CENTRO"], "categorias": {
         "A": {"nombre": "Doméstico"}}}
-
-    # Mockear el diálogo para simular que el usuario hace clic en "Guardar 30771072-1"
-    monkeypatch.setattr(
-        DialogoConfirmacionDniDuplicado,
-        "exec",
-        lambda self: setattr(
-            self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_SUGERIDO) or 1,
-    )
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
     qtbot.addWidget(dialogo)
@@ -683,8 +670,7 @@ def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monk
     dialogo.campo_id.setText("30771072")
     dialogo.campo_nombre.setText("QUISPE SEGUNDA CONEXION")
     dialogo.campo_direccion.setText("JR. LIMA 45")
-    dialogo.campo_nuevo_medidor.setText("55443322")
-    dialogo._agregar_medidor()
+    dialogo.campo_medidor.setText("55443322")
     dialogo._guardar()
 
     # Debe haberse guardado con el DNI sugerido con sufijo -1
@@ -694,29 +680,348 @@ def test_dialogo_usuario_guardar_con_sugerido(qtbot, datos_usuarios_prueba, monk
     assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
 
 
-def test_dialogo_usuario_guardar_cancelar_mantiene_edicion(qtbot, datos_usuarios_prueba, monkeypatch):
+def test_dialogo_usuario_conexion_y_medidor_duplicados_bloquean(qtbot, datos_usuarios_prueba):
+    """Verifica que una conexión repetida o un medidor repetido bloqueen el guardado."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
-    config = {"sectores": ["CENTRO"], "categorias": {
-        "A": {"nombre": "Doméstico"}}}
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
 
-    # Mockear el diálogo para simular que el usuario hace clic en "Cancelar" (volver a editar)
-    monkeypatch.setattr(
-        DialogoConfirmacionDniDuplicado,
-        "exec",
-        lambda self: setattr(
-            self, "accion_elegida", DialogoConfirmacionDniDuplicado.ACCION_CANCELAR) or 0,
-    )
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+
+    dialogo.campo_id.setText("44556677")
+    dialogo.campo_nombre.setText("TEST UNICIDAD")
+    dialogo.campo_direccion.setText("JR. PRUEBA 123")
+    dialogo.campo_medidor.setText("999999")  # medidor libre inicial
+
+    # Conexión 000796 ya pertenece a ALVAREZ MAMANI, MARIBEL
+    dialogo.campo_conexion.setText("000796")
+    dialogo._validar_conexion_en_vivo()
+    assert not dialogo.lbl_error_conexion.isHidden()
+    assert "ya está asignada" in dialogo.lbl_error_conexion.text()
+    assert not dialogo.btn_guardar.isEnabled()
+
+    # Si se corrige la conexión a una libre
+    dialogo.campo_conexion.setText("000888")
+    dialogo._validar_conexion_en_vivo()
+    assert dialogo.lbl_error_conexion.isHidden()
+    assert dialogo.btn_guardar.isEnabled()
+
+    # Medidor 003386 ya pertenece a ALVAREZ MAMANI, MARIBEL
+    dialogo.campo_medidor.setText("003386")
+    dialogo._validar_medidor_en_vivo()
+    assert not dialogo.lbl_error_medidor.isHidden()
+    assert "ya está asignado" in dialogo.lbl_error_medidor.text()
+    assert not dialogo.btn_guardar.isEnabled()
+
+
+def test_dialogo_usuario_autocompleta_nombre_con_dni_existente(qtbot, datos_usuarios_prueba):
+    """Al tipear un DNI registrado, autocompleta el nombre y muestra el aviso de nueva conexión."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    config = {"sectores": ["CENTRO"], "categorias": {"A": {"nombre": "Doméstico"}}}
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
     qtbot.addWidget(dialogo)
 
     dialogo.campo_id.setText("30771072")
-    dialogo.campo_nombre.setText("INTENTO FALLIDO")
-    dialogo.campo_direccion.setText("JR. LIMA 45")
-    dialogo.campo_nuevo_medidor.setText("55443322")
-    dialogo._agregar_medidor()
+    assert dialogo.campo_nombre.text() == "QUISPE CONDORI, JUAN"
+    assert "El DNI corresponde a <b>QUISPE CONDORI, JUAN</b>" in dialogo.lbl_error_dni.text()
+
+
+def test_dialogo_nuevo_usuario_lectura_actual_por_defecto_cero_y_editable(qtbot, datos_usuarios_prueba):
+    """En nuevo usuario, el campo Lectura Actual inicia en 0, es editable y se guarda."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    servicio.config["mes_actual"] = {"periodo": "2026-03", "estado": "ABIERTO"}
+    config = dict(servicio.config)
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
+    qtbot.addWidget(dialogo)
+
+    # Lectura Anterior no existe en modo nuevo
+    assert dialogo.campo_lectura_anterior is None
+    # Lectura Actual inicia con 0
+    assert dialogo.campo_lectura_actual is not None
+    assert dialogo.campo_lectura_actual.text() == "0"
+    assert not dialogo.campo_lectura_actual.isReadOnly()
+
+    # Usuario puede cambiarlo (ej. a 125)
+    dialogo.campo_lectura_actual.setText("125")
+    assert dialogo.campo_lectura_actual.text() == "125"
+
+    # Llenar datos requeridos y guardar
+    dialogo.campo_id.setText("78901234")
+    dialogo.campo_nombre.setText("LOPEZ PEREZ, CARMEN")
+    dialogo.campo_direccion.setText("AV LOS HEROES 100")
+    dialogo.campo_medidor.setText("99887766")
     dialogo._guardar()
 
-    # No debe haberse guardado nada nuevo
-    assert "30771072-1" not in servicio.usuarios
-    assert servicio.usuarios["30771072"]["nombre"] == "QUISPE CONDORI, JUAN"
+    # Verificar que el usuario y la lectura se guardaron correctamente
+    usr = servicio.obtener_usuario("78901234")
+    assert usr is not None
+    mes_doc = servicio.mes.get("78901234")
+    assert mes_doc is not None
+    med_mes = mes_doc["medidores"][0]
+    assert med_mes["nro_medidor"] == "99887766"
+    assert med_mes["lectura_actual"] == 125
+    assert med_mes["lectura_anterior"] == 0
+
+
+def test_dialogo_editar_usuario_lectura_anterior_bloqueada_y_actual_editable(qtbot, datos_usuarios_prueba):
+    """En editar usuario, Lectura Anterior está bloqueada y Lectura Actual es editable."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    usuario_existente = servicio.obtener_usuario("30771072")
+    usuario_existente["id_usuario"] = "30771072"
+    # Configurar mes con lectura anterior 50 y actual 75
+    servicio.mes["30771072"] = {
+        "nro_conexion": "000100",
+        "nombre": "QUISPE CONDORI, JUAN",
+        "sector": "BARRIO DE CHAUPI",
+        "direccion": "CALLE UNION S/N",
+        "codigo_categoria": "A",
+        "medidores": [
+            {
+                "nro_medidor": "123456",
+                "lectura_anterior": 50,
+                "lectura_actual": 75,
+                "estado_lectura": "LEIDO",
+            }
+        ],
+    }
+    config = dict(servicio.config)
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
+    qtbot.addWidget(dialogo)
+
+    # Lectura Anterior bloqueada
+    assert dialogo.campo_lectura_anterior is not None
+    assert dialogo.campo_lectura_anterior.text() == "50"
+    assert dialogo.campo_lectura_anterior.isReadOnly() is True
+
+    # Lectura Actual editable con valor actual
+    assert dialogo.campo_lectura_actual is not None
+    assert dialogo.campo_lectura_actual.text() == "75"
+    assert dialogo.campo_lectura_actual.isReadOnly() is False
+
+
+def test_dialogo_editar_usuario_bloquea_lectura_actual_menor_a_anterior(qtbot, datos_usuarios_prueba, monkeypatch):
+    """No permite guardar ni editar una lectura actual menor a la anterior; desactiva botón y alerta."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    usuario_existente = servicio.obtener_usuario("30771072")
+    usuario_existente["id_usuario"] = "30771072"
+    servicio.mes["30771072"] = {
+        "nro_conexion": "000100",
+        "nombre": "QUISPE CONDORI, JUAN",
+        "sector": "BARRIO DE CHAUPI",
+        "direccion": "CALLE UNION S/N",
+        "codigo_categoria": "A",
+        "medidores": [
+            {
+                "nro_medidor": "123456",
+                "lectura_anterior": 100,
+                "lectura_actual": 120,
+                "estado_lectura": "LEIDO",
+            }
+        ],
+    }
+    config = dict(servicio.config)
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
+    qtbot.addWidget(dialogo)
+
+    assert dialogo.btn_guardar.isEnabled()
+
+    # Usuario ingresa lectura actual 80 (menor a 100 anterior)
+    dialogo.campo_lectura_actual.setText("80")
+    dialogo._validar_lectura_en_vivo()
+    dialogo._validar_formulario()
+
+    # Debe mostrar error en rojo y deshabilitar botón Guardar
+    assert not dialogo.lbl_error_lectura.isHidden()
+    assert "no puede ser menor a la lectura anterior (100)" in dialogo.lbl_error_lectura.text()
+    assert not dialogo.btn_guardar.isEnabled()
+
+    # Si se intenta forzar _guardar(), no debe persistir y debe bloquear
+    dialogo._guardar()
+    # En el mes la lectura no debió cambiar a 80
+    assert servicio.mes["30771072"]["medidores"][0]["lectura_actual"] == 120
+
+    # Si el usuario corrige la lectura a un valor válido (ej. 130 >= 100)
+    dialogo.campo_lectura_actual.setText("130")
+    dialogo._validar_lectura_en_vivo()
+    dialogo._validar_formulario()
+
+    assert dialogo.lbl_error_lectura.isHidden()
+    assert dialogo.btn_guardar.isEnabled()
+
+    # Ahora sí debe permitir guardar
+    dialogo._guardar()
+    assert servicio.mes["30771072"]["medidores"][0]["lectura_actual"] == 130
+
+
+def test_dialogo_motivo_cambio_medidor_opciones_y_cancelar(qtbot):
+    """Verifica que el diálogo de motivo de cambio de medidor permita elegir opciones o cancelar."""
+    dlg = DialogoMotivoCambioMedidor(medidor_anterior="6659780", medidor_nuevo="7711223")
+    qtbot.addWidget(dlg)
+
+    # Por defecto está seleccionada la opción 1 (Corrección)
+    assert dlg.radio_op1.isChecked()
+    assert not dlg.radio_op2.isChecked()
+
+    # Si se selecciona opción 2 (Reinstalación) y continuar
+    dlg.radio_op2.setChecked(True)
+    dlg._on_continuar()
+    assert dlg.motivo_elegido == DialogoMotivoCambioMedidor.MOTIVO_REINSTALACION
+
+    # Si se pulsa Cancelar
+    dlg2 = DialogoMotivoCambioMedidor(medidor_anterior="6659780", medidor_nuevo="7711223")
+    qtbot.addWidget(dlg2)
+    dlg2.btn_cancelar.click()
+    assert dlg2.result() == DialogoMotivoCambioMedidor.DialogCode.Rejected
+
+
+def test_dialogo_editar_usuario_cambio_medidor_correccion(qtbot, datos_usuarios_prueba, monkeypatch):
+    """Al cambiar medidor por corrección, mantiene lectura anterior y actual intactas."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    usuario_existente = servicio.obtener_usuario("30771072")
+    usuario_existente["id_usuario"] = "30771072"
+    servicio.mes["30771072"] = {
+        "nro_conexion": "000100",
+        "nombre": "QUISPE CONDORI, JUAN",
+        "sector": "BARRIO DE CHAUPI",
+        "direccion": "CALLE UNION S/N",
+        "codigo_categoria": "A",
+        "medidores": [
+            {
+                "nro_medidor": "123456",
+                "lectura_anterior": 100,
+                "lectura_actual": 120,
+                "estado_lectura": "LEIDO",
+            }
+        ],
+    }
+    config = dict(servicio.config)
+
+    # Mock del diálogo de motivo para simular elegir "Corrección"
+    monkeypatch.setattr(
+        DialogoMotivoCambioMedidor,
+        "exec",
+        lambda self: setattr(self, "motivo_elegido", DialogoMotivoCambioMedidor.MOTIVO_CORRECCION) or 1,
+    )
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
+    qtbot.addWidget(dialogo)
+
+    assert dialogo.medidor_original == "123456"
+
+    # Cambiar medidor a 998877 libre
+    dialogo.campo_medidor.setText("998877")
+    dialogo._al_terminar_editar_medidor()
+
+    # Lectura anterior y actual deben mantenerse intactas
+    assert dialogo.lec_anterior_val == 100
+    assert dialogo.campo_lectura_anterior.text() == "100"
+    assert dialogo.campo_lectura_actual.text() == "120"
+
+    dialogo._guardar()
+
+    # En el padrón y en el mes el medidor se actualizó con lecturas intactas
+    assert servicio.usuarios["30771072"]["medidores"] == ["998877"]
+    med_mes = servicio.mes["30771072"]["medidores"][0]
+    assert med_mes["nro_medidor"] == "998877"
+    assert med_mes["lectura_anterior"] == 100
+    assert med_mes["lectura_actual"] == 120
+    assert med_mes.get("novedad") == "NORMAL"
+
+
+def test_dialogo_editar_usuario_cambio_medidor_reinstalacion(qtbot, datos_usuarios_prueba, monkeypatch):
+    """Al cambiar medidor por reinstalación, reinicia lectura anterior en 0 y actual en 0 con CAMBIO_MEDIDOR."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    usuario_existente = servicio.obtener_usuario("30771072")
+    usuario_existente["id_usuario"] = "30771072"
+    servicio.mes["30771072"] = {
+        "nro_conexion": "000100",
+        "nombre": "QUISPE CONDORI, JUAN",
+        "sector": "BARRIO DE CHAUPI",
+        "direccion": "CALLE UNION S/N",
+        "codigo_categoria": "A",
+        "medidores": [
+            {
+                "nro_medidor": "123456",
+                "lectura_anterior": 100,
+                "lectura_actual": 120,
+                "estado_lectura": "LEIDO",
+            }
+        ],
+    }
+    config = dict(servicio.config)
+
+    # Mock del diálogo de motivo para simular elegir "Reinstalación"
+    monkeypatch.setattr(
+        DialogoMotivoCambioMedidor,
+        "exec",
+        lambda self: setattr(self, "motivo_elegido", DialogoMotivoCambioMedidor.MOTIVO_REINSTALACION) or 1,
+    )
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
+    qtbot.addWidget(dialogo)
+
+    # Cambiar medidor a 998877 libre
+    dialogo.campo_medidor.setText("998877")
+    dialogo._al_terminar_editar_medidor()
+
+    # Lectura anterior y actual deben reiniciarse a 0
+    assert dialogo.lec_anterior_val == 0
+    assert dialogo.campo_lectura_anterior.text() == "0"
+    assert dialogo.campo_lectura_actual.text() == "0"
+    assert dialogo.btn_guardar.isEnabled()
+
+    dialogo._guardar()
+
+    # En el padrón y en el mes el medidor se actualizó con lecturas en 0 y novedad CAMBIO_MEDIDOR
+    assert servicio.usuarios["30771072"]["medidores"] == ["998877"]
+    med_mes = servicio.mes["30771072"]["medidores"][0]
+    assert med_mes["nro_medidor"] == "998877"
+    assert med_mes["lectura_anterior"] == 0
+    assert med_mes["lectura_actual"] == 0
+    assert med_mes.get("novedad") == "CAMBIO_MEDIDOR"
+
+
+def test_dialogo_editar_usuario_cambio_medidor_cancelar(qtbot, datos_usuarios_prueba, monkeypatch):
+    """Al pulsar Cancelar en la consulta de motivo, revierte el medidor al original."""
+    servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    usuario_existente = servicio.obtener_usuario("30771072")
+    usuario_existente["id_usuario"] = "30771072"
+    servicio.mes["30771072"] = {
+        "nro_conexion": "000100",
+        "nombre": "QUISPE CONDORI, JUAN",
+        "sector": "BARRIO DE CHAUPI",
+        "direccion": "CALLE UNION S/N",
+        "codigo_categoria": "A",
+        "medidores": [
+            {
+                "nro_medidor": "123456",
+                "lectura_anterior": 100,
+                "lectura_actual": 120,
+                "estado_lectura": "LEIDO",
+            }
+        ],
+    }
+    config = dict(servicio.config)
+
+    # Mock del diálogo de motivo simulando Cancelar (0)
+    monkeypatch.setattr(
+        DialogoMotivoCambioMedidor,
+        "exec",
+        lambda self: 0,
+    )
+
+    dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
+    qtbot.addWidget(dialogo)
+
+    dialogo.campo_medidor.setText("998877")
+    dialogo._al_terminar_editar_medidor()
+
+    # Debe revertir el campo_medidor al original 123456
+    assert dialogo.campo_medidor.text() == "123456"
+    assert dialogo.campo_lectura_anterior.text() == "100"
+
+

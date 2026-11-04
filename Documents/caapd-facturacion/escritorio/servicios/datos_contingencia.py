@@ -120,6 +120,11 @@ class ServicioDatosContingencia(ServicioDatos):
                     sd_max = max(sd_max, int(num))
         return f"SD-{sd_max + 1:03d}"
 
+    def validar_conexion_unica(
+        self, conexion: str, id_usuario_actual: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
+        return True, None
+
     def validar_medidores_unicos(
         self, medidores: List[str], id_usuario_actual: Optional[str] = None
     ) -> Tuple[bool, Optional[str]]:
@@ -152,6 +157,7 @@ class ServicioDatosContingencia(ServicioDatos):
         novedad: str = "NORMAL",
         nota: str = "",
         registrado_por: str = "ADMIN",
+        lectura_anterior: Optional[int] = None,
     ) -> Dict[str, Any]:
         doc = self.mes.get(id_usuario)
         if not doc:
@@ -159,6 +165,8 @@ class ServicioDatosContingencia(ServicioDatos):
 
         med_obj = next((m for m in doc.get("medidores", []) if m.get("nro_medidor") == nro_medidor), None)
         if med_obj:
+            if lectura_anterior is not None:
+                med_obj["lectura_anterior"] = int(lectura_anterior)
             med_obj["lectura_actual"] = int(lectura_actual)
             med_obj["fecha_lectura"] = datetime.date.today().isoformat()
             med_obj["estado_lectura"] = "LEIDO"
@@ -167,7 +175,7 @@ class ServicioDatosContingencia(ServicioDatos):
             med_obj["registrado_por"] = registrado_por
 
         # Encolar para sincronización posterior
-        encolar_cambio("lectura", {
+        datos_cola = {
             "periodo": periodo,
             "id_usuario": id_usuario,
             "nro_medidor": nro_medidor,
@@ -175,7 +183,10 @@ class ServicioDatosContingencia(ServicioDatos):
             "novedad": novedad,
             "nota": nota,
             "registrado_por": registrado_por,
-        })
+        }
+        if lectura_anterior is not None:
+            datos_cola["lectura_anterior"] = lectura_anterior
+        encolar_cambio("lectura", datos_cola)
         self.ops["escrituras"] += 1
         return {"id_usuario": id_usuario, "nro_medidor": nro_medidor}
 

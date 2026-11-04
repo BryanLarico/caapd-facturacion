@@ -2291,6 +2291,24 @@ class ServicioDatosPadron(ServicioDatos):
                 con_max = max(con_max, int(c))
         return f"{con_max + 1:06d}"
 
+    def validar_conexion_unica(
+        self, conexion: str, id_usuario_actual: Optional[str] = None
+    ) -> Tuple[bool, Optional[str]]:
+        if not conexion or not str(conexion).strip():
+            return True, None
+        con_norm = codigos.normalizar_conexion(conexion)
+        for uid, u in self.usuarios.items():
+            if id_usuario_actual and uid == id_usuario_actual:
+                continue
+            u_con = codigos.normalizar_conexion(u.get("nro_conexion") or "")
+            if u_con and u_con == con_norm:
+                nombre = u.get("nombre", "Desconocido")
+                return (
+                    False,
+                    f"La conexión {con_norm} ya está asignada a '{nombre}' (ID: {uid}).",
+                )
+        return True, None
+
     def obtener_siguiente_id_sd(self) -> str:
         sd_max = 0
         for uid in self.usuarios.keys():
@@ -2303,19 +2321,23 @@ class ServicioDatosPadron(ServicioDatos):
     def validar_medidores_unicos(
         self, medidores: List[str], id_usuario_actual: Optional[str] = None
     ) -> Tuple[bool, Optional[str]]:
-        meds_existentes: Dict[str, str] = {}
+        meds_existentes: Dict[str, Tuple[str, str, str]] = {}
         for uid, u in self.usuarios.items():
             if id_usuario_actual and uid == id_usuario_actual:
                 continue
+            nom = u.get("nombre") or uid
+            con = str(u.get("nro_conexion") or "")
             for m in u.get("medidores") or []:
                 num = str(m.get("nro_medidor") if isinstance(
                     m, dict) else m).strip()
                 if num:
-                    meds_existentes[num] = u.get("nombre") or uid
+                    meds_existentes[num] = (nom, uid, con)
         for med in medidores:
             m_str = str(med).strip()
             if m_str in meds_existentes:
-                return False, f"El medidor {m_str} ya pertenece a {meds_existentes[m_str]}."
+                nom, uid, con = meds_existentes[m_str]
+                detalle_con = f" (Conexión {con})" if con else ""
+                return False, f"El medidor {m_str} ya pertenece a '{nom}'{detalle_con}."
         return True, None
 
     # -----------------------------------------------------------------------
