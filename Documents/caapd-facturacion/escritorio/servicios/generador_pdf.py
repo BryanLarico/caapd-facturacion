@@ -33,8 +33,10 @@ Soporta:
 - Conversion a letras en espanol con calculos.numero_a_letras().
 """
 from __future__ import annotations
+import calendar
 import io
 import os
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -429,6 +431,25 @@ def generar_qr_imagen(texto: str) -> Image.Image:
     return qr.make_image(fill_color="black", back_color="transparent").convert("RGBA")
 
 
+def _fecha_lectura(valor: Any) -> Optional[str]:
+    if isinstance(valor, (date, datetime)):
+        return valor.strftime("%d/%m/%Y")
+    texto = str(valor or "").strip()
+    for formato in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(texto[:10], formato).strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return None
+
+
+def _fechas_periodo(periodo: str) -> Tuple[str, str]:
+    anio, mes = map(int, periodo.split("-"))
+    inicio = date(anio, mes, 1)
+    fin = date(anio, mes, calendar.monthrange(anio, mes)[1])
+    return inicio.strftime("%d/%m/%Y"), fin.strftime("%d/%m/%Y")
+
+
 def generar_recibo_pdf(
     datos: Dict[str, Any],
     ruta_salida: str | Path,
@@ -548,6 +569,7 @@ def generar_recibo_pdf(
     pdf.drawString(8.0 * cm, 14.3 * cm, f"Categoría: {categoria_str}")
 
     # 8. Tabla 1: Medidores y Lecturas
+    inicio_periodo, fin_periodo = _fechas_periodo(datos.get("periodo") or date.today().strftime("%Y-%m"))
     medidores = datos.get("medidores") or []
     if not medidores:
         medidores = [{
@@ -585,9 +607,10 @@ def generar_recibo_pdf(
     for m in medidores:
         n_med = str(m.get("medidor") or m.get("nro_medidor") or "—")
         l_ant = float(m.get("lectura_anterior") or 0.0)
-        f_ant = str(m.get("fecha_anterior") or "—")
+        f_ant = _fecha_lectura(m.get("fecha_anterior")) or inicio_periodo
         l_act = float(m.get("lectura_actual") or 0.0)
-        f_act = str(m.get("fecha_actual") or m.get("fecha_lectura") or "—")
+        f_act = (_fecha_lectura(m.get("fecha_actual"))
+                 or _fecha_lectura(m.get("fecha_lectura")) or fin_periodo)
         c_m3 = float(m.get("consumo") or (l_act - l_ant))
         f_ant_global = f_ant if f_ant != "—" else f_ant_global
         f_act_global = f_act if f_act != "—" else f_act_global
@@ -737,15 +760,17 @@ def preparar_datos_recibo_desde_doc(
     vencimiento_fmt = formatear_fecha(vencimiento)
 
     # Medidores del usuario
+    inicio_periodo, fin_periodo = _fechas_periodo(periodo)
     medidores_doc = doc.get("medidores") or []
     medidores_formateados = []
     for m in medidores_doc:
         n_med = m.get("nro_medidor") or "—"
         l_ant = float(m.get("lectura_anterior") or 0.0)
-        f_ant = formatear_fecha(m.get("fecha_anterior") or "—")
+        f_ant = _fecha_lectura(m.get("fecha_anterior")) or inicio_periodo
         l_act = float(m.get("lectura_actual") if m.get(
             "lectura_actual") is not None else l_ant)
-        f_act = formatear_fecha(m.get("fecha_lectura") or "—")
+        f_act = (_fecha_lectura(m.get("fecha_lectura"))
+                 or _fecha_lectura(m.get("fecha_actual")) or fin_periodo)
         c_m3 = max(0.0, l_act - l_ant)
         medidores_formateados.append({
             "medidor": n_med,

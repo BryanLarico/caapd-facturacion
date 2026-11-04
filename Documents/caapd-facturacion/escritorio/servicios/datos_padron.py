@@ -2676,10 +2676,22 @@ class ServicioDatosPadron(ServicioDatos):
         return serie
 
     def _doc_para_pdf(self, doc: Dict[str, Any], id_usuario: str, periodo: str) -> Dict[str, Any]:
-        """Copia del doc con historial_m3 completado desde los padrones previos si esta vacio."""
+        """Copia para PDF con historial y fechas anteriores de los padrones previos."""
         d = dict(doc)
         if not d.get("historial_m3"):
             d["historial_m3"] = self._historial_consumos(id_usuario, periodo)
+        anio, mes = map(int, periodo.split("-"))
+        previo = f"{anio - 1:04d}-12" if mes == 1 else f"{anio:04d}-{mes - 1:02d}"
+        doc_previo = (getattr(self, "meses_encontrados", {}).get(previo) or {}).get(id_usuario) or {}
+        medidores_previos = {
+            str(m.get("nro_medidor")): m
+            for m in doc_previo.get("medidores") or [] if m.get("nro_medidor")
+        }
+        d["medidores"] = [dict(m) for m in doc.get("medidores") or []]
+        for m in d["medidores"]:
+            if not m.get("fecha_anterior"):
+                anterior = medidores_previos.get(str(m.get("nro_medidor"))) or {}
+                m["fecha_anterior"] = anterior.get("fecha_lectura")
         return d
 
     def generar_pdf_recibo(self, periodo: str, id_usuario: str) -> str:
