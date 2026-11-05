@@ -730,8 +730,8 @@ def test_dialogo_usuario_autocompleta_nombre_con_dni_existente(qtbot, datos_usua
 
 
 
-def test_dialogo_nuevo_usuario_medidor_queda_pendiente_de_lectura(qtbot, datos_usuarios_prueba):
-    """En nuevo usuario solo se captura el medidor; la lectura queda PENDIENTE para Lecturas."""
+def test_dialogo_nuevo_usuario_lectura_predeterminada_y_guardado(qtbot, datos_usuarios_prueba):
+    """En nuevo usuario la lectura actual inicia en 0 y se guarda correctamente."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     servicio.config["mes_actual"] = {"periodo": "2026-03", "estado": "ABIERTO"}
     config = dict(servicio.config)
@@ -739,11 +739,8 @@ def test_dialogo_nuevo_usuario_medidor_queda_pendiente_de_lectura(qtbot, datos_u
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config)
     qtbot.addWidget(dialogo)
 
-    assert len(dialogo.filas_medidores) == 1
-    fila = dialogo.filas_medidores[0]
-    assert not hasattr(fila, "campo_lectura_actual")
-    assert not hasattr(fila, "campo_lectura_anterior")
-    assert fila.btn_quitar.isVisibleTo(dialogo)
+    assert dialogo.campo_medidor.text() == ""
+    assert dialogo.campo_lectura_actual.text() == "0"
 
     dialogo.campo_id.setText("78901234")
     dialogo.campo_nombre.setText("LOPEZ PEREZ, CARMEN")
@@ -757,13 +754,12 @@ def test_dialogo_nuevo_usuario_medidor_queda_pendiente_de_lectura(qtbot, datos_u
     med_mes = servicio.mes["78901234"]["medidores"][0]
     assert med_mes["nro_medidor"] == "99887766"
     assert med_mes["lectura_anterior"] == 0
-    assert med_mes["lectura_actual"] is None
-    assert med_mes["estado_lectura"] == "PENDIENTE"
+    assert med_mes["lectura_actual"] == 0
+    assert med_mes["estado_lectura"] == "LEIDO"
 
 
-
-def test_dialogo_editar_usuario_muestra_solo_medidor_y_conserva_lecturas(qtbot, datos_usuarios_prueba):
-    """Al editar, la fila muestra solo el medidor y guardar no altera las lecturas del mes."""
+def test_dialogo_editar_usuario_muestra_medidor_y_conserva_lecturas(qtbot, datos_usuarios_prueba):
+    """Al editar, muestra el medidor único, lectura anterior y actual; guardar no altera lecturas."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
@@ -790,21 +786,20 @@ def test_dialogo_editar_usuario_muestra_solo_medidor_y_conserva_lecturas(qtbot, 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
     qtbot.addWidget(dialogo)
 
-    assert len(dialogo.filas_medidores) == 1
     assert dialogo.campo_medidor.text() == "123456"
-    assert not hasattr(dialogo.filas_medidores[0], "campo_lectura_actual")
-    # No queda ninguna fila fantasma fuera del layout (antes se creaba y se borraba una vacía)
-    assert dialogo.layout_medidores.count() == 1
+    assert dialogo.campo_lectura_anterior.text() == "100"
+    assert dialogo.campo_lectura_actual.text() == "120"
 
     dialogo.campo_direccion.setText("CALLE NUEVA 5")
     dialogo._guardar()
     assert servicio.mes["30771072"]["medidores"][0] == antes
     assert servicio.usuarios["30771072"]["medidores"] == ["123456"]
+    assert servicio.usuarios["30771072"]["direccion"] == "CALLE NUEVA 5"
+    assert servicio.mes["30771072"]["direccion"] == "CALLE NUEVA 5"
 
 
-
-def test_dialogo_editar_usuario_quitar_y_agregar_medidor(qtbot, datos_usuarios_prueba):
-    """Quitar el medidor deja el formulario inválido; añadir otro lo habilita y queda PENDIENTE."""
+def test_dialogo_editar_usuario_valida_lectura_actual_menor_que_anterior(qtbot, datos_usuarios_prueba):
+    """En edición, no permite guardar una lectura actual menor a la anterior."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
@@ -819,8 +814,6 @@ def test_dialogo_editar_usuario_quitar_y_agregar_medidor(qtbot, datos_usuarios_p
                 "nro_medidor": "123456",
                 "lectura_anterior": 100,
                 "lectura_actual": 120,
-                "fecha_anterior": "2026-02-20",
-                "fecha_lectura": "2026-03-20",
                 "estado_lectura": "LEIDO",
             }
         ],
@@ -830,24 +823,14 @@ def test_dialogo_editar_usuario_quitar_y_agregar_medidor(qtbot, datos_usuarios_p
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
     qtbot.addWidget(dialogo)
 
-    dialogo.filas_medidores[0].btn_quitar.click()
-    assert dialogo.filas_medidores == []
-    assert dialogo.layout_medidores.count() == 0
+    # Intentar poner lectura menor que 100
+    dialogo.campo_lectura_actual.setText("80")
     assert not dialogo.btn_guardar.isEnabled()
-    assert "medidor" in dialogo.lbl_resumen.text().lower()
+    assert "no puede ser menor a la anterior" in dialogo.msg_lectura.text().lower()
 
-    dialogo.campo_nuevo_medidor.setText("998877")
-    dialogo._agregar_medidor()
-    assert [f.campo_medidor.text() for f in dialogo.filas_medidores] == ["998877"]
-    assert dialogo.campo_nuevo_medidor.text() == ""
+    # Si se corrige a un valor mayor o igual
+    dialogo.campo_lectura_actual.setText("105")
     assert dialogo.btn_guardar.isEnabled()
-
-    dialogo._guardar()
-    assert servicio.usuarios["30771072"]["medidores"] == ["998877"]
-    med_mes = servicio.mes["30771072"]["medidores"][0]
-    assert med_mes["lectura_anterior"] == 0
-    assert med_mes["lectura_actual"] is None
-    assert med_mes["estado_lectura"] == "PENDIENTE"
 
 
 def test_dialogo_motivo_cambio_medidor_opciones_y_cancelar(qtbot):
@@ -871,9 +854,8 @@ def test_dialogo_motivo_cambio_medidor_opciones_y_cancelar(qtbot):
     assert dlg2.result() == DialogoMotivoCambioMedidor.DialogCode.Rejected
 
 
-
 def test_dialogo_editar_usuario_cambio_medidor_correccion(qtbot, datos_usuarios_prueba, monkeypatch):
-    """Al cambiar medidor por corrección, mantiene lectura anterior y actual intactas."""
+    """Al cambiar medidor por corrección al pulsar Guardar, mantiene lectura anterior y actual intactas."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
@@ -896,35 +878,38 @@ def test_dialogo_editar_usuario_cambio_medidor_correccion(qtbot, datos_usuarios_
     }
     config = dict(servicio.config)
 
-    monkeypatch.setattr(
-        DialogoMotivoCambioMedidor,
-        "exec",
-        lambda self: setattr(self, "motivo_elegido", DialogoMotivoCambioMedidor.MOTIVO_CORRECCION) or 1,
-    )
+    modal_abierto = []
+
+    def mock_exec(self):
+        modal_abierto.append(True)
+        self.motivo_elegido = DialogoMotivoCambioMedidor.MOTIVO_CORRECCION
+        return DialogoMotivoCambioMedidor.DialogCode.Accepted
+
+    monkeypatch.setattr(DialogoMotivoCambioMedidor, "exec", mock_exec)
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
     qtbot.addWidget(dialogo)
 
     assert dialogo.medidor_original == "123456"
 
+    # Cambiar texto del medidor: NO debe abrir el modal automáticamente
     dialogo.campo_medidor.setText("998877")
-    assert dialogo.filas_medidores[0].confirmar_cambio() is True
-    assert dialogo.filas_medidores[0].motivo == DialogoMotivoCambioMedidor.MOTIVO_CORRECCION
+    assert len(modal_abierto) == 0
 
+    # Al presionar Guardar Usuario recién abre el modal y guarda
     dialogo._guardar()
+    assert len(modal_abierto) == 1
 
     assert servicio.usuarios["30771072"]["medidores"] == ["998877"]
     med_mes = servicio.mes["30771072"]["medidores"][0]
     assert med_mes["nro_medidor"] == "998877"
     assert med_mes["lectura_anterior"] == 100
     assert med_mes["lectura_actual"] == 120
-    assert med_mes["fecha_lectura"] == "2026-03-20"
-    assert med_mes["estado_lectura"] == "LEIDO"
-
+    assert med_mes.get("novedad") == "NORMAL"
 
 
 def test_dialogo_editar_usuario_cambio_medidor_reinstalacion(qtbot, datos_usuarios_prueba, monkeypatch):
-    """Al cambiar medidor por reinstalación, reinicia en 0 y queda PENDIENTE con CAMBIO_MEDIDOR."""
+    """Al cambiar medidor por reinstalación al pulsar Guardar, reinicia lecturas en 0 y aplica CAMBIO_MEDIDOR."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
@@ -947,34 +932,35 @@ def test_dialogo_editar_usuario_cambio_medidor_reinstalacion(qtbot, datos_usuari
     }
     config = dict(servicio.config)
 
-    monkeypatch.setattr(
-        DialogoMotivoCambioMedidor,
-        "exec",
-        lambda self: setattr(self, "motivo_elegido", DialogoMotivoCambioMedidor.MOTIVO_REINSTALACION) or 1,
-    )
+    modal_abierto = []
+
+    def mock_exec(self):
+        modal_abierto.append(True)
+        self.motivo_elegido = DialogoMotivoCambioMedidor.MOTIVO_REINSTALACION
+        return DialogoMotivoCambioMedidor.DialogCode.Accepted
+
+    monkeypatch.setattr(DialogoMotivoCambioMedidor, "exec", mock_exec)
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
     qtbot.addWidget(dialogo)
 
     dialogo.campo_medidor.setText("998877")
-    assert dialogo.filas_medidores[0].confirmar_cambio() is True
-    assert dialogo.btn_guardar.isEnabled()
+    dialogo.campo_lectura_actual.setText("0")
+    assert len(modal_abierto) == 0
 
     dialogo._guardar()
+    assert len(modal_abierto) == 1
 
     assert servicio.usuarios["30771072"]["medidores"] == ["998877"]
     med_mes = servicio.mes["30771072"]["medidores"][0]
     assert med_mes["nro_medidor"] == "998877"
     assert med_mes["lectura_anterior"] == 0
-    assert med_mes["lectura_actual"] is None
-    assert med_mes["fecha_anterior"] is None
-    assert med_mes["estado_lectura"] == "PENDIENTE"
+    assert med_mes["lectura_actual"] == 0
     assert med_mes.get("novedad") == "CAMBIO_MEDIDOR"
 
 
-
 def test_dialogo_editar_usuario_cambio_medidor_cancelar(qtbot, datos_usuarios_prueba, monkeypatch):
-    """Al pulsar Cancelar en la consulta de motivo, revierte el medidor al original."""
+    """Al pulsar Cancelar en el motivo, NO guarda y NO revierte el número de medidor escrito."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
@@ -998,15 +984,18 @@ def test_dialogo_editar_usuario_cambio_medidor_cancelar(qtbot, datos_usuarios_pr
     antes = dict(servicio.mes["30771072"]["medidores"][0])
     config = dict(servicio.config)
 
+    # Simular que el usuario pulsa Cancelar en el modal de motivo
     monkeypatch.setattr(DialogoMotivoCambioMedidor, "exec", lambda self: 0)
 
     dialogo = DialogoUsuario(servicio_datos=servicio, config=config, usuario=usuario_existente)
     qtbot.addWidget(dialogo)
 
     dialogo.campo_medidor.setText("998877")
-    assert dialogo.filas_medidores[0].confirmar_cambio() is False
-
-    assert dialogo.campo_medidor.text() == "123456"
-    assert dialogo.filas_medidores[0].motivo is None
     dialogo._guardar()
+
+    # El campo de medidor NO debe revertirse al anterior (permanece 998877)
+    assert dialogo.campo_medidor.text() == "998877"
+
+    # En los datos del servicio no se debe haber aplicado el cambio
     assert servicio.mes["30771072"]["medidores"][0] == antes
+    assert servicio.usuarios["30771072"]["medidores"] == ["123456"]

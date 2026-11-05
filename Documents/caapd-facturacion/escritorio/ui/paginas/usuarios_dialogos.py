@@ -29,7 +29,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.paginas.usuarios_medidores import FilaMedidor
+import datetime
+
+import calculos
+
 from ui import iconos
 
 import codigos
@@ -453,7 +456,16 @@ class DialogoUsuario(QDialog):
                         self.id_original = str(k)
                         break
 
-        self.filas_medidores = []
+        self.medidores_lista: List[str] = []
+        self.medidor_original = ""
+        self._motivo_cambio_medidor: Optional[str] = None
+        self.lec_anterior_val: int = 0
+        self.lec_actual_val: Optional[int] = None
+        self.campo_lectura_anterior: Optional[QLineEdit] = None
+        self.campo_lectura_actual: Optional[QLineEdit] = None
+
+        if self.es_edicion:
+            self._cargar_lecturas_existentes()
 
         # Campos que el usuario ya "toco": solo a esos se les muestra el error
         # en rojo mientras escribe. Al pulsar Guardar se muestran todos.
@@ -470,18 +482,26 @@ class DialogoUsuario(QDialog):
 
     clase_motivo = DialogoMotivoCambioMedidor
 
-    @property
-    def campo_medidor(self):
-        return self.filas_medidores[0].campo_medidor
+    def _cargar_lecturas_existentes(self) -> None:
+        """Carga la lectura anterior y actual del mes vigente para el medidor del usuario."""
+        if not self.es_edicion or not self.usuario:
+            return
+        meds = self.usuario.get("medidores") or []
+        med_val = ""
+        if meds:
+            m0 = meds[0]
+            med_val = str(m0.get("nro_medidor") if isinstance(m0, dict) else m0).strip()
+        self.medidor_original = codigos.normalizar_medidor(med_val) if med_val.isdigit() else med_val
 
-    @property
-    def medidores_lista(self):
-        return [codigos.normalizar_medidor(f.campo_medidor.text())
-                for f in self.filas_medidores if f.campo_medidor.text().strip()]
-
-    @property
-    def medidor_original(self):
-        return self.filas_medidores[0].original.get("nro_medidor", "")
+        doc_mes = getattr(self.servicio, "mes", {}).get(self.id_original, {})
+        if doc_mes:
+            med_mes = next(
+                (m for m in doc_mes.get("medidores", []) if str(m.get("nro_medidor")) == str(self.medidor_original)),
+                None
+            )
+            if med_mes:
+                self.lec_anterior_val = int(med_mes.get("lectura_anterior", 0) or 0)
+                self.lec_actual_val = med_mes.get("lectura_actual")
 
     def _ajustar_tamano_a_pantalla(self) -> None:
         """
@@ -634,7 +654,6 @@ class DialogoUsuario(QDialog):
         self.campo_nombre = QLineEdit()
         self.campo_nombre.setPlaceholderText(
             "Ej. CONDORI MAMANI, CARLOS ALBERTO")
-        # Solo letras (incluye tildes y Ñ), espacios y signos propios de nombres (, . ' -)
         self.campo_nombre.setValidator(QRegularExpressionValidator(
             QRegularExpression(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ,.'\-]*"), self.campo_nombre))
         self.campo_nombre.setMaxLength(120)
@@ -658,7 +677,6 @@ class DialogoUsuario(QDialog):
         col_sec.addWidget(lbl_sec)
 
         self.combo_sector = QComboBox()
-        # Puede encogerse con el diálogo; el desplegable (view) muestra el texto completo
         self.combo_sector.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.combo_sector.setMinimumContentsLength(12)
@@ -698,7 +716,6 @@ class DialogoUsuario(QDialog):
         categorias = dict(categorias_raw) if isinstance(
             categorias_raw, dict) else {}
 
-        # Garantizar que las 3 categorías estándar siempre existan con nombre
         for cod, nom_def in nombres_defecto.items():
             if cod not in categorias or not isinstance(categorias[cod], dict):
                 categorias[cod] = {"nombre": nom_def}
@@ -734,38 +751,101 @@ class DialogoUsuario(QDialog):
         layout_form.addLayout(col_dir)
         layout_form.addSpacing(6)
 
+        # 6. Medidor de Agua (1 conexión = 1 medidor)
         col_med = QVBoxLayout()
-        col_med.addWidget(QLabel("Medidores (máximo 5 por conexión)"))
-        self.layout_medidores = QVBoxLayout()
-        col_med.addLayout(self.layout_medidores)
-        fila_add = QHBoxLayout()
-        self.campo_nuevo_medidor = QLineEdit()
-        self.campo_nuevo_medidor.setPlaceholderText("Número del nuevo medidor")
-        self.campo_nuevo_medidor.setValidator(QRegularExpressionValidator(
-            QRegularExpression(r"\d{0,12}"), self.campo_nuevo_medidor))
-        self.campo_nuevo_medidor.returnPressed.connect(self._agregar_medidor)
-        self.campo_nuevo_medidor.textChanged.connect(lambda: self._validar_formulario())
-        fila_add.addWidget(self.campo_nuevo_medidor, stretch=1)
-        self.btn_agregar_medidor = QPushButton("+")
-        self.btn_agregar_medidor.setAutoDefault(False)
-        self.btn_agregar_medidor.setAccessibleName("Añadir medidor")
-        self.btn_agregar_medidor.setToolTip("Añadir medidor (Enter)")
-        self.btn_agregar_medidor.clicked.connect(self._agregar_medidor)
-        fila_add.addWidget(self.btn_agregar_medidor)
-        col_med.addLayout(fila_add)
-        self.lbl_error_medidor = self._crear_mensaje_campo()
-        self.msg_medidores = self.lbl_error_medidor
+        col_med.setSpacing(4)
+        lbl_med = QLabel("N° de Medidor:")
+        lbl_med.setStyleSheet("font-weight: 500;")
+        col_med.addWidget(lbl_med)
+
+        self.campo_medidor = QLineEdit()
+        self.campo_medidor.setPlaceholderText("Ej. 22392996")
+        self.campo_medidor.setMaxLength(12)
+        self.campo_medidor.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r"\d{0,12}"), self.campo_medidor))
+        col_med.addWidget(self.campo_medidor)
+
+        self.lbl_error_medidor = QLabel("")
+        self.lbl_error_medidor.setStyleSheet(
+            "color: #dc2626; font-size: 12px; font-weight: 600; padding-top: 2px;"
+        )
+        self.lbl_error_medidor.setVisible(False)
+        col_med.addWidget(self.lbl_error_medidor)
+
+        self.msg_medidores = self._crear_mensaje_campo()
         col_med.addWidget(self.msg_medidores)
+        self.campo_nuevo_medidor = self.campo_medidor  # alias retrocompatibilidad
+
         layout_form.addLayout(col_med)
+        layout_form.addSpacing(6)
+
+        # 7. Lecturas (Lectura Actual en Nuevo, Lectura Anterior y Actual en Editar)
+        if not self.es_edicion:
+            col_lec = QVBoxLayout()
+            col_lec.setSpacing(4)
+            lbl_lec = QLabel("Lectura Actual:")
+            lbl_lec.setStyleSheet("font-weight: 500;")
+            col_lec.addWidget(lbl_lec)
+
+            self.campo_lectura_actual = QLineEdit("0")
+            self.campo_lectura_actual.setPlaceholderText("0")
+            self.campo_lectura_actual.setMaxLength(9)
+            self.campo_lectura_actual.setValidator(QRegularExpressionValidator(
+                QRegularExpression(r"\d{0,9}"), self.campo_lectura_actual))
+            col_lec.addWidget(self.campo_lectura_actual)
+
+            self.msg_lectura = self._crear_mensaje_campo()
+            col_lec.addWidget(self.msg_lectura)
+
+            layout_form.addLayout(col_lec)
+            layout_form.addSpacing(6)
+        else:
+            fila_lec = QHBoxLayout()
+            fila_lec.setSpacing(12)
+
+            col_ant = QVBoxLayout()
+            col_ant.setSpacing(4)
+            lbl_ant = QLabel("Lectura Anterior:")
+            lbl_ant.setStyleSheet("font-weight: 500;")
+            col_ant.addWidget(lbl_ant)
+
+            self.campo_lectura_anterior = QLineEdit()
+            self.campo_lectura_anterior.setReadOnly(True)
+            self.campo_lectura_anterior.setStyleSheet(
+                "QLineEdit { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }"
+            )
+            col_ant.addWidget(self.campo_lectura_anterior)
+            fila_lec.addLayout(col_ant, stretch=1)
+
+            col_act = QVBoxLayout()
+            col_act.setSpacing(4)
+            lbl_act = QLabel("Lectura Actual:")
+            lbl_act.setStyleSheet("font-weight: 500;")
+            col_act.addWidget(lbl_act)
+
+            self.campo_lectura_actual = QLineEdit()
+            self.campo_lectura_actual.setPlaceholderText("Ej. 10")
+            self.campo_lectura_actual.setMaxLength(9)
+            self.campo_lectura_actual.setValidator(QRegularExpressionValidator(
+                QRegularExpression(r"\d{0,9}"), self.campo_lectura_actual))
+            col_act.addWidget(self.campo_lectura_actual)
+            fila_lec.addLayout(col_act, stretch=1)
+
+            col_lec_cont = QVBoxLayout()
+            col_lec_cont.setSpacing(4)
+            col_lec_cont.addLayout(fila_lec)
+            self.msg_lectura = self._crear_mensaje_campo()
+            col_lec_cont.addWidget(self.msg_lectura)
+
+            layout_form.addLayout(col_lec_cont)
+            layout_form.addSpacing(6)
 
         layout_form.addStretch(1)
 
         scroll_area.setWidget(scroll_widget)
         layout_principal.addWidget(scroll_area, stretch=1)
 
-        # Resumen de lo que falta para poder guardar (gris; rojo tras intentar guardar).
-        # Va en su propia fila, con altura fija para 2 líneas, y reserva el espacio
-        # aunque esté oculto: el diálogo no cambia de tamaño al aparecer/desaparecer.
+        # Resumen de lo que falta para poder guardar
         self.lbl_resumen = QLabel("")
         self.lbl_resumen.setProperty("class", "campo_mensaje")
         self.lbl_resumen.setWordWrap(True)
@@ -817,17 +897,39 @@ class DialogoUsuario(QDialog):
             lambda _t: self._marcar_tocado("direccion"))
         self.campo_direccion.textChanged.connect(
             lambda _t: self._validar_formulario())
-        # Al salir de un campo tambien cuenta como "tocado" (aunque no haya escrito)
+
+        self.campo_medidor.textEdited.connect(
+            lambda _t: self._marcar_tocado("medidor"))
+        self.campo_medidor.textChanged.connect(
+            lambda _t: self._marcar_tocado("medidor"))
+        self.campo_medidor.textChanged.connect(self._validar_medidor_en_vivo)
+        self.campo_medidor.textChanged.connect(
+            lambda _t: self._validar_formulario())
+
+        if self.campo_lectura_actual is not None:
+            self.campo_lectura_actual.textEdited.connect(
+                lambda _t: self._marcar_tocado("lectura"))
+            self.campo_lectura_actual.textChanged.connect(
+                lambda _t: self._marcar_tocado("lectura"))
+            self.campo_lectura_actual.textChanged.connect(
+                lambda _t: self._validar_formulario())
+
+        # Al salir de un campo tambien cuenta como "tocado"
         for campo, clave in (
             (self.campo_id, "dni"),
             (self.campo_conexion, "conexion"),
             (self.campo_nombre, "nombre"),
             (self.campo_direccion, "direccion"),
+            (self.campo_medidor, "medidor"),
         ):
             campo.editingFinished.connect(
                 lambda c=clave: self._marcar_tocado(c))
 
-        # Conectar validaciones en vivo para DNI, conexión y medidor
+        if self.campo_lectura_actual is not None:
+            self.campo_lectura_actual.editingFinished.connect(
+                lambda: self._marcar_tocado("lectura"))
+
+        # Conectar validaciones en vivo para DNI y conexión
         self.campo_id.textChanged.connect(self._validar_dni_en_vivo)
         self.campo_conexion.textChanged.connect(self._validar_conexion_en_vivo)
 
@@ -854,18 +956,30 @@ class DialogoUsuario(QDialog):
                     self.combo_categoria.setCurrentIndex(i)
                     break
 
-            doc_mes = getattr(self.servicio, "mes", {}).get(self.id_original, {})
-            por_numero = {
-                str(m["nro_medidor"]): m for m in doc_mes.get("medidores", [])
-                if isinstance(m, dict) and m.get("nro_medidor")
-            }
-            for m in self.usuario.get("medidores") or []:
-                base = dict(m) if isinstance(m, dict) else {"nro_medidor": str(m)}
-                self._crear_fila_medidor(por_numero.get(base["nro_medidor"], base))
-            if not self.filas_medidores:
-                self._crear_fila_medidor()
+            # Medidor
+            meds = self.usuario.get("medidores") or []
+            med_val = ""
+            if meds:
+                m0 = meds[0]
+                med_val = str(m0.get("nro_medidor") if isinstance(m0, dict) else m0).strip()
+            self.campo_medidor.setText(med_val)
+            self.medidor_original = codigos.normalizar_medidor(med_val) if med_val.isdigit() else med_val
+            if self.medidor_original:
+                self.medidores_lista = [self.medidor_original]
+
+            # Lecturas
+            if self.campo_lectura_anterior is not None:
+                self.campo_lectura_anterior.setText(str(self.lec_anterior_val))
+            if self.campo_lectura_actual is not None:
+                if self.lec_actual_val is not None:
+                    self.campo_lectura_actual.setText(str(self.lec_actual_val))
+                else:
+                    self.campo_lectura_actual.clear()
         else:
-            self._crear_fila_medidor()
+            self.campo_medidor.clear()
+            self.medidores_lista = []
+            if self.campo_lectura_actual is not None:
+                self.campo_lectura_actual.setText("0")
             self.campo_conexion.setText(self.servicio.obtener_siguiente_conexion_libre())
 
         # Estado inicial del boton Guardar (sin marcar nada en rojo todavia)
@@ -955,73 +1069,64 @@ class DialogoUsuario(QDialog):
             self.lbl_error_conexion.setVisible(False)
 
     def _validar_medidor_en_vivo(self, texto: str = "") -> None:
-        self._validar_formulario(mostrar_todo=True)
+        txt = self.campo_medidor.text().strip()
+        if not txt:
+            self.lbl_error_medidor.setText("")
+            self.lbl_error_medidor.setVisible(False)
+            self.medidores_lista = []
+            return
+
+        if not txt.isdigit():
+            self.lbl_error_medidor.setText("⚠️ El número de medidor solo admite dígitos.")
+            self.lbl_error_medidor.setVisible(True)
+            self.medidores_lista = []
+            return
+
+        med_norm = codigos.normalizar_medidor(txt)
+        valido, err_msg = self.servicio.validar_medidores_unicos(
+            [med_norm],
+            id_usuario_actual=self.id_original if self.es_edicion else None,
+        )
+        if not valido:
+            self.lbl_error_medidor.setText(f"⚠️ {err_msg}")
+            self.lbl_error_medidor.setVisible(True)
+            self.medidores_lista = []
+        else:
+            self.lbl_error_medidor.setText("")
+            self.lbl_error_medidor.setVisible(False)
+            self.medidores_lista = [med_norm]
 
     def _al_terminar_editar_medidor(self) -> None:
-        self.filas_medidores[0].confirmar_cambio()
-
-    def _crear_fila_medidor(self, datos=None, nuevo=False):
-        fila = FilaMedidor(self, datos, nuevo)
-        self.filas_medidores.append(fila)
-        self.layout_medidores.addWidget(fila)
-        return fila
+        pass
 
     def _agregar_medidor(self) -> None:
-        texto = self.campo_nuevo_medidor.text().strip()
-        if not texto.isdigit():
-            self.msg_medidores.setText("Ingresa un número de medidor válido.")
-            self.msg_medidores.show()
-            return
-        numero = codigos.normalizar_medidor(texto)
-        if numero in self.medidores_lista:
-            self.msg_medidores.setText("El medidor ya está en la lista.")
-            self.msg_medidores.show()
-            return
-        valido, error = self.servicio.validar_medidores_unicos(
-            [numero], id_usuario_actual=self.id_original or None)
-        if not valido:
-            self.msg_medidores.setText(error)
-            self.msg_medidores.show()
-            return
-        vacia = next((f for f in self.filas_medidores
-                      if not f.campo_medidor.text().strip() and not f.original), None)
-        if len(self.filas_medidores) >= 5 and vacia is None:
-            self.msg_medidores.setText("Máximo 5 medidores por conexión. No se puede añadir un sexto.")
-            self.msg_medidores.show()
-            return
-        if vacia is not None:
-            vacia.campo_medidor.setText(numero)
-        else:
-            self._crear_fila_medidor({"nro_medidor": numero}, nuevo=True)
-        self.campo_nuevo_medidor.clear()
+        self._validar_medidor_en_vivo()
         self._validar_formulario()
 
-    def _quitar_medidor(self, fila) -> None:
-        self.filas_medidores.remove(fila)
-        self.layout_medidores.removeWidget(fila)
-        fila.hide()
-        fila.setParent(None)
-        fila.deleteLater()
+    def _quitar_medidor(self, medidor: str = "") -> None:
+        self.campo_medidor.clear()
+        self.medidores_lista = []
+        self._validar_medidor_en_vivo()
         self._validar_formulario()
+
+    def _renderizar_chips_medidores(self) -> None:
+        pass
 
     # -------------------------------------------------------------------
     # Validacion en vivo y feedback visual
     # -------------------------------------------------------------------
-    CAMPOS_OBLIGATORIOS = ("dni", "nombre", "direccion", "medidores")
+    CAMPOS_OBLIGATORIOS = ("dni", "nombre", "direccion", "medidor")
     NOMBRES_CAMPO = {
         "dni": "DNI",
         "conexion": "N° de conexión",
         "nombre": "apellidos y nombres",
         "direccion": "dirección",
-        "medidores": "número de medidor",
+        "medidor": "número de medidor",
+        "lectura": "lectura actual",
     }
 
     def _crear_mensaje_campo(self) -> QLabel:
-        """Etiqueta pequeña bajo un campo para mostrar el error/aviso del campo.
-
-            Reserva su espacio aunque esté oculta y no usa word-wrap: así el diálogo
-            no cambia de altura con cada tecla (evita el aviso QWindowsWindow::setGeometry).
-            """
+        """Etiqueta pequeña bajo un campo para mostrar el error/aviso del campo."""
         lbl = QLabel("")
         lbl.setProperty("class", "campo_mensaje")
         lbl.setProperty("nivel", "error")
@@ -1043,18 +1148,9 @@ class DialogoUsuario(QDialog):
             self._tocados.add(clave)
         self._validar_formulario()
 
-    # DNI de 7-8 digitos, opcionalmente con sufijo para una misma persona con
-    # varias conexiones: 76469789, 76469789-1, 76469789-A. Tambien SD-xxx.
     _PATRON_DNI = re.compile(r"^(\d{7,8})(?:-([A-Za-z0-9]{1,2}))?$")
 
     def _normalizar_id_ingresado(self, texto: str) -> Optional[str]:
-        """Devuelve el ID normalizado o None si el formato no es valido.
-
-        '7646978'      -> '07646978'
-        '76469789-1'   -> '76469789-1'
-        '76469789-a'   -> '76469789-A'
-        'SD-012'       -> 'SD-012'
-        """
         texto = texto.strip().upper()
         m = self._PATRON_DNI.match(texto)
         if m:
@@ -1100,7 +1196,7 @@ class DialogoUsuario(QDialog):
                     errores["dni"] = (
                         "El DNI debe tener 8 dígitos (o formato SD-xxx).", "error")
 
-        # Conexión (si se escribe debe ser numérica y no estar repetida)
+        # Conexión
         texto_con = self.campo_conexion.text().strip()
         if texto_con:
             if not texto_con.isdigit():
@@ -1132,31 +1228,42 @@ class DialogoUsuario(QDialog):
             errores["nombre"] = (
                 "Ingresa al menos apellido y nombre (ej. CONDORI MAMANI, CARLOS).", "error")
 
-        # Direccion
+        # Dirección
         if not self.campo_direccion.text().strip():
             errores["direccion"] = (
                 "Ingresa la dirección o una referencia.", "error")
 
-        if not self.filas_medidores:
-            errores["medidores"] = ("Agrega al menos un medidor.", "error")
-        elif len(self.filas_medidores) > 5:
-            errores["medidores"] = ("Máximo 5 medidores por conexión.", "error")
-        numeros = []
-        for fila in self.filas_medidores:
-            numero = fila.campo_medidor.text().strip()
-            if not numero.isdigit():
-                errores["medidores"] = ("El número de medidor solo admite dígitos.", "error")
-            else:
-                numero = codigos.normalizar_medidor(numero)
-                if numero in numeros:
-                    errores["medidores"] = ("El medidor ya está en la lista.", "error")
-                numeros.append(numero)
-        valido, error = self.servicio.validar_medidores_unicos(
-            numeros, id_usuario_actual=self.id_original or None)
-        if not valido:
-            errores["medidores"] = (error, "error")
-        if self.campo_nuevo_medidor.text().strip():
-            errores["medidores"] = ("Pulsa + o Enter para añadir el medidor pendiente.", "error")
+        # Medidor (1 medidor obligatorio)
+        texto_med = self.campo_medidor.text().strip()
+        if not texto_med:
+            errores["medidor"] = ("Ingresa el número de medidor.", "error")
+        elif not texto_med.isdigit():
+            errores["medidor"] = ("El número de medidor solo admite dígitos.", "error")
+        else:
+            med_norm = codigos.normalizar_medidor(texto_med)
+            valido_med, err_med = self.servicio.validar_medidores_unicos(
+                [med_norm], id_usuario_actual=self.id_original if self.es_edicion else None
+            )
+            if not valido_med:
+                errores["medidor"] = (err_med or "Este medidor ya está asignado.", "error")
+
+        # Lectura actual
+        if self.campo_lectura_actual is not None:
+            texto_lec = self.campo_lectura_actual.text().strip()
+            if texto_lec:
+                if not texto_lec.isdigit():
+                    errores["lectura"] = (
+                        "La lectura actual debe ser un número entero.", "error")
+                elif self.es_edicion:
+                    val_lec = int(texto_lec)
+                    # Si es el mismo medidor que el original, no permitir menor que la lectura anterior
+                    texto_med = self.campo_medidor.text().strip()
+                    med_norm = codigos.normalizar_medidor(texto_med) if texto_med.isdigit() else texto_med
+                    if med_norm == self.medidor_original and val_lec < self.lec_anterior_val:
+                        errores["lectura"] = (
+                            f"La lectura actual no puede ser menor a la anterior ({self.lec_anterior_val}).",
+                            "error"
+                        )
 
         return errores
 
@@ -1178,7 +1285,7 @@ class DialogoUsuario(QDialog):
     def _validar_formulario(self, mostrar_todo: bool = False) -> bool:
         """Recalcula errores, pinta los campos y habilita/deshabilita Guardar."""
         if not hasattr(self, "btn_guardar"):
-            return True  # la UI aun no termino de construirse
+            return True
         errores = self._calcular_errores()
         mostrar_todo = mostrar_todo or self._intento_guardar
 
@@ -1187,10 +1294,13 @@ class DialogoUsuario(QDialog):
             "conexion": (self.campo_conexion, self.msg_conexion),
             "nombre": (self.campo_nombre, self.msg_nombre),
             "direccion": (self.campo_direccion, self.msg_direccion),
-            "medidores": (self.campo_nuevo_medidor, self.msg_medidores),
+            "medidor": (self.campo_medidor, self.msg_medidores),
+            "lectura": (self.campo_lectura_actual, getattr(self, "msg_lectura", None)),
         }
 
         for clave, (campo, lbl) in mapa.items():
+            if lbl is None:
+                continue
             msg, nivel = errores.get(clave, (None, "error"))
             visible = msg is not None and (
                 mostrar_todo or clave in self._tocados or nivel == "aviso_bloqueante")
@@ -1203,7 +1313,7 @@ class DialogoUsuario(QDialog):
 
         if hay_bloqueo:
             faltan = [self.NOMBRES_CAMPO[c]
-                      for c in ("dni", "nombre", "direccion", "medidores", "conexion") if c in errores]
+                      for c in ("dni", "nombre", "direccion", "medidor", "conexion", "lectura") if c in errores]
             self.lbl_resumen.setText(
                 "Para guardar falta: " + ", ".join(faltan) + ".")
             self.lbl_resumen.setProperty(
@@ -1224,7 +1334,8 @@ class DialogoUsuario(QDialog):
             ("conexion", self.campo_conexion),
             ("nombre", self.campo_nombre),
             ("direccion", self.campo_direccion),
-            ("medidores", self.campo_nuevo_medidor),
+            ("medidor", self.campo_medidor),
+            ("lectura", self.campo_lectura_actual),
         ]
         for clave, campo in orden:
             if clave in errores and campo is not None:
@@ -1232,7 +1343,6 @@ class DialogoUsuario(QDialog):
                 return
 
     def _guardar(self) -> None:
-        # Validacion visual primero: marca en rojo todo lo que falte
         self._intento_guardar = True
         errores = self._calcular_errores()
         if errores:
@@ -1246,19 +1356,19 @@ class DialogoUsuario(QDialog):
         sector = self.combo_sector.currentText()
         cat_data = self.combo_categoria.currentData() or "A"
         direccion = self.campo_direccion.text().strip().upper()
+        texto_med = self.campo_medidor.text().strip()
+        med_norm = codigos.normalizar_medidor(texto_med)
 
-        # Validaciones
-        if not nombre:
-            QMessageBox.warning(
-                self, "Campo requerido", "Debe ingresar los apellidos y nombres completos.")
-            self.campo_nombre.setFocus()
-            return
-
-        for fila in self.filas_medidores:
-            if not fila.confirmar_cambio():
+        # 0. Si se modificó el número de medidor en modo edición, preguntar motivo al pulsar Guardar
+        motivo_cambio = None
+        if self.es_edicion and self.medidor_original and med_norm != self.medidor_original:
+            dlg = DialogoMotivoCambioMedidor(self.medidor_original, med_norm, self)
+            res = dlg.exec()
+            if res != QDialog.DialogCode.Accepted:
+                # Cancelar: aborta el guardado pero NO revierte el texto ingresado en el campo de medidor
                 return
-        if not self._validar_formulario(mostrar_todo=True):
-            return
+            motivo_cambio = dlg.motivo_elegido
+            self._motivo_cambio_medidor = motivo_cambio
 
         # 1. Determinar y validar ID
         id_final = ""
@@ -1278,12 +1388,9 @@ class DialogoUsuario(QDialog):
 
             usr_existente = self.servicio.obtener_usuario(id_final)
             if usr_existente is not None:
-                # Si ya existe este DNI en el padrón, se asigna el correlativo siguiente (ej. 30769540-1)
-                # para registrar la nueva conexión sin sobreescribir la existente.
                 id_final = obtener_siguiente_dni_sugerido(
                     self.servicio, id_final)
         else:
-            # Modo edición: si el usuario cambió el DNI / ID (ej. de SD-001 a DNI real)
             id_final = self.id_original
             if nuevo_id and nuevo_id != self.id_original:
                 if not (es_formato_id_valido(nuevo_id) or (self._normalizar_id_ingresado(nuevo_id) is not None)):
@@ -1299,7 +1406,6 @@ class DialogoUsuario(QDialog):
                     norm_id = obtener_siguiente_dni_sugerido(
                         self.servicio, norm_id)
 
-                # Reasignar DNI en el padrón, mes y espejo Firebase
                 try:
                     self.servicio.corregir_dni_usuario(
                         self.id_original, norm_id)
@@ -1309,7 +1415,7 @@ class DialogoUsuario(QDialog):
                         self, "Error al cambiar DNI", f"No se pudo reasignar el DNI:\n{e}")
                     return
 
-        # 2. Validar que la conexión sea única
+        # 2. Validar conexión única
         con_norm = codigos.normalizar_conexion(
             conexion) if conexion else self.servicio.obtener_siguiente_conexion_libre()
         valido_con, err_con = self.servicio.validar_conexion_unica(
@@ -1326,6 +1432,73 @@ class DialogoUsuario(QDialog):
         activo_final = self.usuario.get(
             "activo", True) if self.es_edicion else True
 
+        # 3. Preparar lecturas y datos de medidor
+        txt_lec = self.campo_lectura_actual.text().strip() if self.campo_lectura_actual is not None else ""
+        val_lec = int(txt_lec) if txt_lec.isdigit() else None
+
+        if not self.es_edicion:
+            dict_med = {
+                "nro_medidor": med_norm,
+                "lectura_anterior": 0,
+                "lectura_actual": val_lec if val_lec is not None else 0,
+                "fecha_anterior": None,
+                "fecha_lectura": datetime.date.today().isoformat() if val_lec is not None else None,
+                "estado_lectura": "LEIDO" if val_lec is not None else "PENDIENTE",
+                "novedad": "NORMAL",
+                "nota": "",
+                "registrado_por": "ADMIN",
+            }
+            if dict_med["lectura_actual"] is not None:
+                try:
+                    dict_med["consumo"] = calculos.consumo_medidor(
+                        0, dict_med["lectura_actual"], "NORMAL")
+                except Exception:
+                    dict_med["consumo"] = 0
+        else:
+            doc_mes = getattr(self.servicio, "mes", {}).get(id_final, {})
+            med_previo = {}
+            if doc_mes:
+                med_previo = next(
+                    (m for m in doc_mes.get("medidores", []) if str(m.get("nro_medidor")) == str(self.medidor_original)),
+                    {}
+                ) or {}
+
+            dict_med = dict(med_previo) if med_previo else {}
+            dict_med["nro_medidor"] = med_norm
+
+            if motivo_cambio == DialogoMotivoCambioMedidor.MOTIVO_REINSTALACION:
+                dict_med["lectura_anterior"] = 0
+                dict_med["fecha_anterior"] = None
+                dict_med["lectura_actual"] = val_lec if val_lec is not None else 0
+                dict_med["estado_lectura"] = "LEIDO" if val_lec is not None else "PENDIENTE"
+                dict_med["novedad"] = "CAMBIO_MEDIDOR"
+                dict_med["fecha_lectura"] = datetime.date.today().isoformat()
+            elif motivo_cambio == DialogoMotivoCambioMedidor.MOTIVO_CORRECCION:
+                dict_med["nro_medidor"] = med_norm
+                if val_lec is not None:
+                    dict_med["lectura_actual"] = val_lec
+                    dict_med["estado_lectura"] = "LEIDO"
+                    dict_med["fecha_lectura"] = datetime.date.today().isoformat()
+                if "novedad" not in dict_med:
+                    dict_med["novedad"] = "NORMAL"
+            else:
+                # Mismo medidor sin cambio
+                if val_lec is not None and val_lec != self.lec_actual_val:
+                    dict_med["lectura_actual"] = val_lec
+                    dict_med["estado_lectura"] = "LEIDO"
+                    dict_med["fecha_lectura"] = datetime.date.today().isoformat()
+                    try:
+                        dict_med["consumo"] = calculos.consumo_medidor(
+                            dict_med.get("lectura_anterior", 0) or 0,
+                            dict_med["lectura_actual"],
+                            dict_med.get("novedad"),
+                        )
+                    except Exception:
+                        dict_med["consumo"] = 0
+                elif val_lec is None and "lectura_actual" not in dict_med:
+                    dict_med["lectura_actual"] = None
+                    dict_med["estado_lectura"] = "PENDIENTE"
+
         datos_guardar = {
             "nro_conexion": con_norm,
             "nombre": nombre,
@@ -1333,7 +1506,7 @@ class DialogoUsuario(QDialog):
             "direccion": direccion,
             "codigo_categoria": cat_data,
             "activo": activo_final,
-            "medidores": [fila.datos() for fila in self.filas_medidores],
+            "medidores": [dict_med],
         }
 
         try:
@@ -1365,6 +1538,7 @@ class DialogoUsuario(QDialog):
         except Exception as e:
             mostrar_dialogo_error(self, "Error al guardar",
                                   f"No se pudo guardar el usuario:\n{e}")
+
 
 
 class DialogoEliminarUsuario(QDialog):
