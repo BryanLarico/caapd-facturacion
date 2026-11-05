@@ -780,6 +780,32 @@ def test_dialogo_editar_usuario_muestra_medidor_y_conserva_lecturas(qtbot, datos
             }
         ],
     }
+    servicio.meses_encontrados = {
+        "2026-02": {
+            "30771072": {
+                "medidores": [
+                    {
+                        "nro_medidor": "123456",
+                        "lectura_anterior": 80,
+                        "lectura_actual": 100,
+                    }
+                ]
+            }
+        }
+    }
+    servicio.meses_encontrados = {
+        "2026-02": {
+            "30771072": {
+                "medidores": [
+                    {
+                        "nro_medidor": "123456",
+                        "lectura_anterior": 80,
+                        "lectura_actual": 100,
+                    }
+                ]
+            }
+        }
+    }
     antes = dict(servicio.mes["30771072"]["medidores"][0])
     config = dict(servicio.config)
 
@@ -857,6 +883,19 @@ def test_dialogo_motivo_cambio_medidor_opciones_y_cancelar(qtbot):
 def test_dialogo_editar_usuario_cambio_medidor_correccion(qtbot, datos_usuarios_prueba, monkeypatch):
     """Al cambiar medidor por corrección al pulsar Guardar, mantiene lectura anterior y actual intactas."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    servicio.meses_encontrados = {
+        "2026-02": {
+            "30771072": {
+                "medidores": [
+                    {
+                        "nro_medidor": "123456",
+                        "lectura_anterior": 80,
+                        "lectura_actual": 100,
+                    }
+                ]
+            }
+        }
+    }
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
     servicio.mes["30771072"] = {
@@ -906,11 +945,27 @@ def test_dialogo_editar_usuario_cambio_medidor_correccion(qtbot, datos_usuarios_
     assert med_mes["lectura_anterior"] == 100
     assert med_mes["lectura_actual"] == 120
     assert med_mes.get("novedad") == "NORMAL"
+    # En todas las bases mensuales históricas también se actualizó el medidor por ser corrección
+    assert servicio.meses_encontrados["2026-02"]["30771072"]["medidores"][0]["nro_medidor"] == "998877"
+    assert servicio.meses_encontrados["2026-02"]["30771072"]["medidores"][0]["lectura_anterior"] == 80
 
 
 def test_dialogo_editar_usuario_cambio_medidor_reinstalacion(qtbot, datos_usuarios_prueba, monkeypatch):
     """Al cambiar medidor por reinstalación al pulsar Guardar, reinicia lecturas en 0 y aplica CAMBIO_MEDIDOR."""
     servicio = ServicioDatosMemoria(usuarios=dict(datos_usuarios_prueba))
+    servicio.meses_encontrados = {
+        "2026-02": {
+            "30771072": {
+                "medidores": [
+                    {
+                        "nro_medidor": "123456",
+                        "lectura_anterior": 80,
+                        "lectura_actual": 100,
+                    }
+                ]
+            }
+        }
+    }
     usuario_existente = servicio.obtener_usuario("30771072")
     usuario_existente["id_usuario"] = "30771072"
     servicio.mes["30771072"] = {
@@ -957,6 +1012,8 @@ def test_dialogo_editar_usuario_cambio_medidor_reinstalacion(qtbot, datos_usuari
     assert med_mes["lectura_anterior"] == 0
     assert med_mes["lectura_actual"] == 0
     assert med_mes.get("novedad") == "CAMBIO_MEDIDOR"
+    # En reinstalación NO se modifican las bases históricas, el medidor anterior se mantiene
+    assert servicio.meses_encontrados["2026-02"]["30771072"]["medidores"][0]["nro_medidor"] == "123456" 
 
 
 def test_dialogo_editar_usuario_cambio_medidor_cancelar(qtbot, datos_usuarios_prueba, monkeypatch):
@@ -999,3 +1056,106 @@ def test_dialogo_editar_usuario_cambio_medidor_cancelar(qtbot, datos_usuarios_pr
     # En los datos del servicio no se debe haber aplicado el cambio
     assert servicio.mes["30771072"]["medidores"][0] == antes
     assert servicio.usuarios["30771072"]["medidores"] == ["123456"]
+
+
+def test_servicio_datos_padron_corregir_medidor_en_todas_las_bases(tmp_path):
+    """Verifica que ServicioDatosPadron.corregir_medidor_en_todas_las_bases actualice el medidor
+    en self.usuarios, self.mes y en todos los archivos Excel mensuales en Base de datos/."""
+    from servicios.datos_padron import ServicioDatosPadron
+    from respaldo_excel import generar_respaldo_excel
+    import openpyxl
+
+    bd_dir = tmp_path / "Base de datos"
+    bd_dir.mkdir()
+
+    cfg = {
+        "sectores": ["BARRIO DE LUCMANI"],
+        "categorias": {"A": {"cargo_fijo": 1.5, "cargo_fijo_sin_consumo": 1.5, "tarifa_desague": 0.0, "rangos": [{"m3_desde": 0, "m3_hasta": None, "precio_m3": 1.0}]}},
+        "mes_actual": {"periodo": "2026-10", "estado": "ABIERTO"},
+    }
+    usr = {
+        "30770204": {
+            "id_usuario": "30770204",
+            "nro_conexion": "000010",
+            "nombre": "CHALCO ESCOBAR, REYNA",
+            "sector": "BARRIO DE LUCMANI",
+            "direccion": "LUCMANI S/N",
+            "codigo_categoria": "A",
+            "activo": True,
+            "medidores": ["6659780"],
+        }
+    }
+    m09 = {
+        "30770204": {
+            "id_usuario": "30770204",
+            "nro_conexion": "000010",
+            "nombre": "CHALCO ESCOBAR, REYNA",
+            "sector": "BARRIO DE LUCMANI",
+            "direccion": "LUCMANI S/N",
+            "codigo_categoria": "A",
+            "medidores": [{
+                "nro_medidor": "6659780",
+                "lectura_anterior": 1,
+                "lectura_actual": 1,
+                "consumo": 0.0,
+                "novedad": "NORMAL",
+                "estado_lectura": "LEIDO",
+            }],
+            "total_a_pagar": 5.0,
+            "monto_pagado": 0.0,
+            "meses_adeudados": 1,
+        }
+    }
+    m10 = {
+        "30770204": {
+            "id_usuario": "30770204",
+            "nro_conexion": "000010",
+            "nombre": "CHALCO ESCOBAR, REYNA",
+            "sector": "BARRIO DE LUCMANI",
+            "direccion": "LUCMANI S/N",
+            "codigo_categoria": "A",
+            "medidores": [{
+                "nro_medidor": "6659780",
+                "lectura_anterior": 1,
+                "lectura_actual": None,
+                "consumo": 0,
+                "novedad": "NORMAL",
+                "estado_lectura": "PENDIENTE",
+            }],
+            "total_a_pagar": 5.0,
+            "monto_pagado": 0.0,
+            "meses_adeudados": 2,
+        }
+    }
+    generar_respaldo_excel(cfg, usr, m09, periodo="2026-09", ruta_archivo=bd_dir / "PADRON_MES_2026-09.xlsx")
+    generar_respaldo_excel(cfg, usr, m10, periodo="2026-10", ruta_archivo=bd_dir / "PADRON_MES_2026-10.xlsx")
+
+    servicio = ServicioDatosPadron(base_dir=bd_dir)
+    assert "2026-09" in servicio.meses_encontrados
+    assert "2026-10" in servicio.meses_encontrados
+
+    # Ejecutar corrección de número de medidor
+    periodos = servicio.corregir_medidor_en_todas_las_bases("30770204", "6659780", "6659789")
+
+    assert "2026-09" in periodos
+    assert "2026-10" in periodos
+
+    # Verificar en memoria
+    assert servicio.usuarios["30770204"]["medidores"] == ["6659789"]
+    assert servicio.mes["30770204"]["medidores"][0]["nro_medidor"] == "6659789"
+    assert servicio.meses_encontrados["2026-09"]["30770204"]["medidores"][0]["nro_medidor"] == "6659789"
+    assert servicio.meses_encontrados["2026-09"]["30770204"]["medidores"][0]["lectura_anterior"] == 1
+    assert servicio.meses_encontrados["2026-09"]["30770204"]["medidores"][0]["lectura_actual"] == 1
+
+    # Verificar en los archivos físicos Excel
+    wb9_check = openpyxl.load_workbook(bd_dir / "PADRON_MES_2026-09.xlsx", data_only=True)
+    ws9_check = wb9_check["BARRIO DE LUCMANI"]
+    fila_u9 = next(r for r in ws9_check.iter_rows(values_only=True) if r[1] == "000010")
+    assert fila_u9[2] == "6659789"
+    assert fila_u9[5] == 1  # Lectura anterior intacta
+    assert fila_u9[6] == 1  # Lectura actual intacta
+
+    wb10_check = openpyxl.load_workbook(bd_dir / "PADRON_MES_2026-10.xlsx", data_only=True)
+    ws10_check = wb10_check["BARRIO DE LUCMANI"]
+    fila_u10 = next(r for r in ws10_check.iter_rows(values_only=True) if r[1] == "000010")
+    assert fila_u10[2] == "6659789"

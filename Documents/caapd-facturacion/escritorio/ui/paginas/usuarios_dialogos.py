@@ -1459,9 +1459,11 @@ class DialogoUsuario(QDialog):
             med_previo = {}
             if doc_mes:
                 med_previo = next(
-                    (m for m in doc_mes.get("medidores", []) if str(m.get("nro_medidor")) == str(self.medidor_original)),
+                    (m for m in doc_mes.get("medidores", []) if str(m.get("nro_medidor", "")).strip() == str(self.medidor_original).strip()),
                     {}
                 ) or {}
+                if not med_previo and doc_mes.get("medidores"):
+                    med_previo = doc_mes.get("medidores")[0]
 
             dict_med = dict(med_previo) if med_previo else {}
             dict_med["nro_medidor"] = med_norm
@@ -1517,6 +1519,15 @@ class DialogoUsuario(QDialog):
                     id_final, datos_guardar, agregar_al_mes=True)
             else:
                 res = self.servicio.actualizar_usuario(id_final, datos_guardar)
+                if (
+                    motivo_cambio == DialogoMotivoCambioMedidor.MOTIVO_CORRECCION
+                    and self.medidor_original
+                    and med_norm != self.medidor_original
+                ):
+                    if hasattr(self.servicio, "corregir_medidor_en_todas_las_bases"):
+                        self.servicio.corregir_medidor_en_todas_las_bases(
+                            id_final, self.medidor_original, med_norm
+                        )
 
             if isinstance(res, tuple):
                 exito_sync, err_sync = res

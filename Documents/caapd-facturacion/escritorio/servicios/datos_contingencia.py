@@ -103,6 +103,29 @@ class ServicioDatosContingencia(ServicioDatos):
         self.usuarios[id_nuevo] = u
         return u
 
+    def corregir_medidor_en_todas_las_bases(
+        self, id_usuario: str, medidor_viejo: str, medidor_nuevo: str
+    ) -> List[str]:
+        med_v = str(medidor_viejo or "").strip()
+        med_n = str(medidor_nuevo or "").strip()
+        if id_usuario in self.usuarios:
+            u = self.usuarios[id_usuario]
+            meds = u.get("medidores") or []
+            nuevos = []
+            for m in meds:
+                m_nro = m.get("nro_medidor") if isinstance(m, dict) else str(m)
+                if str(m_nro).strip() == med_v:
+                    if isinstance(m, dict):
+                        mc = dict(m)
+                        mc["nro_medidor"] = med_n
+                        nuevos.append(mc)
+                    else:
+                        nuevos.append(med_n)
+                else:
+                    nuevos.append(m)
+            u["medidores"] = nuevos
+        return []
+
     def obtener_siguiente_conexion_libre(self) -> str:
         con_max = 0
         for u in self.usuarios.values():

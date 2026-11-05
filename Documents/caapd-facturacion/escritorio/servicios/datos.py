@@ -210,6 +210,14 @@ class ServicioDatos:
     def corregir_dni_usuario(self, id_viejo: str, id_nuevo: str) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def corregir_medidor_en_todas_las_bases(
+        self, id_usuario: str, medidor_viejo: str, medidor_nuevo: str
+    ) -> List[str]:
+        """Corrige un número de medidor mal digitado en el padrón y en todas las bases mensuales
+        donde figure el usuario con dicho medidor. Devuelve la lista de periodos actualizados.
+        """
+        raise NotImplementedError
+
     def obtener_siguiente_conexion_libre(self) -> str:
         raise NotImplementedError
 
@@ -421,6 +429,29 @@ class ServicioDatosFirebase(ServicioDatos):
         fb = self._get_fb()
         res = fb.corregir_dni_usuario(id_viejo, id_nuevo)
         on_datos_cambiados("corregir_dni", res)
+        return res
+
+    def corregir_medidor_en_todas_las_bases(
+        self, id_usuario: str, medidor_viejo: str, medidor_nuevo: str
+    ) -> List[str]:
+        from respaldo import on_datos_cambiados
+
+        fb = self._get_fb()
+        if hasattr(fb, "corregir_medidor_en_todas_las_bases"):
+            res = fb.corregir_medidor_en_todas_las_bases(
+                id_usuario, medidor_viejo, medidor_nuevo
+            )
+        else:
+            res = []
+        on_datos_cambiados(
+            "corregir_medidor",
+            {
+                "id_usuario": id_usuario,
+                "medidor_viejo": medidor_viejo,
+                "medidor_nuevo": medidor_nuevo,
+                "periodos": res,
+            },
+        )
         return res
 
     def obtener_siguiente_conexion_libre(self) -> str:
@@ -664,6 +695,8 @@ class ServicioDatosMemoria(ServicioDatos):
         }
         self.usuarios = usuarios or {}
         self.mes = mes or {}
+        self.meses_encontrados = {}
+        self.periodo = self.config.get("mes_actual", {}).get("periodo", "2026-03")
         self.ops = ops or {"lecturas": 5, "escrituras": 2}
         self.limpiezas_cache = 0
         self.lectores: Dict[str, Dict[str, Any]] = {}
@@ -791,6 +824,63 @@ class ServicioDatosMemoria(ServicioDatos):
             "usuario_actualizado": True,
             "meses_actualizados": meses_act,
         }
+
+    def corregir_medidor_en_todas_las_bases(
+        self, id_usuario: str, medidor_viejo: str, medidor_nuevo: str
+    ) -> List[str]:
+        med_v = str(medidor_viejo or "").strip()
+        med_n = str(medidor_nuevo or "").strip()
+        if not med_v or not med_n:
+            return []
+
+        def _coincide(val: Any) -> bool:
+            s = str(val or "").strip()
+            if s == med_v:
+                return True
+            if s.isdigit() and med_v.isdigit() and int(s) == int(med_v):
+                return True
+            return False
+
+        # 1. Actualizar en self.usuarios
+        if id_usuario in self.usuarios:
+            u = self.usuarios[id_usuario]
+            meds = u.get("medidores") or []
+            nuevos_meds = []
+            for m in meds:
+                m_nro = m.get("nro_medidor") if isinstance(m, dict) else str(m)
+                if _coincide(m_nro):
+                    if isinstance(m, dict):
+                        mc = dict(m)
+                        mc["nro_medidor"] = med_n
+                        nuevos_meds.append(mc)
+                    else:
+                        nuevos_meds.append(med_n)
+                else:
+                    nuevos_meds.append(m)
+            u["medidores"] = nuevos_meds
+
+        # 2. Actualizar en self.mes
+        if id_usuario in self.mes:
+            m_doc = self.mes[id_usuario]
+            for m in m_doc.get("medidores") or []:
+                if isinstance(m, dict) and _coincide(m.get("nro_medidor")):
+                    m["nro_medidor"] = med_n
+
+        # 3. Actualizar en self.meses_encontrados
+        periodos_modificados: List[str] = []
+        if hasattr(self, "meses_encontrados") and isinstance(self.meses_encontrados, dict):
+            for per, docs in self.meses_encontrados.items():
+                if id_usuario in docs:
+                    m_doc = docs[id_usuario]
+                    modificado = False
+                    for m in m_doc.get("medidores") or []:
+                        if isinstance(m, dict) and _coincide(m.get("nro_medidor")):
+                            m["nro_medidor"] = med_n
+                            modificado = True
+                    if modificado and per not in periodos_modificados:
+                        periodos_modificados.append(per)
+
+        return periodos_modificados
 
     def obtener_siguiente_conexion_libre(self) -> str:
         max_num = 0

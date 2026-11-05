@@ -824,13 +824,11 @@ class ServicioDatosPadron(ServicioDatos):
             s = re.sub(r"[^a-z0-9]", "_", s)
             return re.sub(r"_+", "_", s).strip("_")
 
+        import re
         periodo = "2026-10"
-        nombre = ruta.name
-        partes = nombre.split("_")
-        for p in partes:
-            if len(p) == 7 and p[:4].isdigit() and p[4] == "-" and p[5:].isdigit():
-                periodo = p
-                break
+        m_per = re.search(r"(\d{4}-\d{2})", ruta.name)
+        if m_per:
+            periodo = m_per.group(1)
 
         wb = openpyxl.load_workbook(str(ruta), data_only=True)
         ws = None
@@ -2311,6 +2309,121 @@ class ServicioDatosPadron(ServicioDatos):
         u["_sync_exito"] = exito_sync
         u["_sync_error"] = err_sync
         return u
+
+    def corregir_medidor_en_todas_las_bases(
+        self, id_usuario: str, medidor_viejo: str, medidor_nuevo: str
+    ) -> List[str]:
+        """Corrige un número de medidor mal digitado (Opción 1) en el padrón general (usuarios)
+        y en TODOS los archivos mensuales (PADRON_MES_*.xlsx) donde figure el usuario con dicho medidor.
+
+        Guarda los respaldos Excel correspondientes en 'Base de datos/'.
+        Devuelve la lista de periodos actualizados.
+        """
+        import re
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        med_v = str(medidor_viejo or "").strip()
+        med_n = str(medidor_nuevo or "").strip()
+        if not med_v or not med_n:
+            return []
+
+        if med_n.isdigit():
+            med_n = codigos.normalizar_medidor(med_n)
+
+        def _coincide(val: Any) -> bool:
+            s = str(val or "").strip()
+            if not s:
+                return False
+            if s == med_v:
+                return True
+            if s.isdigit() and med_v.isdigit() and int(s) == int(med_v):
+                return True
+            try:
+                if codigos.normalizar_medidor(s) == codigos.normalizar_medidor(med_v):
+                    return True
+            except Exception:
+                pass
+            return False
+
+        # 1. Actualizar en self.usuarios
+        if id_usuario in self.usuarios:
+            u = self.usuarios[id_usuario]
+            meds = u.get("medidores") or []
+            nuevos_meds = []
+            for m in meds:
+                m_nro = m.get("nro_medidor") if isinstance(m, dict) else str(m)
+                if _coincide(m_nro):
+                    if isinstance(m, dict):
+                        mc = dict(m)
+                        mc["nro_medidor"] = med_n
+                        nuevos_meds.append(mc)
+                    else:
+                        nuevos_meds.append(med_n)
+                else:
+                    nuevos_meds.append(m)
+            u["medidores"] = nuevos_meds
+
+        # 2. Asegurar que todos los archivos en Base de datos/ estén cargados en self.meses_encontrados
+        directorio = getattr(self, "base_dir", None) or rutas.ruta_base_de_datos()
+        archivos = buscar_archivos_base_datos(directorio)
+        patron = re.compile(r"PADRON_MES_(\d{4}-\d{2})", re.IGNORECASE)
+        if not hasattr(self, "meses_encontrados") or self.meses_encontrados is None:
+            self.meses_encontrados = {}
+
+        for arch in archivos:
+            match = patron.search(arch.name)
+            if match:
+                per = match.group(1)
+                if per not in self.meses_encontrados:
+                    try:
+                        self.cargar_mes(per)
+                    except Exception as e:
+                        logger.warning(f"No se pudo cargar el mes {per}: {e}")
+
+        # Si el periodo activo está en memoria, asegurarlo en self.meses_encontrados
+        if self.periodo and self.mes:
+            if self.periodo not in self.meses_encontrados:
+                self.meses_encontrados[self.periodo] = self.mes
+
+        # 3. Modificar el medidor en cada periodo de self.meses_encontrados y re-guardar el Excel correspondiente
+        periodos_modificados: List[str] = []
+        for per, docs_mes in list(self.meses_encontrados.items()):
+            if id_usuario in docs_mes:
+                doc = docs_mes[id_usuario]
+                modificado = False
+                for m in doc.get("medidores") or []:
+                    if isinstance(m, dict) and _coincide(m.get("nro_medidor")):
+                        m["nro_medidor"] = med_n
+                        modificado = True
+                if modificado:
+                    periodos_modificados.append(per)
+                    try:
+                        self.guardar_en_respaldo_local(per)
+                    except Exception as err:
+                        logger.warning(
+                            f"Error al guardar respaldo local para periodo {per}: {err}"
+                        )
+
+        # 4. Asegurar que self.mes también quede actualizado si era un objeto distinto
+        if id_usuario in self.mes:
+            m_doc = self.mes[id_usuario]
+            for m in m_doc.get("medidores") or []:
+                if isinstance(m, dict) and _coincide(m.get("nro_medidor")):
+                    m["nro_medidor"] = med_n
+
+        if self.periodo and (self.periodo not in periodos_modificados) and (id_usuario in self.mes):
+            periodos_modificados.append(self.periodo)
+
+        try:
+            self._sincronizar_usuario_unitario_a_firebase(
+                id_usuario, self.mes.get(id_usuario, self.usuarios.get(id_usuario))
+            )
+        except Exception:
+            pass
+
+        return periodos_modificados
 
     def obtener_siguiente_conexion_libre(self) -> str:
         con_max = 0
